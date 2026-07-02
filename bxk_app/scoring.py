@@ -3,7 +3,6 @@ from bxk_app.schwab_client import get_market_snapshot
 
 
 def score_market() -> MarketDecision:
-
     market = get_market_snapshot()
 
     score = 0
@@ -12,36 +11,53 @@ def score_market() -> MarketDecision:
     # VIX
     if 12 <= market.vix <= 20:
         score += 1
-        reasons.append("VIX Ideal")
+        vix_state = "IDEAL"
+        reasons.append("VIX ideal")
     else:
-        reasons.append("VIX Outside Range")
+        vix_state = "OUTSIDE RANGE"
+        reasons.append("VIX outside range")
 
     # Expected Move
-    if market.expected_move > 40:
+    if market.expected_move >= 50:
         score += 1
-        reasons.append("Healthy Expected Move")
+        expected_move_state = "HEALTHY"
+        reasons.append("Expected move healthy")
     else:
-        reasons.append("Expected Move Too Small")
+        expected_move_state = "LOW"
+        reasons.append("Expected move too small")
 
     # IV Rank
-    if market.iv_rank > 20:
+    if market.iv_rank >= 20:
         score += 1
-        reasons.append("IV Rank Good")
+        iv_rank_state = "GOOD"
+        reasons.append("IV rank good")
     else:
-        reasons.append("IV Rank Low")
+        iv_rank_state = "LOW"
+        reasons.append("IV rank low")
+
+    # Placeholder trend until live VWAP/EMA logic
+    trend = "MIXED"
 
     confidence = int(score / 3 * 100)
 
     if score == 3:
-        trade = "TRADE"
+        market_regime = "TRADE"
+        recommendation = "Trade allowed"
     elif score == 2:
-        trade = "CAUTION"
+        market_regime = "CAUTION"
+        recommendation = "Small size only"
     else:
-        trade = "WAIT"
+        market_regime = "WAIT"
+        recommendation = "No trade"
 
     return MarketDecision(
-        market_regime=trade,
+        market_regime=market_regime,
         confidence=confidence,
         score=score,
+        trend=trend,
+        vix_state=vix_state,
+        expected_move_state=expected_move_state,
+        iv_rank_state=iv_rank_state,
+        recommendation=recommendation,
         reasons=reasons,
     )

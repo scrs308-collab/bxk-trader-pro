@@ -6,6 +6,11 @@ class MarketDecision(BaseModel):
     market_regime: str
     confidence: int
     score: int
+    trend: str
+    vix_state: str
+    expected_move_state: str
+    iv_rank_state: str
+    recommendation: str
     reasons: List[str]
 
 
@@ -14,6 +19,7 @@ class TradeRecommendation(BaseModel):
     confidence: int
     score: int
     reasons: List[str]
+
 
 class MarketSnapshot(BaseModel):
     symbol: str

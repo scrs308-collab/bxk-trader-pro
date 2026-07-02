@@ -1,41 +1,26 @@
-# -------- ACCOUNT --------
+import os
+from dotenv import load_dotenv
 
-ACCOUNT_SIZE = 25000
-MAX_RISK_PER_TRADE = 0.08
+load_dotenv()
 
-# -------- MARKET --------
+# ===============================
+# Schwab API
+# ===============================
 
-SYMBOL = "SPX"
+SCHWAB_CLIENT_ID = os.getenv("SCHWAB_CLIENT_ID")
+SCHWAB_CLIENT_SECRET = os.getenv("SCHWAB_CLIENT_SECRET")
+SCHWAB_REDIRECT_URI = os.getenv("SCHWAB_REDIRECT_URI")
+SCHWAB_TOKEN_FILE = os.getenv("SCHWAB_TOKEN_FILE")
 
-VIX_IDEAL_LOW = 15
-VIX_IDEAL_HIGH = 18
+# ===============================
+# Trading Settings
+# ===============================
 
-MAX_IV_RANK = 50
-MIN_IV_RANK = 10
-
-# -------- IRON CONDOR --------
-
-DEFAULT_WING = 25
-
-MIN_CREDIT = 0.80
-MAX_SPREAD = 2.00
-
-MIN_SHORT_DELTA = 0.05
-MAX_SHORT_DELTA = 0.15
-
-MIN_BUFFER_EM = 0.20
-
-# -------- DIRECTIONAL --------
-
-EMA_FAST = 9
-EMA_SLOW = 21
-
-# -------- SCORING --------
+MAX_WING_WIDTH = 25
+TARGET_DELTA = 0.15
 
 TRADE_SCORE = 70
 CAUTION_SCORE = 55
-
-# -------- POSITION --------
 
 STOP_MULTIPLIER = 2.0
 TARGET_PERCENT = 70
