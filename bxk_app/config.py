@@ -1,0 +1,41 @@
+# -------- ACCOUNT --------
+
+ACCOUNT_SIZE = 25000
+MAX_RISK_PER_TRADE = 0.08
+
+# -------- MARKET --------
+
+SYMBOL = "SPX"
+
+VIX_IDEAL_LOW = 15
+VIX_IDEAL_HIGH = 18
+
+MAX_IV_RANK = 50
+MIN_IV_RANK = 10
+
+# -------- IRON CONDOR --------
+
+DEFAULT_WING = 25
+
+MIN_CREDIT = 0.80
+MAX_SPREAD = 2.00
+
+MIN_SHORT_DELTA = 0.05
+MAX_SHORT_DELTA = 0.15
+
+MIN_BUFFER_EM = 0.20
+
+# -------- DIRECTIONAL --------
+
+EMA_FAST = 9
+EMA_SLOW = 21
+
+# -------- SCORING --------
+
+TRADE_SCORE = 70
+CAUTION_SCORE = 55
+
+# -------- POSITION --------
+
+STOP_MULTIPLIER = 2.0
+TARGET_PERCENT = 70
