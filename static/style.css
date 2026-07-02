@@ -1,0 +1,62 @@
+body{
+
+    background:#101722;
+    color:white;
+    font-family:Arial,Helvetica,sans-serif;
+    margin:40px;
+
+}
+
+.card{
+
+    background:#182233;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:25px;
+
+}
+
+table{
+
+    width:100%;
+    border-collapse:collapse;
+
+}
+
+th{
+
+    background:#22344a;
+    padding:12px;
+
+}
+
+td{
+
+    padding:10px;
+    border-bottom:1px solid #2e4159;
+
+}
+
+tr:hover{
+
+    background:#22344a;
+
+}
+
+h1{
+
+    color:#45d483;
+
+}
+
+h2{
+
+    color:#6ec1ff;
+
+}
+
+b{
+
+    color:#f4d35e;
+
+}

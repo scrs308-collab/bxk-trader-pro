@@ -5,8 +5,8 @@ from fastapi.responses import FileResponse
 from bxk_app.routes import router
 
 app = FastAPI(
-    title="BXK Scanner V5",
-    version="5.0"
+    title="BXK Trader Pro ",
+    version="6.0"
 )
 
 app.include_router(router)
