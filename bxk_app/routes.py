@@ -1,8 +1,11 @@
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
-
+from bxk_app.market_data import market_data
 from bxk_app.scoring import score_market
 from bxk_app.strategy_ranker import rank_strategies
+from datetime import datetime
+from fastapi import APIRouter
+
 router = APIRouter()
 
 
@@ -34,6 +37,11 @@ def recommend():
     }
 
 
+
+@router.get("/api/market-header")
+def market_header():
+    return market_data.get_header()
+    
 @router.get("/")
 @router.get("/dashboard")
 def dashboard():
