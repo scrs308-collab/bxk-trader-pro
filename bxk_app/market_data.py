@@ -42,12 +42,44 @@ class MarketData:
             self.expected_move = round(float(expected_move), 2)
 
     def get_header(self):
+        spx_value = float(self.spx) if self.spx != "--" else None
+        expected_move_value = (
+            float(self.expected_move) if self.expected_move != "--" else None
+        )
+
+        short_put = "--"
+        short_call = "--"
+        wing_width = 25
+        long_put = "--"
+        long_call = "--"
+
+        if spx_value is not None and expected_move_value is not None:
+            lower_move = spx_value - expected_move_value
+            upper_move = spx_value + expected_move_value
+
+            short_put = round(lower_move / 5) * 5
+            short_call = round(upper_move / 5) * 5
+
+            long_put = short_put - wing_width
+            long_call = short_call + wing_width
+
         return {
             "spx": self.spx,
             "spx_change": self.spx_change,
             "vix": self.vix,
             "vix1d": self.vix1d,
             "expected_move": self.expected_move,
+            "short_put": short_put,
+            "short_call": short_call,
+            "trade_setup": {
+                "strategy": "Iron Condor",
+                "short_put": short_put,
+                "long_put": long_put,
+                "short_call": short_call,
+                "long_call": long_call,
+                "wing_width": wing_width,
+                "contracts": 1,
+            },
             "market_status": self.market_status(),
             "server_time": datetime.now().strftime("%I:%M:%S %p"),
         }

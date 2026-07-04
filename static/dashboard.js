@@ -1,4 +1,4 @@
-console.log("BXK Trader Pro Dashboard v5.1 Loaded");
+console.log("BXK Trader Pro Dashboard v5.3 Trade Setup Loaded");
 
 const dashboard = document.getElementById("dashboard");
 
@@ -17,9 +17,9 @@ function safe(value, fallback = "--") {
 function normalizeTrade(value) {
   const text = String(value ?? "WAIT").toUpperCase();
 
+  if (text.includes("NO")) return "NO TRADE";
   if (text.includes("TRADE")) return "TRADE";
   if (text.includes("WAIT")) return "WAIT";
-  if (text.includes("NO")) return "NO TRADE";
 
   return text;
 }
@@ -43,19 +43,14 @@ dashboard.innerHTML = `
       <p>Professional SPX Options Intelligence</p>
     </div>
 
-  <div class="market-strip">
-    <div><span>SPX</span><strong id="spxPrice">--</strong></div>
-
-    <div><span>VIX</span><strong id="vixPrice">--</strong></div>
-
-    <div><span>VIX1D</span><strong id="vix1dPrice">--</strong></div>
-
-    <div><span>Expected Move</span><strong id="expectedMove">--</strong></div>
-
-    <div><span>Time</span><strong id="marketClock">${nowTime()}</strong></div>
-
-    <div><span>Status</span><strong id="marketStatus">--</strong></div>
-  </div>
+    <div class="market-strip">
+      <div><span>SPX</span><strong id="spxPrice">--</strong></div>
+      <div><span>VIX</span><strong id="vixPrice">--</strong></div>
+      <div><span>VIX1D</span><strong id="vix1dPrice">--</strong></div>
+      <div><span>Expected Move</span><strong id="expectedMove">--</strong></div>
+      <div><span>Time</span><strong id="marketClock">${nowTime()}</strong></div>
+      <div><span>Status</span><strong id="marketStatus">--</strong></div>
+    </div>
 
     <div id="tradePill" class="status-pill wait">WAIT</div>
   </header>
@@ -83,16 +78,112 @@ dashboard.innerHTML = `
   </section>
 
   <section class="grid cards-5">
-    <div class="card good"><span>Trend</span><strong id="trendState">--</strong><small>Market structure</small></div>
-    <div class="card good"><span>VIX</span><strong id="vixState">--</strong><small>Volatility condition</small></div>
-    <div class="card good"><span>Expected Move</span><strong id="expectedMoveState">--</strong><small>Premium environment</small></div>
-    <div class="card good"><span>IV Rank</span><strong id="ivRankState">--</strong><small>Option premium</small></div>
-    <div class="card warn"><span>Time Window</span><strong id="timeWindowState">WAIT</strong><small>Opening range not confirmed</small></div>
+    <div class="card good">
+      <span>Trend</span>
+      <strong id="trendState">--</strong>
+      <small>Market structure</small>
+    </div>
+
+    <div class="card good">
+      <span>VIX</span>
+      <strong id="vixState">--</strong>
+      <small>Volatility condition</small>
+    </div>
+
+    <div class="card good">
+      <span>Expected Move</span>
+      <strong id="expectedMoveState">--</strong>
+      <small>Premium environment</small>
+    </div>
+
+    <div class="card good">
+      <span>IV Rank</span>
+      <strong id="ivRankState">--</strong>
+      <small>Option premium</small>
+    </div>
+
+    <div class="card warn">
+      <span>Time Window</span>
+      <strong id="timeWindowState">WAIT</strong>
+      <small>Opening range not confirmed</small>
+    </div>
+  </section>
+
+  <section class="panel chart-panel">
+    <h2>BXK Price Map</h2>
+
+    <div class="price-map">
+      <div class="price-line upper">
+        Upper Expected Move
+        <span id="upperMove">--</span>
+      </div>
+
+      <div class="price-line strike-call">
+        Suggested Short Call
+        <span id="shortCall">--</span>
+      </div>
+
+      <div class="price-zone"></div>
+
+      <div class="price-line current">
+        Current SPX
+        <span id="currentSpx">--</span>
+      </div>
+
+      <div class="price-zone"></div>
+
+      <div class="price-line strike-put">
+        Suggested Short Put
+        <span id="shortPut">--</span>
+      </div>
+
+      <div class="price-line lower">
+        Lower Expected Move
+        <span id="lowerMove">--</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel trade-card">
+    <h2>Today's Trade Setup</h2>
+
+    <div class="trade-card-grid">
+      <div>
+        <span>Strategy</span>
+        <strong id="tradeStrategy">--</strong>
+      </div>
+
+      <div>
+        <span>Put Spread</span>
+        <strong id="putSpread">--</strong>
+      </div>
+
+      <div>
+        <span>Call Spread</span>
+        <strong id="callSpread">--</strong>
+      </div>
+
+      <div>
+        <span>Wing Width</span>
+        <strong id="wingWidth">--</strong>
+      </div>
+
+      <div>
+        <span>Contracts</span>
+        <strong id="contracts">--</strong>
+      </div>
+
+      <div>
+        <span>Status</span>
+        <strong id="tradeSetupStatus" class="green">READY</strong>
+      </div>
+    </div>
   </section>
 
   <section class="two-col">
     <div class="panel">
       <h2>Top Strategies Today</h2>
+
       <table>
         <thead>
           <tr>
@@ -102,32 +193,57 @@ dashboard.innerHTML = `
             <th>Confidence</th>
           </tr>
         </thead>
+
         <tbody id="strategyRows">
-          <tr><td colspan="4">Loading strategies...</td></tr>
+          <tr>
+            <td colspan="4">Loading strategies...</td>
+          </tr>
         </tbody>
       </table>
     </div>
 
     <div class="panel">
       <h2>Decision Reasons</h2>
+
       <ul id="decisionReasons" class="checklist">
         <li>Loading decision reasons...</li>
       </ul>
     </div>
   </section>
-  <section class="panel narrative-panel">
-  <h2>Market Narrative</h2>
-  <p id="marketNarrative">Loading market narrative...</p>
 
-</section>
+  <section class="panel narrative-panel">
+    <h2>Market Narrative</h2>
+    <p id="marketNarrative">Loading market narrative...</p>
+  </section>
+
   <section class="panel position-panel">
     <h2>Position Monitor</h2>
+
     <div class="position-grid">
-      <div><span>Current Position</span><strong>No active trade</strong></div>
-      <div><span>P/L</span><strong>--</strong></div>
-      <div><span>Short Put Buffer</span><strong>--</strong></div>
-      <div><span>Short Call Buffer</span><strong>--</strong></div>
-      <div><span>Exit Signal</span><strong>WAIT</strong></div>
+      <div>
+        <span>Current Position</span>
+        <strong>No active trade</strong>
+      </div>
+
+      <div>
+        <span>P/L</span>
+        <strong>--</strong>
+      </div>
+
+      <div>
+        <span>Short Put Buffer</span>
+        <strong>--</strong>
+      </div>
+
+      <div>
+        <span>Short Call Buffer</span>
+        <strong>--</strong>
+      </div>
+
+      <div>
+        <span>Exit Signal</span>
+        <strong>WAIT</strong>
+      </div>
     </div>
   </section>
 </div>
@@ -143,6 +259,38 @@ async function loadMarketHeader() {
     document.getElementById("vix1dPrice").textContent = safe(data.vix1d);
     document.getElementById("marketClock").textContent = safe(data.server_time, nowTime());
     document.getElementById("expectedMove").textContent = "±" + safe(data.expected_move);
+
+    const spx = Number(data.spx);
+    const expectedMove = Number(data.expected_move);
+
+    if (!Number.isNaN(spx) && !Number.isNaN(expectedMove)) {
+      document.getElementById("currentSpx").textContent = spx.toFixed(2);
+      document.getElementById("upperMove").textContent = (spx + expectedMove).toFixed(2);
+      document.getElementById("lowerMove").textContent = (spx - expectedMove).toFixed(2);
+      document.getElementById("shortCall").textContent = safe(data.short_call);
+      document.getElementById("shortPut").textContent = safe(data.short_put);
+    }
+
+    const setup = data.trade_setup;
+
+    if (setup) {
+      document.getElementById("tradeStrategy").textContent = safe(setup.strategy);
+
+      document.getElementById("putSpread").textContent =
+        `${safe(setup.short_put)} / ${safe(setup.long_put)}`;
+
+      document.getElementById("callSpread").textContent =
+        `${safe(setup.short_call)} / ${safe(setup.long_call)}`;
+
+      document.getElementById("wingWidth").textContent =
+        `${safe(setup.wing_width)} pts`;
+
+      document.getElementById("contracts").textContent =
+        safe(setup.contracts);
+
+      document.getElementById("tradeSetupStatus").textContent =
+        "READY";
+    }
 
     const status = document.getElementById("marketStatus");
     const marketStatus = safe(data.market_status, "UNKNOWN");
@@ -194,19 +342,32 @@ async function loadStatus() {
     actionSignal.className = "big-signal";
     actionSignal.classList.add(trade === "TRADE" ? "trade" : "wait");
 
-    document.getElementById("actionConfidence").textContent = `Confidence ${confidence}%`;
+    document.getElementById("actionConfidence").textContent =
+      `Confidence ${confidence}%`;
 
-    document.getElementById("scoreCircle").textContent = confidence || "--";
+    document.getElementById("scoreCircle").textContent =
+      confidence || "--";
+
     document.getElementById("scoreText").textContent =
       `Score ${safe(data.score)} / Confidence ${confidence}%`;
 
-    document.getElementById("healthFill").style.width = `${health}%`;
-    document.getElementById("healthLabel").textContent = `${health}% Healthy`;
+    document.getElementById("healthFill").style.width =
+      `${health}%`;
 
-    document.getElementById("trendState").textContent = safe(data.trend);
-    document.getElementById("vixState").textContent = safe(data.vix_state);
-    document.getElementById("expectedMoveState").textContent = safe(data.expected_move_state);
-    document.getElementById("ivRankState").textContent = safe(data.iv_rank_state);
+    document.getElementById("healthLabel").textContent =
+      `${health}% Healthy`;
+
+    document.getElementById("trendState").textContent =
+      safe(data.trend);
+
+    document.getElementById("vixState").textContent =
+      safe(data.vix_state);
+
+    document.getElementById("expectedMoveState").textContent =
+      safe(data.expected_move_state);
+
+    document.getElementById("ivRankState").textContent =
+      safe(data.iv_rank_state);
 
     renderStrategies(data.strategies ?? []);
     renderReasons(data.reasons ?? []);
@@ -219,7 +380,11 @@ function renderStrategies(strategies) {
   const tbody = document.getElementById("strategyRows");
 
   if (!strategies.length) {
-    tbody.innerHTML = `<tr><td colspan="4">No strategy data available</td></tr>`;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4">No strategy data available</td>
+      </tr>
+    `;
     return;
   }
 
@@ -232,7 +397,11 @@ function renderStrategies(strategies) {
           <td>${index + 1}</td>
           <td>${safe(item.name)}</td>
           <td>${safe(item.score)}</td>
-          <td><span class="badge ${badgeClass(confidence)}">${confidence}</span></td>
+          <td>
+            <span class="badge ${badgeClass(confidence)}">
+              ${confidence}
+            </span>
+          </td>
         </tr>
       `;
     })
@@ -243,12 +412,15 @@ function renderReasons(reasons) {
   const list = document.getElementById("decisionReasons");
 
   if (!reasons.length) {
-    list.innerHTML = `<li>No decision reasons available</li>`;
+    list.innerHTML = "<li>No decision reasons available</li>";
     return;
   }
 
-  list.innerHTML = reasons.map((reason) => `<li>${reason}</li>`).join("");
+  list.innerHTML = reasons
+    .map((reason) => `<li>${reason}</li>`)
+    .join("");
 }
+
 async function loadMarketBrief() {
   try {
     const response = await fetch("/api/market-brief");
@@ -258,10 +430,12 @@ async function loadMarketBrief() {
       data.summary ?? "No market narrative available.";
   } catch (error) {
     console.error("Market brief failed:", error);
+
     document.getElementById("marketNarrative").textContent =
       "Market narrative unavailable.";
   }
 }
+
 loadMarketHeader();
 loadStatus();
 loadMarketBrief();
