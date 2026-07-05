@@ -109,41 +109,6 @@ dashboard.innerHTML = `
     </div>
   </section>
 
-  <section class="panel chart-panel">
-    <h2>BXK Price Map</h2>
-
-    <div class="price-map">
-      <div class="price-line upper">
-        Upper Expected Move
-        <span id="upperMove">--</span>
-      </div>
-
-      <div class="price-line strike-call">
-        Suggested Short Call
-        <span id="shortCall">--</span>
-      </div>
-
-      <div class="price-zone"></div>
-
-      <div class="price-line current">
-        Current SPX
-        <span id="currentSpx">--</span>
-      </div>
-
-      <div class="price-zone"></div>
-
-      <div class="price-line strike-put">
-        Suggested Short Put
-        <span id="shortPut">--</span>
-      </div>
-
-      <div class="price-line lower">
-        Lower Expected Move
-        <span id="lowerMove">--</span>
-      </div>
-    </div>
-  </section>
-
   <section class="panel trade-card">
     <h2>Today's Trade Setup</h2>
 
@@ -179,6 +144,43 @@ dashboard.innerHTML = `
       </div>
     </div>
   </section>
+    
+  <section class="panel chart-panel">
+    <h2>BXK Price Map</h2>
+
+    <div class="price-map">
+      <div class="price-line upper">
+        Upper Expected Move
+        <span id="upperMove">--</span>
+      </div>
+
+      <div class="price-line strike-call">
+        Suggested Short Call
+        <span id="shortCall">--</span>
+      </div>
+
+      <div class="price-zone"></div>
+
+      <div class="price-line current">
+        Current SPX
+        <span id="currentSpx">--</span>
+      </div>
+
+      <div class="price-zone"></div>
+
+      <div class="price-line strike-put">
+        Suggested Short Put
+        <span id="shortPut">--</span>
+      </div>
+
+      <div class="price-line lower">
+        Lower Expected Move
+        <span id="lowerMove">--</span>
+      </div>
+    </div>
+  </section>
+
+  
 
   <section class="two-col">
     <div class="panel">
@@ -216,36 +218,55 @@ dashboard.innerHTML = `
     <p id="marketNarrative">Loading market narrative...</p>
   </section>
 
-  <section class="panel position-panel">
-    <h2>Position Monitor</h2>
+   <section class="panel trade-panel">
 
-    <div class="position-grid">
-      <div>
-        <span>Current Position</span>
-        <strong>No active trade</strong>
-      </div>
+<h2>Today's Trade Setup</h2>
 
-      <div>
-        <span>P/L</span>
-        <strong>--</strong>
-      </div>
+<div class="trade-card">
 
-      <div>
-        <span>Short Put Buffer</span>
-        <strong>--</strong>
-      </div>
+<div class="trade-header">
+<h3 id="tradeStrategy">Iron Condor</h3>
+<span id="tradeContracts">1 Contract</span>
+</div>
 
-      <div>
-        <span>Short Call Buffer</span>
-        <strong>--</strong>
-      </div>
+<div class="trade-row">
+<label>Put Spread</label>
+<strong id="putSpread">-- / --</strong>
+</div>
 
-      <div>
-        <span>Exit Signal</span>
-        <strong>WAIT</strong>
-      </div>
-    </div>
-  </section>
+<div class="trade-row">
+<label>Call Spread</label>
+<strong id="callSpread">-- / --</strong>
+</div>
+
+<div class="trade-row">
+<label>Target Credit</label>
+<strong id="targetCredit">--</strong>
+</div>
+
+<div class="trade-row">
+<label>Max Profit</label>
+<strong id="maxProfit">--</strong>
+</div>
+
+<div class="trade-row">
+<label>Max Risk</label>
+<strong id="maxRisk">--</strong>
+</div>
+
+<div class="trade-row">
+<label>POP</label>
+<strong id="tradePOP">--</strong>
+</div>
+
+<div class="trade-row">
+<label>Risk / Reward</label>
+<strong id="riskReward">--</strong>
+</div>
+
+</div>
+
+</section>
 </div>
 `;
 
@@ -270,27 +291,38 @@ async function loadMarketHeader() {
       document.getElementById("shortCall").textContent = safe(data.short_call);
       document.getElementById("shortPut").textContent = safe(data.short_put);
     }
-
     const setup = data.trade_setup;
 
-    if (setup) {
-      document.getElementById("tradeStrategy").textContent = safe(setup.strategy);
+if (setup) {
 
-      document.getElementById("putSpread").textContent =
-        `${safe(setup.short_put)} / ${safe(setup.long_put)}`;
+    document.getElementById("tradeStrategy").textContent = setup.strategy;
 
-      document.getElementById("callSpread").textContent =
-        `${safe(setup.short_call)} / ${safe(setup.long_call)}`;
+    document.getElementById("tradeContracts").textContent =
+        `${setup.contracts} Contract${setup.contracts > 1 ? "s" : ""}`;
 
-      document.getElementById("wingWidth").textContent =
-        `${safe(setup.wing_width)} pts`;
+    document.getElementById("putSpread").textContent =
+        `${setup.short_put} / ${setup.long_put}`;
 
-      document.getElementById("contracts").textContent =
-        safe(setup.contracts);
+    document.getElementById("callSpread").textContent =
+        `${setup.short_call} / ${setup.long_call}`;
 
-      document.getElementById("tradeSetupStatus").textContent =
-        "READY";
-    }
+    document.getElementById("targetCredit").textContent =
+        `$${setup.target_credit}`;
+
+    document.getElementById("maxProfit").textContent =
+        `$${setup.max_profit}`;
+
+    document.getElementById("maxRisk").textContent =
+        `$${setup.max_risk}`;
+
+    document.getElementById("tradePOP").textContent =
+        `${setup.pop}%`;
+
+    document.getElementById("riskReward").textContent =
+        setup.risk_reward;
+}
+   
+    
 
     const status = document.getElementById("marketStatus");
     const marketStatus = safe(data.market_status, "UNKNOWN");

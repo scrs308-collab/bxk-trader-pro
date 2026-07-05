@@ -6,9 +6,11 @@ __pycache__/
 
 # Virtual Environment
 .venv/
+venv/
 
 # Environment Variables
 .env
+.env.*
 
 # VS Code
 .vscode/
@@ -16,5 +18,14 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Schwab OAuth
+# OAuth / API Tokens
 tokens.json
+schwab_tokens.json
+*.token
+*.tokens
+
+# Logs
+*.log
+
+# Python cache
+.pytest_cache/

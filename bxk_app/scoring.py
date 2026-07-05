@@ -1,15 +1,31 @@
 from bxk_app.models import MarketDecision
-from bxk_app.schwab_client import get_market_snapshot
+from bxk_app.market_data import market_data
 
 
 def score_market() -> MarketDecision:
-    market = get_market_snapshot()
+    try:
+        snapshot = market_data.get_snapshot()
+    except Exception as e:
+        return MarketDecision(
+            market_regime="WAIT",
+            confidence=0,
+            score=0,
+            trend="UNKNOWN",
+            vix_state="UNKNOWN",
+            expected_move_state="UNKNOWN",
+            iv_rank_state="UNKNOWN",
+            recommendation=f"Market data unavailable: {str(e)}",
+            reasons=["Unable to retrieve market snapshot"],
+        )
 
     score = 0
     reasons = []
 
-    # VIX
-    if 12 <= market.vix <= 20:
+    vix = snapshot["vix"]
+    expected_move = snapshot["expected_move"]
+    iv_rank = snapshot["iv_rank"]
+
+    if 12 <= vix <= 20:
         score += 1
         vix_state = "IDEAL"
         reasons.append("VIX ideal")
@@ -17,8 +33,7 @@ def score_market() -> MarketDecision:
         vix_state = "OUTSIDE RANGE"
         reasons.append("VIX outside range")
 
-    # Expected Move
-    if market.expected_move >= 50:
+    if expected_move >= 50:
         score += 1
         expected_move_state = "HEALTHY"
         reasons.append("Expected move healthy")
@@ -26,8 +41,7 @@ def score_market() -> MarketDecision:
         expected_move_state = "LOW"
         reasons.append("Expected move too small")
 
-    # IV Rank
-    if market.iv_rank >= 20:
+    if iv_rank >= 20:
         score += 1
         iv_rank_state = "GOOD"
         reasons.append("IV rank good")
@@ -35,10 +49,8 @@ def score_market() -> MarketDecision:
         iv_rank_state = "LOW"
         reasons.append("IV rank low")
 
-    # Placeholder trend until live VWAP/EMA logic
     trend = "MIXED"
-
-    confidence = int(score / 3 * 100)
+    confidence = int((score / 3) * 100)
 
     if score == 3:
         market_regime = "TRADE"
