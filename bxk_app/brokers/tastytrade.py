@@ -1,14 +1,16 @@
 import requests
 
+from bxk_app.brokers.base import BrokerBase
 from bxk_app.config import (
     TASTYTRADE_CLIENT_SECRET,
     TASTYTRADE_REFRESH_TOKEN,
 )
 
+
 TASTYTRADE_BASE_URL = "https://api.tastyworks.com"
 
 
-class TastytradeAPI:
+class TastytradeBroker(BrokerBase):
     def __init__(self):
         self.access_token = None
         self.last_error = None
@@ -30,7 +32,6 @@ class TastytradeAPI:
                 return False
 
             data = response.json()
-
             self.access_token = (
                 data.get("access_token")
                 or data.get("data", {}).get("access-token")
@@ -58,9 +59,14 @@ class TastytradeAPI:
             "Content-Type": "application/json",
         }
 
+    def get_status(self):
+        return {
+            "connected": self.access_token is not None,
+            "last_error": self.last_error,
+        }
+
     def get_accounts(self):
         headers = self.headers()
-
         if not headers:
             return []
 
@@ -75,8 +81,7 @@ class TastytradeAPI:
                 self.last_error = f"{response.status_code}: {response.text}"
                 return []
 
-            data = response.json()
-            return data.get("data", {}).get("items", [])
+            return response.json().get("data", {}).get("items", [])
 
         except Exception as e:
             self.last_error = str(e)
@@ -92,7 +97,6 @@ class TastytradeAPI:
 
     def get_balances(self, account_number=None):
         headers = self.headers()
-
         if not headers:
             return None
 
@@ -119,9 +123,9 @@ class TastytradeAPI:
         except Exception as e:
             self.last_error = str(e)
             return None
+
     def get_positions(self, account_number=None):
         headers = self.headers()
-
         if not headers:
             return []
 
@@ -148,28 +152,20 @@ class TastytradeAPI:
         except Exception as e:
             self.last_error = str(e)
             return []
+
     def get_position_summary(self):
         positions = self.get_positions()
-
         summary = []
 
         for pos in positions:
-            symbol = pos.get("symbol", "")
-            underlying = pos.get("underlying-symbol", "")
-            quantity = pos.get("quantity", "0")
-            direction = pos.get("quantity-direction", "")
-            close_price = pos.get("close-price", "0")
-            average_open_price = pos.get("average-open-price", "0")
-            instrument_type = pos.get("instrument-type", "")
-
             summary.append({
-                "symbol": symbol,
-                "underlying": underlying,
-                "instrument_type": instrument_type,
-                "quantity": quantity,
-                "direction": direction,
-                "average_open_price": average_open_price,
-                "close_price": close_price,
+                "symbol": pos.get("symbol", ""),
+                "underlying": pos.get("underlying-symbol", ""),
+                "instrument_type": pos.get("instrument-type", ""),
+                "quantity": pos.get("quantity", "0"),
+                "direction": pos.get("quantity-direction", ""),
+                "average_open_price": pos.get("average-open-price", "0"),
+                "close_price": pos.get("close-price", "0"),
                 "cost_effect": pos.get("cost-effect", ""),
                 "expires_at": pos.get("expires-at", ""),
                 "multiplier": pos.get("multiplier", "100.0"),
@@ -200,9 +196,9 @@ class TastytradeAPI:
             "margin_equity": money(balances.get("margin-equity")),
             "open_positions": len(positions),
         }
+
     def get_equity_quote(self, symbol: str):
         headers = self.headers()
-
         if not headers:
             return None
 
@@ -210,9 +206,7 @@ class TastytradeAPI:
             response = requests.get(
                 f"{TASTYTRADE_BASE_URL}/market-data/by-type",
                 headers=headers,
-                params={
-                    "equity": symbol,
-                },
+                params={"equity": symbol},
                 timeout=15,
             )
 
@@ -220,8 +214,7 @@ class TastytradeAPI:
                 self.last_error = f"{response.status_code}: {response.text}"
                 return None
 
-            data = response.json()
-            items = data.get("data", {}).get("items", [])
+            items = response.json().get("data", {}).get("items", [])
 
             if not items:
                 self.last_error = f"No quote returned for {symbol}"
@@ -232,10 +225,9 @@ class TastytradeAPI:
         except Exception as e:
             self.last_error = str(e)
             return None
-        
+
     def get_index_quote(self, symbol: str):
         headers = self.headers()
-
         if not headers:
             return None
 
@@ -243,9 +235,7 @@ class TastytradeAPI:
             response = requests.get(
                 f"{TASTYTRADE_BASE_URL}/market-data/by-type",
                 headers=headers,
-                params={
-                    "index": symbol,
-                },
+                params={"index": symbol},
                 timeout=15,
             )
 
@@ -253,8 +243,7 @@ class TastytradeAPI:
                 self.last_error = f"{response.status_code}: {response.text}"
                 return None
 
-            data = response.json()
-            items = data.get("data", {}).get("items", [])
+            items = response.json().get("data", {}).get("items", [])
 
             if not items:
                 self.last_error = f"No index quote returned for {symbol}"
@@ -270,15 +259,10 @@ class TastytradeAPI:
         symbol = symbol.upper()
 
         if symbol in ["SPX", "$SPX", "VIX", "$VIX", "VIX1D", "$VIX1D"]:
-            clean_symbol = symbol.replace("$", "")
-            return self.get_index_quote(clean_symbol)
+            return self.get_index_quote(symbol.replace("$", ""))
 
         return self.get_equity_quote(symbol)
-       
-    def get_status(self):
-        return {
-            "connected": self.access_token is not None,
-            "last_error": self.last_error,
-        }
 
-tastytrade_api = TastytradeAPI()
+
+broker = TastytradeBroker()
+

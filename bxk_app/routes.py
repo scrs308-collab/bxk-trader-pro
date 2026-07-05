@@ -7,7 +7,8 @@ from bxk_app.market_data import market_data
 from bxk_app.scoring import score_market
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.tastytrade_client import tastytrade_client
-from bxk_app.tastytrade_api import tastytrade_api
+from bxk_app.broker_tastytrade import tastytrade_api
+from bxk_app.brokers.tastytrade import broker as new_tastytrade_broker
 
 router = APIRouter()
 
@@ -76,6 +77,7 @@ def debug():
         "market_engine": market_engine.get_status(),
         "market_snapshot": market_data.get_snapshot(),
     }
+
 @router.get("/api/refresh-market")
 def refresh_market():
     market_engine.refresh()
@@ -110,10 +112,9 @@ def market_brief():
         "timestamp": datetime.now().isoformat(timespec="seconds"),
     }
 
-
 @router.get("/api/live-market")
 def live_market():
-    return market_data.get_header()
+    return market_engine.update()
 
 @router.get("/api/test-tastytrade")
 def test_tastytrade():
@@ -133,4 +134,70 @@ def test_tastytrade_rest():
         "connected": connected,
         "status": tastytrade_api.get_status(),
         "accounts": accounts,
+    }
+
+@router.get("/api/test-tastytrade-balances")
+def test_tastytrade_balances():
+    connected = tastytrade_api.authenticate()
+    balances = tastytrade_api.get_balances() if connected else None
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "balances": balances,
+    }
+@router.get("/api/test-tastytrade-positions")
+def test_tastytrade_positions():
+    connected = tastytrade_api.authenticate()
+    positions = tastytrade_api.get_positions() if connected else []
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "positions": positions,
+    }
+
+@router.get("/api/positions-summary")
+def positions_summary():
+    connected = tastytrade_api.authenticate()
+    positions = tastytrade_api.get_position_summary() if connected else []
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "count": len(positions),
+        "positions": positions,
+    }
+
+@router.get("/api/account-summary")
+def account_summary():
+    connected = tastytrade_api.authenticate()
+
+    return {
+        "connected": connected,
+        "account": tastytrade_api.get_account_summary() if connected else None,
+    }
+
+@router.get("/api/test-quote/{symbol}")
+def test_quote(symbol: str):
+    connected = tastytrade_api.authenticate()
+    quote = tastytrade_api.get_quote(symbol.upper()) if connected else None
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "symbol": symbol.upper(),
+        "quote": quote,
+    }
+
+@router.get("/api/test-new-broker")
+def test_new_broker():
+    connected = new_tastytrade_broker.authenticate()
+
+    return {
+        "connected": connected,
+        "status": new_tastytrade_broker.get_status(),
+        "account": new_tastytrade_broker.get_account_summary() if connected else None,
+        "spx": new_tastytrade_broker.get_quote("SPX") if connected else None,
+        "vix": new_tastytrade_broker.get_quote("VIX") if connected else None,
     }

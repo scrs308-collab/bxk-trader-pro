@@ -1,46 +1,35 @@
-from datetime import datetime
-
 from bxk_app.market_data import market_data
+from bxk_app.brokers.tastytrade import broker
 
 
 class MarketEngine:
-    def __init__(self):
-        self.status = "STOPPED"
-        self.last_update = None
-        self.last_error = None
-        self.source = "placeholder"
 
-    def refresh(self):
-        """
-        Phase 1B placeholder refresh.
-        Later this will pull from Tastytrade first, then Schwab.
-        """
+    def update(self):
 
-        try:
+        broker.authenticate()
+
+        spx = broker.get_quote("SPX")
+        vix = broker.get_quote("VIX")
+        qqq = broker.get_quote("QQQ")
+
+        account = broker.get_account_summary()
+        positions = broker.get_position_summary()
+
+        if spx:
             market_data.update(
-                spx=7535.54,
-                spx_change=0.00,
-                vix=15.85,
-                vix1d=12.50,
-                expected_move=62.5,
+                spx=spx.get("last", 0)
             )
 
-            self.status = "OK"
-            self.last_update = datetime.now().isoformat(timespec="seconds")
-            self.last_error = None
-            self.source = "placeholder"
+        if vix:
+            market_data.update(
+                vix=vix.get("last", 0)
+            )
 
-        except Exception as e:
-            self.status = "ERROR"
-            self.last_error = str(e)
+        market_data.account = account
+        market_data.positions = positions
+        market_data.qqq = qqq
 
-    def get_status(self):
-        return {
-            "engine_status": self.status,
-            "source": self.source,
-            "last_update": self.last_update,
-            "last_error": self.last_error,
-        }
+        return market_data.get_header()
 
 
 market_engine = MarketEngine()

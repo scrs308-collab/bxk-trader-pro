@@ -8,6 +8,9 @@ class MarketData:
         self.vix = "--"
         self.vix1d = "--"
         self.expected_move = "--"
+        self.account = {}
+        self.positions = []
+        self.qqq = {}
 
     def market_status(self):
         now = datetime.now()
@@ -103,6 +106,10 @@ class MarketData:
             },
             "market_status": self.market_status(),
             "server_time": datetime.now().strftime("%I:%M:%S %p"),
+            "account": self.account,
+            "positions": self.positions,
+            "qqq": self.qqq,
+
         }
 
 
