@@ -1,4 +1,5 @@
 from tastytrade import Session
+from tastytrade.account import Account
 
 from bxk_app.config import (
     TASTYTRADE_CLIENT_SECRET,
@@ -13,12 +14,6 @@ class TastytradeClient:
 
     def connect(self):
         try:
-            if not TASTYTRADE_CLIENT_SECRET:
-                raise ValueError("Missing TASTYTRADE_CLIENT_SECRET")
-
-            if not TASTYTRADE_REFRESH_TOKEN:
-                raise ValueError("Missing TASTYTRADE_REFRESH_TOKEN")
-
             self.session = Session(
                 TASTYTRADE_CLIENT_SECRET,
                 TASTYTRADE_REFRESH_TOKEN,
@@ -31,6 +26,26 @@ class TastytradeClient:
             self.session = None
             self.last_error = str(e)
             return False
+
+    def get_accounts(self):
+        if not self.session:
+            if not self.connect():
+                return []
+
+        try:
+            accounts = Account.get_accounts(self.session)
+
+            return [
+                {
+                    "account_number": acct.account_number,
+                    "nickname": getattr(acct, "nickname", ""),
+                }
+                for acct in accounts
+            ]
+
+        except Exception as e:
+            self.last_error = str(e)
+            return []
 
     def connected(self):
         return self.session is not None

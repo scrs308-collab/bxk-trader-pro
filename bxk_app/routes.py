@@ -7,7 +7,7 @@ from bxk_app.market_data import market_data
 from bxk_app.scoring import score_market
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.tastytrade_client import tastytrade_client
-
+from bxk_app.tastytrade_api import tastytrade_api
 
 router = APIRouter()
 
@@ -117,9 +117,20 @@ def live_market():
 
 @router.get("/api/test-tastytrade")
 def test_tastytrade():
-    success = tastytrade_client.connect()
+    connected = tastytrade_client.connect()
 
     return {
-        "connected": success,
+        "connected": connected,
         "status": tastytrade_client.get_status(),
+        "accounts": tastytrade_client.get_accounts(),
+    }
+@router.get("/api/test-tastytrade-rest")
+def test_tastytrade_rest():
+    connected = tastytrade_api.authenticate()
+    accounts = tastytrade_api.get_accounts() if connected else []
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "accounts": accounts,
     }
