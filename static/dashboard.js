@@ -117,7 +117,39 @@ function updateDashboard(data) {
 
   el("riskLevel").textContent =
     opportunity.risk_level ?? "--";
-}
+
+  el("tradeScore").textContent =
+    opportunity.trade_score ?? "--";
+
+  el("tradeConfidence").textContent =
+    opportunity.confidence ?? "--";
+
+  el("putBuffer").textContent =
+    opportunity.put_buffer ?? "--";
+
+  el("callBuffer").textContent =
+    opportunity.call_buffer ?? "--";
+
+  el("tradeSource").textContent =
+    opportunity.source ?? "--";
+    
+      el("liveCredit").textContent =
+    opportunity.live_credit ?? "--";
+
+  el("putCredit").textContent =
+    opportunity.put_credit ?? "--";
+
+  el("callCredit").textContent =
+    opportunity.call_credit ?? "--";
+
+  el("returnOnRisk").textContent =
+    opportunity.return_on_risk
+      ? `${opportunity.return_on_risk}%`
+      : "--";
+
+  el("candidatesEvaluated").textContent =
+    opportunity.candidates_evaluated ?? "--";
+}    
 
 async function fetchRecommendation() {
   try { 

@@ -274,7 +274,64 @@ class TastytradeAPI:
             return self.get_index_quote(clean_symbol)
 
         return self.get_equity_quote(symbol)
-       
+
+    def get_nested_option_chain(self, symbol: str):
+        headers = self.headers()
+
+        if not headers:
+            return None
+
+        symbol = symbol.upper().replace("$", "")
+
+        try:
+            response = requests.get(
+                f"{TASTYTRADE_BASE_URL}/option-chains/{symbol}/nested",
+                headers=headers,
+                timeout=20,
+            )
+
+            if response.status_code != 200:
+                self.last_error = f"{response.status_code}: {response.text}"
+                return None
+
+            return response.json().get("data", {})
+
+        except Exception as e:
+            self.last_error = str(e)
+            return None
+
+    def get_spx_option_chain(self):
+        return self.get_nested_option_chain("SPX")
+
+    def get_option_quotes(self, symbols: list[str]):
+        headers = self.headers()
+
+        if not headers:
+            return []
+
+        if not symbols:
+            return []
+
+        try:
+            response = requests.get(
+                f"{TASTYTRADE_BASE_URL}/market-data/by-type",
+                headers=headers,
+                params={
+                    "option": ",".join(symbols),
+                },
+                timeout=20,
+            )
+
+            if response.status_code != 200:
+                self.last_error = f"{response.status_code}: {response.text}"
+                return []
+
+            return response.json().get("data", {}).get("items", [])
+
+        except Exception as e:
+            self.last_error = str(e)
+            return []
+
     def get_status(self):
         return {
             "connected": self.access_token is not None,

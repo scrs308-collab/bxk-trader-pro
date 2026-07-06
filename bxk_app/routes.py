@@ -10,7 +10,8 @@ from bxk_app.tastytrade_client import tastytrade_client
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.brokers.tastytrade import broker as new_tastytrade_broker
 from bxk_app.opportunity_engine import build_opportunity
-
+from bxk_app.scanner_engine import find_best_iron_condor
+from bxk_app.option_scanner import generate_candidate_condors
 router = APIRouter()
 
 @router.get("/api/test-env")
@@ -18,9 +19,9 @@ def test_env():
     import os
 
     return {
-        "client_id_loaded": bool(TASTYTRADE_CLIENT_ID),
-        "client_secret_loaded": bool(TASTYTRADE_CLIENT_SECRET),
-        "refresh_token_loaded": bool(TASTYTRADE_REFRESH_TOKEN),
+        "client_id_loaded": bool(os.getenv("TASTYTRADE_CLIENT_ID")),
+        "client_secret_loaded": bool(os.getenv("TASTYTRADE_CLIENT_SECRET")),
+        "refresh_token_loaded": bool(os.getenv("TASTYTRADE_REFRESH_TOKEN")),
         "tt_secret_loaded": bool(os.getenv("TT_SECRET")),
         "tt_refresh_token_loaded": bool(os.getenv("TT_REFRESH_TOKEN")),
     }
@@ -207,4 +208,98 @@ def test_new_broker():
         "account": new_tastytrade_broker.get_account_summary() if connected else None,
         "spx": new_tastytrade_broker.get_quote("SPX") if connected else None,
         "vix": new_tastytrade_broker.get_quote("VIX") if connected else None,
+    }
+@router.get("/api/test-spx-chain")
+def test_spx_chain():
+    connected = tastytrade_api.authenticate()
+    chain = tastytrade_api.get_spx_option_chain() if connected else None
+
+    return {
+        "connected": connected,
+        "status": tastytrade_api.get_status(),
+        "has_chain": bool(chain),
+        "chain_keys": list(chain.keys()) if isinstance(chain, dict) else None,
+        "chain_preview": chain,
+    }
+@router.get("/api/test-spx-chain-shape")
+def test_spx_chain_shape():
+    chain = tastytrade_api.get_spx_option_chain()
+
+    if not chain:
+        return {"error": "No chain"}
+
+    item = chain["items"][0]
+    expiration = item["expirations"][0]
+    strike = expiration["strikes"][0]
+
+    return {
+        "item_keys": list(item.keys()),
+        "expiration_keys": list(expiration.keys()),
+        "strike_keys": list(strike.keys()),
+        "first_expiration": {
+            "expiration_type": expiration.get("expiration-type"),
+            "expiration_date": expiration.get("expiration-date"),
+            "days_to_expiration": expiration.get("days-to-expiration"),
+            "settlement_type": expiration.get("settlement-type"),
+        },
+        "first_strike": strike,
+    }
+
+
+@router.get("/api/test-spx-option-quotes")
+def test_spx_option_quotes():
+    chain = tastytrade_api.get_spx_option_chain()
+
+    if not chain:
+        return {"error": "No chain"}
+
+    item = chain["items"][0]
+    expiration = item["expirations"][0]
+    strikes = expiration["strikes"]
+
+    sample_symbols = []
+
+    for strike in strikes:
+        price = float(strike["strike-price"])
+
+        if 7450 <= price <= 7625:
+            sample_symbols.append(strike["put-streamer-symbol"])
+            sample_symbols.append(strike["call-streamer-symbol"])
+
+        if len(sample_symbols) >= 10:
+            break
+
+    quotes = tastytrade_api.get_option_quotes(sample_symbols)
+
+    return {
+        "using": "streamer-symbols",
+        "sample_symbols": sample_symbols,
+        "quote_count": len(quotes),
+        "quotes": quotes,
+        "status": tastytrade_api.get_status(),
+    }
+
+
+@router.get("/api/test-scanner-engine")
+def test_scanner_engine():
+    trade = find_best_iron_condor(
+        spx_price=7535.54,
+        expected_move=62.5,
+        wing_width=25,
+    )
+@router.get("/api/test-candidates")
+def test_candidates():
+    candidates = generate_candidate_condors(
+        spx_price=7535.54,
+        expected_move=62.5,
+        wing_width=25,
+    )
+
+    return {
+        "count": len(candidates),
+        "first": candidates[0] if candidates else None,
+        "last": candidates[-1] if candidates else None,
+    }
+    return {
+        "trade": trade,
     }
