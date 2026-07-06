@@ -1,20 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BXK Trader Pro</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="/static/style.css">
+  <title>BXK Trader Pro</title>
+
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="/static/favicon.ico" />
 </head>
 
 <body>
+  <div class="app">
 
-<div id="dashboard">
-    Loading...
-</div>
+    <header class="topbar">
+      <div>
+        <h1>BXK Trader Pro</h1>
+        <p>Live Market Intelligence</p>
+      </div>
 
-<script src="/static/dashboard.js"></script>
+      <div class="status-pill" id="apiStatus">
+        ● Connecting
+      </div>
+    </header>
 
+    <main class="dashboard">
+
+      <section class="card hero-card">
+        <div class="card-label">Recommendation</div>
+        <div class="recommendation" id="recommendation">Loading...</div>
+        <div class="confidence" id="confidence">Confidence: --</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Market Score</div>
+        <div class="score" id="score">--</div>
+        <div class="score-bar">
+          <div id="scoreFill"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Market Regime</div>
+        <div class="metric" id="trade">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Trend</div>
+        <div class="metric" id="trend">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">VIX State</div>
+        <div class="metric" id="vixState">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Expected Move</div>
+        <div class="metric" id="expectedMove">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">IV Rank</div>
+        <div class="metric" id="ivRank">--</div>
+      </section>
+
+      <section class="card wide">
+        <div class="card-label">Reasons</div>
+        <ul id="reasons">
+          <li>Waiting for scanner data...</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <div class="card-label">System</div>
+
+        <div class="small-row">
+          <span>Last Update</span>
+          <strong id="lastUpdate">--</strong>
+        </div>
+
+        <div class="small-row">
+          <span>Clock</span>
+          <strong id="clock">--</strong>
+        </div>
+      </section>
+
+      <section class="card opportunity-card">
+        <div class="card-label">Live Opportunity</div>
+
+        <div class="opportunity-strategy" id="strategyName">WAIT</div>
+
+        <div class="trade-grid">
+          <div>
+            <span>SPX</span>
+            <strong id="spxPrice">--</strong>
+          </div>
+
+          <div>
+            <span>Expected Move</span>
+            <strong id="expectedMovePoints">--</strong>
+          </div>
+
+          <div>
+            <span>Sell Put</span>
+            <strong id="sellPut">--</strong>
+          </div>
+
+          <div>
+            <span>Buy Put</span>
+            <strong id="buyPut">--</strong>
+          </div>
+
+          <div>
+            <span>Sell Call</span>
+            <strong id="sellCall">--</strong>
+          </div>
+
+          <div>
+            <span>Buy Call</span>
+            <strong id="buyCall">--</strong>
+          </div>
+
+          <div>
+            <span>Target Credit</span>
+            <strong id="targetCredit">--</strong>
+          </div>
+
+          <div>
+            <span>POP</span>
+            <strong id="pop">--</strong>
+          </div>
+
+          <div>
+            <span>Max Risk</span>
+            <strong id="maxRisk">--</strong>
+          </div>
+
+          <div>
+            <span>Expected Profit</span>
+            <strong id="expectedProfit">--</strong>
+          </div>
+
+          <div>
+            <span>Risk Level</span>
+            <strong id="riskLevel">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="card placeholder">
+        <div class="card-label">Open Positions</div>
+        <p>Coming in Phase 3</p>
+      </section>
+
+      <section class="card placeholder">
+        <div class="card-label">Today’s P/L</div>
+        <p>Coming in Phase 3</p>
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="/static/dashboard.js?v=3"></script>
 </body>
 </html>

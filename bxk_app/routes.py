@@ -9,6 +9,7 @@ from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.tastytrade_client import tastytrade_client
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.brokers.tastytrade import broker as new_tastytrade_broker
+from bxk_app.opportunity_engine import build_opportunity
 
 router = APIRouter()
 
@@ -44,17 +45,21 @@ def recommend():
     market = score_market()
 
     strategies = rank_strategies(
-        market.score * 30,
+        market.score,
         market.trend,
         market.vix_state,
     )
 
+    opportunity = build_opportunity(market)
+
     return {
         "app": "BXK Trader Pro",
-        "version": "6.0",
+        "version": "6.1",
         "status": "OK",
         "timestamp": datetime.now().isoformat(timespec="seconds"),
+
         "trade": market.market_regime,
+        "market_regime": market.market_regime,
         "confidence": market.confidence,
         "score": market.score,
         "trend": market.trend,
@@ -63,7 +68,9 @@ def recommend():
         "iv_rank_state": market.iv_rank_state,
         "recommendation": market.recommendation,
         "reasons": market.reasons,
+
         "strategies": strategies,
+        "opportunity": opportunity,
     }
 
 

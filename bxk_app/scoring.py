@@ -50,7 +50,9 @@ def score_market() -> MarketDecision:
         reasons.append("IV rank low")
 
     trend = "MIXED"
-    confidence = int((score / 3) * 100)
+    score_percent = int((score / 3) * 100)
+    confidence = score_percent
+   
 
     if score == 3:
         market_regime = "TRADE"
@@ -65,7 +67,7 @@ def score_market() -> MarketDecision:
     return MarketDecision(
         market_regime=market_regime,
         confidence=confidence,
-        score=score,
+        score=score_percent,
         trend=trend,
         vix_state=vix_state,
         expected_move_state=expected_move_state,
