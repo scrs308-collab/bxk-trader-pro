@@ -2,7 +2,8 @@ from bxk_app.market_engine import market_engine
 from datetime import datetime
 
 from fastapi import APIRouter
-
+from bxk_app.option_scanner import generate_candidate_condors, normalize_candidate
+from bxk_app.live_option_engine import calculate_iron_condor_credit
 from bxk_app.market_data import market_data
 from bxk_app.scoring import score_market
 from bxk_app.strategy_ranker import rank_strategies
@@ -12,6 +13,7 @@ from bxk_app.brokers.tastytrade import broker as new_tastytrade_broker
 from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scanner_engine import find_best_iron_condor
 from bxk_app.option_scanner import generate_candidate_condors
+from bxk_app.wing_optimizer import find_best_trade
 router = APIRouter()
 
 @router.get("/api/test-env")
@@ -176,7 +178,16 @@ def positions_summary():
         "count": len(positions),
         "positions": positions,
     }
+@router.get("/api/test-wing-optimizer")
+def test_wing_optimizer():
+    trade = find_best_trade(
+        spx_price=7535.54,
+        expected_move=62.5,
+    )
 
+    return {
+        "trade": trade,
+    }
 @router.get("/api/account-summary")
 def account_summary():
     connected = tastytrade_api.authenticate()
@@ -303,3 +314,70 @@ def test_candidates():
     return {
         "trade": trade,
     }
+@router.get("/api/test-first-candidate-credit")
+def test_first_candidate_credit():
+    raw = generate_candidate_condors(
+        spx_price=7535.54,
+        expected_move=62.5,
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    if not raw:
+        return {"error": "No candidates"}
+
+    trade = normalize_candidate(
+        raw[-1],
+        spx_price=7535.54,
+        expected_move=62.5,
+    )
+
+    credit = calculate_iron_condor_credit(trade)
+
+    return {
+        "trade": trade,
+        "credit": credit,
+    }
+@router.get("/api/test-expirations")
+def test_expirations():
+    chain = tastytrade_api.get_spx_option_chain()
+
+    if not chain:
+        return {"error": "No chain"}
+
+    item = chain["items"][0]
+
+    return {
+        "expirations": [
+            {
+                "date": exp.get("expiration-date"),
+                "dte": exp.get("days-to-expiration"),
+                "type": exp.get("expiration-type"),
+                "settlement": exp.get("settlement-type"),
+                "strike_count": len(exp.get("strikes", [])),
+            }
+            for exp in item.get("expirations", [])[:10]
+        ]
+    }
+@router.get("/api/test-candidate-grid")
+def test_candidate_grid():
+    from bxk_app.option_scanner import generate_candidate_condors
+
+    results = []
+
+    for dte in [0, 1, 2, 3]:
+        for wing in [5, 10, 20, 25]:
+            candidates = generate_candidate_condors(
+                spx_price=7535.54,
+                expected_move=62.5,
+                wing_width=wing,
+                days_to_expiration=dte,
+            )
+
+            results.append({
+                "dte": dte,
+                "wing": wing,
+                "count": len(candidates),
+            })
+
+    return {"results": results}

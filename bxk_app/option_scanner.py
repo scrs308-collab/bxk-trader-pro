@@ -10,29 +10,28 @@ def safe_float(value, default=0.0):
         return default
 
 
-def get_0dte_spx_strikes():
+def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     chain = tastytrade_api.get_spx_option_chain()
 
     if not chain:
         return []
 
     item = chain.get("items", [])[0]
-
     expirations = item.get("expirations", [])
 
-    zero_dte = None
+    selected_expiration = None
 
     for expiration in expirations:
-        if int(expiration.get("days-to-expiration", -1)) == 0:
-            zero_dte = expiration
+        if int(expiration.get("days-to-expiration", -1)) == days_to_expiration:
+            selected_expiration = expiration
             break
 
-    if not zero_dte:
+    if not selected_expiration:
         return []
 
     strikes = []
 
-    for strike in zero_dte.get("strikes", []):
+    for strike in selected_expiration.get("strikes", []):
         strike_price = safe_float(strike.get("strike-price"))
 
         strikes.append(
@@ -42,11 +41,17 @@ def get_0dte_spx_strikes():
                 "put": strike.get("put"),
                 "call_streamer": strike.get("call-streamer-symbol"),
                 "put_streamer": strike.get("put-streamer-symbol"),
+                "expiration_date": selected_expiration.get("expiration-date"),
+                "days_to_expiration": selected_expiration.get("days-to-expiration"),
+                "settlement_type": selected_expiration.get("settlement-type"),
             }
         )
 
     return sorted(strikes, key=lambda x: x["strike"])
 
+
+def get_0dte_spx_strikes():
+    return get_spx_strikes_by_dte(0)
 
 def find_nearest_strike(target_price: float, strikes: list[dict]):
     if not strikes:
@@ -115,11 +120,13 @@ def generate_candidate_condors(
     spx_price: float,
     expected_move: float,
     wing_width: int | None = None,
+    days_to_expiration: int = 0,
 ):
+    
     if wing_width is None:
         wing_width = scanner_settings.wing_width
 
-    strikes = get_0dte_spx_strikes()
+    strikes = get_spx_strikes_by_dte(days_to_expiration)
 
     if not strikes:
         return []

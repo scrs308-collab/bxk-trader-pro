@@ -1,7 +1,6 @@
 from bxk_app.models import MarketDecision
 from bxk_app.market_data import market_data
-from bxk_app.scanner_engine import find_best_iron_condor
-
+from bxk_app.wing_optimizer import find_best_trade
 
 def round_to_5(value: float) -> int:
     return int(round(value / 5) * 5)
@@ -71,16 +70,16 @@ def build_opportunity(market: MarketDecision) -> dict:
     wing_width = 25
     target_credit = 1.75
 
-    chain_trade = find_best_iron_condor(
+    chain_trade = find_best_trade(
         spx_price=spx_price,
         expected_move=expected_move,
-        wing_width=wing_width,
-)
+    )
     live_credit_data = chain_trade if chain_trade else None
 
     if chain_trade:
         source = chain_trade.get("source", "LIVE_CHAIN_RANKED")
         target_credit = chain_trade.get("live_credit", target_credit)
+        wing_width = chain_trade.get("wing_width", wing_width)
 
         sell_put = chain_trade["sell_put"]
         buy_put = chain_trade["buy_put"]
@@ -99,7 +98,7 @@ def build_opportunity(market: MarketDecision) -> dict:
 
     max_risk = round((wing_width - target_credit) * 100, 2)
     expected_profit = round(target_credit * 100, 2)
-
+    
     trade_score = calculate_trade_score(
         target_credit=target_credit,
         wing_width=wing_width,
@@ -118,7 +117,7 @@ def build_opportunity(market: MarketDecision) -> dict:
             f"Expected move: ±{round(expected_move, 2)}",
             f"Put buffer: {put_buffer}",
             f"Call buffer: {call_buffer}",
-            "25-point wings selected",
+            f"{chain_trade.get('wing_width', wing_width) if chain_trade else wing_width}-point wings selected",
             f"Target credit: {target_credit}",
         ]
     )
@@ -126,6 +125,7 @@ def build_opportunity(market: MarketDecision) -> dict:
     return {
         "strategy": "IRON CONDOR",
         "source": source,
+        "days_to_expiration": chain_trade.get("days_to_expiration") if chain_trade else 0,
         "spx_price": round(spx_price, 2),
         "expected_move": round(expected_move, 2),
         "sell_put": sell_put,
