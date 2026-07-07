@@ -4,10 +4,10 @@ from datetime import datetime
 class MarketData:
 
     def __init__(self):
-        self.spx = None
+        self.spx = "TEST 6500.00"
         self.spx_change = None
-        self.vix = None
-        self.vix1d = None
+        self.vix = "TEST 15.25"
+        self.vix1d = "TEST 10.50"
         self.market_status = "LIVE"
 
     def get_header(self):
