@@ -63,6 +63,7 @@ def rank_strategies(market_score: int, trend: str, vix_state: str) -> List[Dict]
         "reason": "Best when price is consolidating near a magnet level."
     })
 
-    strategies.sort(key=lambda x: x["score"], reverse=True)
+    # Highest scoring strategy first
+    strategies.sort(key=lambda s: s["score"], reverse=True)
 
     return strategies

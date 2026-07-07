@@ -4,12 +4,15 @@ from fastapi.responses import FileResponse
 
 from bxk_app.routes import router
 
+
 app = FastAPI(
-    title="BXK Trader Pro ",
-    version="6.0"
+    title="BXK Trader Pro",
+    version="6.0",
 )
 
+
 app.include_router(router)
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

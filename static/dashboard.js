@@ -1,168 +1,181 @@
-const dashboard = document.getElementById("dashboard");
+console.log("BXK Trader Pro Dashboard - Phase 2 UI");
+
+const API_URL = "/api/recommend";
+
+const el = (id) => document.getElementById(id);
 
 function nowTime() {
   return new Date().toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit"
+    second: "2-digit",
   });
 }
 
-dashboard.innerHTML = `
-<div class="app">
-  <header class="topbar">
-    <div>
-      <h1>BXK Trader Pro</h1>
-      <p>Professional SPX Options Intelligence</p>
-    </div>
+function setApiStatus(isOnline) {
+  const apiStatus = el("apiStatus");
 
-    <div class="market-strip">
-      <div><span>SPX</span><strong id="spxPrice">--</strong></div>
-      <div><span>VIX</span><strong id="vixPrice">--</strong></div>
-      <div><span>VIX1D</span><strong id="vix1dPrice">--</strong></div>
-      <div><span>Time</span><strong id="marketClock">${nowTime()}</strong></div>
-      <div><span>Status</span><strong id="marketStatus">LIVE</strong></div>
-    </div>
-
-    <div class="status-pill trade">TRADE</div>
-  </header>
-
-  <section class="hero-grid">
-    <div class="panel health-panel">
-      <h2>Market Health</h2>
-      <div class="meter">
-        <div class="meter-fill" style="width: 84%;"></div>
-      </div>
-      <div class="meter-label">84% Healthy</div>
-    </div>
-
-    <div class="panel action-panel">
-      <h2>Action Now</h2>
-      <div class="big-signal trade">SELL IRON CONDOR</div>
-      <p class="muted">Confidence 100%</p>
-    </div>
-
-    <div class="panel score-panel">
-      <h2>Trade Quality</h2>
-      <div class="score-circle">100</div>
-      <p>Grade A</p>
-    </div>
-  </section>
-
-  <section class="grid cards-5">
-    <div class="card good"><span>Trend</span><strong>MIXED</strong><small>Market structure neutral</small></div>
-    <div class="card good"><span>VIX</span><strong>IDEAL</strong><small>Volatility favorable</small></div>
-    <div class="card good"><span>Expected Move</span><strong>HEALTHY</strong><small>Premium environment OK</small></div>
-    <div class="card good"><span>IV Rank</span><strong>GOOD</strong><small>Option premium acceptable</small></div>
-    <div class="card warn"><span>Time Window</span><strong>WAIT</strong><small>Opening range not confirmed</small></div>
-  </section>
-
-  <section class="two-col">
-    <div class="panel">
-      <h2>Top Strategies Today</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Rank</th>
-            <th>Strategy</th>
-            <th>Score</th>
-            <th>Confidence</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>1</td><td>Iron Condor</td><td>100</td><td><span class="badge good-badge">High</span></td></tr>
-          <tr><td>2</td><td>Butterfly</td><td>70</td><td><span class="badge mid-badge">Medium</span></td></tr>
-          <tr><td>3</td><td>Debit Call Spread</td><td>45</td><td><span class="badge low-badge">Low</span></td></tr>
-          <tr><td>4</td><td>Debit Put Spread</td><td>45</td><td><span class="badge low-badge">Low</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="panel">
-      <h2>Decision Reasons</h2>
-      <ul class="checklist">
-        <li>VIX ideal</li>
-        <li>Expected move healthy</li>
-        <li>IV rank good</li>
-        <li>Premium selling environment acceptable</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="panel position-panel">
-    <h2>Position Monitor</h2>
-    <div class="position-grid">
-      <div><span>Current Position</span><strong>No active trade</strong></div>
-      <div><span>P/L</span><strong>--</strong></div>
-      <div><span>Short Put Buffer</span><strong>--</strong></div>
-      <div><span>Short Call Buffer</span><strong>--</strong></div>
-      <div><span>Exit Signal</span><strong>WAIT</strong></div>
-    </div>
-  </section>
-</div>
-`;
-
-async function loadMarketHeader() {
-  try {
-    const response = await fetch("/api/market-header");
-    const data = await response.json();
-
-    document.getElementById("spxPrice").textContent = data.spx ?? "--";
-    document.getElementById("vixPrice").textContent = data.vix ?? "--";
-    document.getElementById("vix1dPrice").textContent = data.vix1d ?? "--";
-    document.getElementById("marketClock").textContent = data.server_time ?? nowTime();
-    document.getElementById("marketStatus").textContent = data.market_status ?? "LIVE";
-  } catch (error) {
-    console.error("Market header failed:", error);
-    document.getElementById("marketClock").textContent = nowTime();
+  if (isOnline) {
+    apiStatus.textContent = "● LIVE";
+    apiStatus.className = "status-pill online";
+  } else {
+    apiStatus.textContent = "● OFFLINE";
+    apiStatus.className = "status-pill offline";
   }
 }
 
-loadMarketHeader();
-setInterval(loadMarketHeader, 5000);
-async function loadRecommendation() {
-  try {
-    const response = await fetch("/recommend");
+function setScore(score) {
+  const safeScore = Number(score) || 0;
+  el("score").textContent = safeScore;
+  el("scoreFill").style.width = `${Math.max(0, Math.min(100, safeScore))}%`;
+}
+
+function renderReasons(reasons) {
+  const list = el("reasons");
+  list.innerHTML = "";
+
+  if (!Array.isArray(reasons) || reasons.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No scanner reasons returned.";
+    list.appendChild(li);
+    return;
+  }
+
+  reasons.forEach((reason) => {
+    const li = document.createElement("li");
+    li.textContent = reason;
+    list.appendChild(li);
+  });
+}
+
+function getStatusIcon(value) {
+  const text = String(value || "").toLowerCase();
+
+  if (text.includes("bull")) return "📈";
+  if (text.includes("bear")) return "📉";
+  if (text.includes("high") || text.includes("elevated")) return "⚡";
+  if (text.includes("low")) return "🟢";
+  if (text.includes("normal") || text.includes("neutral")) return "⚪";
+  if (text.includes("avoid") || text.includes("no")) return "🔴";
+  if (text.includes("trade") || text.includes("good")) return "🟢";
+
+  return "•";
+}
+
+function updateDashboard(data) {
+  el("recommendation").textContent = data.recommendation ?? "--";
+  el("confidence").textContent = `Confidence: ${data.confidence ?? "--"}`;
+
+  setScore(data.score);
+
+  el("trade").textContent = `${getStatusIcon(data.trade)} ${data.trade ?? "--"}`;
+  el("trend").textContent = `${getStatusIcon(data.trend)} ${data.trend ?? "--"}`;
+  el("vixState").textContent = `${getStatusIcon(data.vix_state)} ${data.vix_state ?? "--"}`;
+  el("expectedMove").textContent = `${getStatusIcon(data.expected_move_state)} ${data.expected_move_state ?? "--"}`;
+  el("ivRank").textContent = `${getStatusIcon(data.iv_rank_state)} ${data.iv_rank_state ?? "--"}`;
+
+  renderReasons(data.reasons);
+  
+  const opportunity = data.opportunity || {};
+
+  el("strategyName").textContent =
+    opportunity.strategy ?? "--";
+
+  el("spxPrice").textContent =
+    opportunity.spx_price ?? "--";
+
+  el("expectedMovePoints").textContent =
+    opportunity.expected_move ?? "--";
+
+  el("sellPut").textContent =
+    opportunity.sell_put ?? "--";
+
+  el("buyPut").textContent =
+    opportunity.buy_put ?? "--";
+
+  el("sellCall").textContent =
+    opportunity.sell_call ?? "--";
+
+  el("buyCall").textContent =
+    opportunity.buy_call ?? "--";
+
+  el("targetCredit").textContent =
+    opportunity.target_credit ?? "--";
+
+  el("pop").textContent =
+    opportunity.pop ? `${opportunity.pop}%` : "--";
+
+  el("maxRisk").textContent =
+    opportunity.max_risk
+        ? `$${opportunity.max_risk}`
+        : "--";
+
+  el("expectedProfit").textContent =
+    opportunity.expected_profit
+        ? `$${opportunity.expected_profit}`
+        : "--";
+
+  el("riskLevel").textContent =
+    opportunity.risk_level ?? "--";
+
+  el("tradeScore").textContent =
+    opportunity.trade_score ?? "--";
+
+  el("tradeConfidence").textContent =
+    opportunity.confidence ?? "--";
+
+  el("putBuffer").textContent =
+    opportunity.put_buffer ?? "--";
+
+  el("callBuffer").textContent =
+    opportunity.call_buffer ?? "--";
+
+  el("tradeSource").textContent =
+    opportunity.source ?? "--";
+    
+      el("liveCredit").textContent =
+    opportunity.live_credit ?? "--";
+
+  el("putCredit").textContent =
+    opportunity.put_credit ?? "--";
+
+  el("callCredit").textContent =
+    opportunity.call_credit ?? "--";
+
+  el("returnOnRisk").textContent =
+    opportunity.return_on_risk
+      ? `${opportunity.return_on_risk}%`
+      : "--";
+
+  el("candidatesEvaluated").textContent =
+    opportunity.candidates_evaluated ?? "--";
+}    
+
+async function fetchRecommendation() {
+  try { 
+    const response = await fetch(API_URL);
+
+    if (!response.ok) {
+      throw new Error(`API error ${response.status}`);
+    }
+
     const data = await response.json();
 
-    console.log("Recommendation data:", data);
-
+    updateDashboard(data);
+    setApiStatus(true);
   } catch (error) {
-    console.error("Recommendation failed:", error);
+    console.error("Dashboard fetch failed:", error);
+    setApiStatus(false);
+    el("recommendation").textContent = "API Offline";
   }
 }
 
-async function loadRecommendation() {
-  try {
-    const response = await fetch("/recommend");
-    const data = await response.json();
-
-    document.querySelector(".status-pill").textContent = data.trade ?? "WAIT";
-    document.querySelector(".big-signal").textContent =
-      data.recommendation ?? data.trade ?? "WAIT";
-
-    document.querySelector(".score-circle").textContent =
-      data.confidence ?? "--";
-
-    document.querySelector(".score-panel p").textContent =
-      `Score ${data.score ?? "--"} / Confidence ${data.confidence ?? "--"}%`;
-
-    document.querySelector(".card:nth-child(1) strong").textContent =
-      data.trend ?? "--";
-
-    document.querySelector(".card:nth-child(2) strong").textContent =
-      data.vix_state ?? "--";
-
-    document.querySelector(".card:nth-child(3) strong").textContent =
-      data.expected_move_state ?? "--";
-
-    document.querySelector(".card:nth-child(4) strong").textContent =
-      data.iv_rank_state ?? "--";
-
-  } catch (error) {
-    console.error("Recommendation failed:", error);
-  }
+function updateClock() {
+  el("clock").textContent = nowTime();
 }
 
-loadRecommendation();
-setInterval(loadRecommendation, 10000);
+fetchRecommendation();
+updateClock();
+
+setInterval(fetchRecommendation, 30000);
+setInterval(updateClock, 1000);
