@@ -18,3 +18,5 @@ __pycache__/
 
 # Schwab OAuth
 tokens.json
+
+desktop.ini
