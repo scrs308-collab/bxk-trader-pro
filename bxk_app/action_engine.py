@@ -1,6 +1,6 @@
 class ActionEngine:
 
-    def evaluate(self, quality):
+    def run(self, quality):
 
         score = quality["score"]
 

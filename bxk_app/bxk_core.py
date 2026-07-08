@@ -26,11 +26,11 @@ class BXKCore:
         self.market_dna_engine = MarketDNAEngine()
         self.action_engine = ActionEngine()
 
-    def evaluate(self):
-        market_snapshot = self.market_engine.evaluate()
-        market_dna = self.market_dna_engine.evaluate(market_snapshot)
-        trade_quality = self.trade_quality_engine.evaluate(market_snapshot)
-        action = self.action_engine.evaluate(trade_quality)
+    def run(self):
+        market_snapshot = self.market_engine.run()
+        market_dna = self.market_dna_engine.run(market_snapshot)
+        trade_quality = self.trade_quality_engine.run(market_snapshot)
+        action = self.action_engine.run(trade_quality)
 
         return {
             "app": "BXK Trader Pro",
@@ -51,4 +51,4 @@ class BXKCore:
 
 
 def get_bxk_core():
-    return BXKCore().evaluate()
+    return BXKCore().run()

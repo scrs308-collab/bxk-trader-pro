@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from bxk_app.option_scanner import generate_candidate_condors, normalize_candidate
 from bxk_app.live_option_engine import calculate_iron_condor_credit
 from bxk_app.market_data import market_data
-from bxk_app.scoring import evaluate_trade_quality
+from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.tastytrade_client import tastytrade_client
 from bxk_app.broker_tastytrade import tastytrade_api
@@ -45,7 +45,7 @@ def recommend_short():
 
 @router.get("/api/recommend")
 def recommend():
-    market = evaluate_trade_quality()
+    market = run_trade_quality()
 
     strategies = rank_strategies(
         market.score,
@@ -101,7 +101,7 @@ def refresh_market():
 
 @router.get("/api/market-brief")
 def market_brief():
-    market = evaluate_trade_quality()
+    market = run_trade_quality()
 
     if market.market_regime == "TRADE":
         summary = (

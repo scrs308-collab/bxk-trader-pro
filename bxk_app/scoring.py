@@ -2,7 +2,7 @@ from bxk_app.models import MarketDecision
 from bxk_app.market_data import market_data
 
 
-def evaluate_trade_quality() -> MarketDecision:
+def run_trade_quality() -> MarketDecision:
     try:
         snapshot = market_data.get_snapshot()
     except Exception as e:

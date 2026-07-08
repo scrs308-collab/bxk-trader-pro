@@ -1,6 +1,6 @@
 class TradeQualityEngine:
 
-    def evaluate(self, market):
+    def run(self, market):
 
         score = 85
 
