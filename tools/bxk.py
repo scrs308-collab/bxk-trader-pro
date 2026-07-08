@@ -5,39 +5,42 @@ Usage:
     python tools/bxk.py version
     python tools/bxk.py status
     python tools/bxk.py doctor
-    python tools/bxk.py new-engine MarketIntelligence
+    python tools/bxk.py start
+    python tools/bxk.py new-engine MarketIntelligenceEngine
     python tools/bxk.py new-doc MarketIntelligence
     python tools/bxk.py release
     python tools/bxk.py backup
 """
 
-import os
-import sys
+import re
 import subprocess
+import sys
+import time
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+DASHBOARD_URL = "http://127.0.0.1:8000"
 
 
-def run(command):
+def run(command: str):
     return subprocess.run(
         command,
         shell=True,
         cwd=ROOT,
         capture_output=True,
-        text=True
+        text=True,
     )
 
 
-def to_snake(name):
-    output = ""
-    for i, char in enumerate(name):
-        if char.isupper() and i > 0:
-            output += "_"
-        output += char.lower()
-    return output
+def to_snake(name: str) -> str:
+    words = re.findall(
+        r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|\d+",
+        name,
+    )
+    return "_".join(word.lower() for word in words)
 
 
 def version():
@@ -47,38 +50,71 @@ def version():
 
 
 def status():
-    result = run("git status --short")
     branch = run("git branch --show-current").stdout.strip()
+    changes = run("git status --short").stdout.strip()
 
-    print("BXK PROJECT STATUS")
-    print("")
-    print(f"Branch: {branch}")
-    print("")
+    print("\nBXK PROJECT STATUS\n")
+    print(f"Branch: {branch}\n")
 
-    if result.stdout.strip():
-        print(result.stdout)
+    if changes:
+        print(changes)
     else:
         print("Working tree clean")
 
 
 def doctor():
     branch = run("git branch --show-current").stdout.strip()
-    git_status = run("git status --short").stdout.strip()
+    changes = run("git status --short").stdout.strip()
     python_version = run("python --version").stdout.strip()
 
-    print("BXK PROJECT HEALTH")
-    print("")
+    print("\nBXK PROJECT HEALTH\n")
     print(f"Branch................ {branch}")
-    print(f"Python................ {python_version}")
-    print(f"Git Clean............. {'YES' if not git_status else 'NO'}")
+    print(f"Python................ {python_version or 'NOT FOUND'}")
+    print(f"Git Clean............. {'YES' if not changes else 'NO'}")
     print(f"Docs Folder........... {'YES' if (ROOT / 'docs').exists() else 'NO'}")
     print(f"App Folder............ {'YES' if (ROOT / 'bxk_app').exists() else 'NO'}")
     print(f"Static Folder......... {'YES' if (ROOT / 'static').exists() else 'NO'}")
-    print("")
-    print("Ready to develop" if not git_status else "Clean up Git changes first")
+    print(f"Requirements.......... {'YES' if (ROOT / 'requirements.txt').exists() else 'NO'}")
+    print(f"Server................ {'YES' if (ROOT / 'server.py').exists() else 'NO'}")
+    print("\nReady to develop" if not changes else "\nClean up Git changes first")
 
 
-def new_engine(name):
+def start():
+    print("\nStarting BXK Trader Pro...\n")
+
+    branch = run("git branch --show-current").stdout.strip()
+    if branch != "v4":
+        print(f"Current branch is '{branch}'. Switching to v4...")
+        checkout = run("git checkout v4")
+        if checkout.returncode != 0:
+            print(checkout.stderr)
+            print("Could not switch to v4. Start aborted.")
+            return
+
+    print("Pulling latest changes...")
+    pull = run("git pull")
+    if pull.stdout.strip():
+        print(pull.stdout.strip())
+    if pull.stderr.strip():
+        print(pull.stderr.strip())
+
+    venv_python = ROOT / ".venv" / "Scripts" / "python.exe"
+    python_cmd = str(venv_python) if venv_python.exists() else "python"
+
+    print("\nLaunching server...")
+    subprocess.Popen(
+        [python_cmd, "server.py"],
+        cwd=ROOT,
+    )
+
+    time.sleep(3)
+    webbrowser.open(DASHBOARD_URL)
+
+    print(f"\nDashboard opened: {DASHBOARD_URL}")
+    print("Server running. Leave this terminal open.")
+
+
+def new_engine(name: str):
     snake = to_snake(name)
     path = ROOT / "bxk_app" / f"{snake}.py"
 
@@ -112,7 +148,7 @@ class {name}:
     print(f"Created {path}")
 
 
-def new_doc(name):
+def new_doc(name: str):
     path = ROOT / "docs" / f"{name}.md"
 
     if path.exists():
@@ -125,16 +161,20 @@ def new_doc(name):
 
 
 def release():
-    print("BXK RELEASE CHECKLIST")
-    print("")
-    print("[ ] Tests passing")
-    print("[ ] Documentation updated")
-    print("[ ] Git working tree clean")
-    print("[ ] Version confirmed")
-    print("[ ] Commit created")
-    print("[ ] Push complete")
-    print("[ ] Tag release")
-    print("[ ] Deploy")
+    print(
+        """
+BXK RELEASE CHECKLIST
+
+[ ] Tests passing
+[ ] Documentation updated
+[ ] Git working tree clean
+[ ] Version confirmed
+[ ] Commit created
+[ ] Push complete
+[ ] Tag release
+[ ] Deploy
+"""
+    )
 
 
 def backup():
@@ -154,6 +194,7 @@ COMMANDS = {
     "version": lambda args: version(),
     "status": lambda args: status(),
     "doctor": lambda args: doctor(),
+    "start": lambda args: start(),
     "new-engine": lambda args: new_engine(args[0]) if args else print("Missing engine name"),
     "new-doc": lambda args: new_doc(args[0]) if args else print("Missing doc name"),
     "release": lambda args: release(),
