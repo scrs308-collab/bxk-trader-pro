@@ -4,7 +4,7 @@ from bxk_app.option_scanner import (
 )
 
 from bxk_app.live_option_engine import calculate_iron_condor_credit
-from bxk_app.trade_scoring import score_candidate
+from bxk_app.trade_quality import score_candidate
 from bxk_app.scanner_settings import scanner_settings
 
 

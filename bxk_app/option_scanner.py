@@ -1,6 +1,6 @@
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.scanner_settings import scanner_settings
-from bxk_app.trade_scoring import score_candidate
+from bxk_app.trade_quality import score_candidate
 from bxk_app.live_option_engine import calculate_iron_condor_credit
 
 def safe_float(value, default=0.0):
