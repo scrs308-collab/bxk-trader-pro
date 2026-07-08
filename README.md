@@ -1,42 +1,145 @@
 # BXK Trader Pro
 
-Professional SPX Options Intelligence Platform
+![Version](https://img.shields.io/badge/version-7.1.0-blue)
+![Status](https://img.shields.io/badge/status-Stable-success)
+![Python](https://img.shields.io/badge/python-3.13-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Framework-green)
+![License](https://img.shields.io/badge/license-MIT-yellow)
 
-## Overview
+---
 
-BXK Trader Pro is an advanced decision support system designed for SPX options traders.
+## Professional SPX Options Trading Platform
 
-It evaluates current market conditions and recommends the highest probability strategy based on:
+BXK Trader Pro is a decision-support platform designed specifically for SPX options traders.
 
-- Market Trend
+The software combines live market data, volatility analysis, market scoring, expected move calculations, strategy optimization, and intelligent trade recommendations into a single streamlined dashboard.
+
+This project is built for active premium sellers with an emphasis on disciplined risk management and repeatable trading processes.
+
+---
+
+# Current Release
+
+Version **7.1.0**
+
+Status:
+
+**Stable Production Release**
+
+Development Branch:
+
+**v4**
+
+---
+
+# Core Features
+
+### Live Market Data
+
+- SPX
 - VIX
 - Expected Move
-- IV Rank
-- Directional Bias
+- Live Option Chains
+
+---
+
+### Market Intelligence
+
+- Trade Scoring
+- Market Analysis
+- Volatility Analysis
+- Expected Move
+
+---
+
+### Strategy Engine
+
+- Iron Condor Optimization
+- Multi-DTE Optimization
+- Wing Optimizer
 - Strategy Ranking
-- Risk Score
-- Confidence Score
 
-## Current Features
+---
 
-- Market Decision Engine
-- Iron Condor Ranking
-- Butterfly Ranking
-- Debit Spread Ranking
-- Confidence Scoring
-- Trade Recommendation
-- Decision Reasons
+### Dashboard
 
-## Planned Features
+- Opportunity Card
+- Scanner
+- Market Status
+- Live Dashboard
 
-- Live SPX Data
-- Live VIX Data
-- Economic Calendar
-- News Risk Detection
-- Position Management
-- Trade Journal
-- Performance Analytics
-- Daily Market Dashboard
-- Automated Alerts
+---
 
-Version: BXK Trader Pro V6
+### Broker Integration
+
+- Tastytrade OAuth
+- Live Options Data
+- Broker Abstraction Layer
+
+---
+
+# Technology Stack
+
+- Python
+- FastAPI
+- HTML5
+- CSS3
+- JavaScript
+- GitHub
+- Railway
+
+---
+
+# Repository Structure
+
+```
+bxk-trader-pro
+
+├── bxk_app/
+├── docs/
+├── static/
+├── requirements.txt
+├── README.md
+└── server.py
+```
+
+---
+
+# Development Workflow
+
+Production
+
+```
+main
+```
+
+Development
+
+```
+v4
+```
+
+---
+
+# Documentation
+
+See the **docs** folder for:
+
+- Architecture
+- API
+- Release Notes
+- Trading Logic
+- Roadmap
+- Change Log
+
+---
+
+# Mission
+
+Build the most practical and intuitive SPX options decision-support platform available.
+
+---
+
+Copyright © 2026
+
+BXK Capital

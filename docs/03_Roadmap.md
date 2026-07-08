@@ -1,35 +1,41 @@
 # Roadmap
 
-## Phase 1 ✅
+## Completed
 
-- Dashboard
-- API
-- Market Data
+✓ Dashboard
 
-## Phase 2 ✅
+✓ Scanner
 
-- Opportunity Card
-- Strategy Ranking
+✓ Opportunity Engine
 
-## Phase 3 ✅
+✓ Multi-DTE Optimizer
 
-- Scanner Engine
-- Live Market
+✓ Broker Abstraction
 
-## Phase 4 ✅
+✓ Tastytrade Integration
 
-- Multi-DTE Optimizer
-- Broker Abstraction
+---
 
-## Phase 5 (Current)
+## Current
 
-Market Intelligence Engine
+Version 4 Development
 
-Upcoming
+- Market Intelligence Engine
 
-- Trade Quality
+- Trade Quality Engine
+
 - Market DNA
-- AI Coach
+
+---
+
+## Future
+
 - Position Manager
-- Journal
-- Analytics
+
+- AI Coach
+
+- Performance Analytics
+
+- Desktop Application
+
+- Mobile Companion

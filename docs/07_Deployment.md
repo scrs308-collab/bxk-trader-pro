@@ -12,8 +12,6 @@ Production
 
 FastAPI
 
-Python
-
 Future
 
 Desktop Application

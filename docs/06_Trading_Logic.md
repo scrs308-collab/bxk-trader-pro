@@ -6,14 +6,20 @@ SPX Iron Condors
 
 Requirements
 
-- Healthy volatility
-- Expected Move favorable
-- Trend neutral
-- Trade Quality above threshold
+• Healthy volatility
+
+• Neutral market
+
+• Favorable expected move
+
+• High Trade Quality
 
 Risk Rules
 
-- Maximum one Iron Condor per day
-- Stop = 2 × Credit
-- Target = 50–75%
-- 25-point wings
+• Maximum one Iron Condor daily
+
+• 25-point wings
+
+• Stop = 2× credit
+
+• Profit target = 50–75%

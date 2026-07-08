@@ -1,21 +1,31 @@
 # Release Notes
 
-## V4
+## Version 7.1.0
 
-Beginning of modular architecture.
+Release Date
 
-Major improvements:
+July 7, 2026
 
-- Clean engine structure
-- Better Git workflow
-- Modular backend
-- AI-driven trade recommendations
+Status
 
----
+Stable Production Release
 
-## V3
+### Features
 
-- Scanner Engine
-- Multi-DTE Optimizer
-- Live Options
-- Dashboard redesign
+✓ Scanner Engine
+
+✓ Opportunity Engine
+
+✓ Multi-DTE Optimizer
+
+✓ Dashboard
+
+✓ Live Market Integration
+
+✓ Broker Abstraction
+
+✓ Tastytrade OAuth
+
+This version is permanently frozen.
+
+Future development continues on branch **v4**

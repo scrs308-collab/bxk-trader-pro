@@ -1,20 +1,19 @@
-# BXK Trader Pro TODO
+# TODO
 
-## Immediate
+## V4
 
 - Market Intelligence Engine
-- Trade Quality
-- Market DNA
-- Opportunity Scanner V2
 
-## Soon
+- Trade Quality
+
+- Market DNA
+
+- Opportunity Engine 2.0
 
 - Position Manager
-- AI Coach
-- Trade Journal
 
-## Future
+- AI Coach
 
 - Performance Dashboard
-- Desktop App
-- Mobile App
+
+- Desktop Application

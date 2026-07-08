@@ -1,70 +1,35 @@
-# Architecture
-
-## Data Flow
+# System Architecture
 
 Live Market Data
-        │
-        ▼
-Market Engine
-        │
-        ▼
-Trade Scoring
-        │
-        ▼
-Opportunity Engine
-        │
-        ▼
-Dashboard
-        │
-        ▼
-Position Engine
-        │
-        ▼
-Trade Journal
 
----
-
-## Core Modules
+↓
 
 Market Engine
 
-Responsible for:
+↓
 
-- SPX
-- VIX
-- Expected Move
-- Trend
-- Market DNA
-- Trade Quality
+Trade Quality Engine
+
+↓
 
 Opportunity Engine
 
-Responsible for:
-
-- Strike Selection
-- Wing Optimization
-- Credit
-- Probability
+↓
 
 Scanner Engine
 
-Responsible for:
+↓
 
-- Best setups
-- Strategy ranking
+Dashboard
 
-AI Coach
+↓
 
-Responsible for:
+Position Manager
 
-- Recommendations
-- Risk alerts
-- Position guidance
+↓
 
-Journal
+Trade Journal
 
-Responsible for:
+↓
 
-- Logging
-- Statistics
-- Performance
+Performance Analytics

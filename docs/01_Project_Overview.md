@@ -1,35 +1,39 @@
-# BXK Trader Pro V4
+# BXK Trader Pro
+
+## Vision
+
+Create a professional trading platform that assists traders in making disciplined, repeatable decisions based on objective market conditions rather than emotion.
+
+---
 
 ## Mission
 
-BXK Trader Pro is an intelligent SPX options trading platform designed to analyze market conditions, recommend high-probability trades, monitor risk in real time, and automatically journal trading performance.
-
-The goal is to provide institutional-quality decision support for premium-selling strategies, with an initial focus on SPX Iron Condors.
+Provide institutional-quality market intelligence for SPX premium-selling strategies.
 
 ---
 
-## Primary Objectives
+## Guiding Principles
 
-- Live Market Data
-- Market Intelligence Engine
-- Opportunity Scanner
-- Strategy Recommendation Engine
-- Position Management
-- AI Trading Coach
-- Trade Journal
-- Performance Analytics
+• Simplicity
+
+• Speed
+
+• Reliability
+
+• Risk First
+
+• Data Driven
+
+• One Source of Truth
 
 ---
 
-## Current Version
+## Primary Strategy
 
-V4 Development
+SPX Iron Condors
 
-Branch:
-v4
+---
 
-Repository:
-GitHub
+## Long-Term Goal
 
-Owner:
-Joe Butler
+Become the complete decision-support platform for professional SPX traders.
