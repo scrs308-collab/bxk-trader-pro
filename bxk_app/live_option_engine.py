@@ -63,9 +63,10 @@ def get_live_quotes(symbols: list[str]) -> dict:
             return loop.run_until_complete(fetch_live_quotes(symbols))
         finally:
             loop.close()
-    except Exception:
-        return {}
-
+    except Exception as e:
+        print(f"LIVE QUOTE ERROR: {e}")
+        return {}        
+    
 
 def mid_price(quote: dict) -> float:
     bid = to_float(quote.get("bid"))

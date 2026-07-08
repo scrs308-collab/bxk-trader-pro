@@ -52,12 +52,12 @@ class MarketData:
 
         return {
             "symbol": "SPX",
-            "price": float(self.spx) if self.spx != "--" else 7535.54,
-            "vix": float(self.vix) if self.vix != "--" else 15.85,
-            "vix1d": float(self.vix1d) if self.vix1d != "--" else 12.50,
-            "atr": 11.44,
-            "iv_rank": 34.2,
-            "expected_move": float(self.expected_move) if self.expected_move != "--" else 62.5,
+            "price": float(self.spx) if self.spx != "--" else 0,
+            "vix": float(self.vix) if self.vix != "--" else 0,
+            "vix1d": float(self.vix1d) if self.vix1d != "--" else 0,
+            "atr": 0,
+            "iv_rank": 0,
+            "expected_move": float(self.expected_move) if self.expected_move != "--" else 0,
             "market_status": self.market_status(),
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }

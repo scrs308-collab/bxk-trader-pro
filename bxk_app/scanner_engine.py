@@ -56,7 +56,7 @@ def find_top_iron_condors(
         days_to_expiration=days_to_expiration,
     )
 
-    ranked = []
+    ranked: list[dict] = []
 
     for raw in raw_candidates:
         trade = normalize_candidate(
