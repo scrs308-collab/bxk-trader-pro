@@ -103,7 +103,13 @@ def start():
 
     print("\nLaunching server...")
     subprocess.Popen(
-        [python_cmd, "server.py"],
+        [
+            python_cmd,
+            "-m",
+            "uvicorn",
+            "bxk_app.main:app",
+            "--reload",
+        ],
         cwd=ROOT,
     )
 
