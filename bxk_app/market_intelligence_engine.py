@@ -6,9 +6,8 @@ Market Intelligence Engine
 Purpose:
 Collects all live market data and converts it into a structured market snapshot.
 """
-
 from datetime import datetime
-
+from bxk_app.market_snapshot import MarketSnapshot
 
 class MarketIntelligenceEngine:
 
@@ -16,23 +15,43 @@ class MarketIntelligenceEngine:
         pass
 
     def evaluate(self):
+        return MarketSnapshot(
 
-        return {
+            timestamp=datetime.now(),
 
-            "timestamp": datetime.now().isoformat(),
+            spx=self.get_spx(),
 
-            "spx": None,
+            vix=self.get_vix(),
 
-            "vix": None,
+            vix1d=self.get_vix1d(),
 
-            "vix1d": None,
+            expected_move=self.get_expected_move(),
 
-            "expected_move": None,
+            trend=self.get_trend(),
 
-            "trend": "UNKNOWN",
+            volatility=self.get_volatility(),
 
-            "volatility": "UNKNOWN",
+            market_regime=self.get_market_regime(),
 
-            "market_regime": "UNKNOWN"
+        )
 
-        }
+    def get_spx(self):
+        return None
+
+    def get_vix(self):
+        return None
+    
+    def get_vix1d(self):
+        return None
+
+    def get_expected_move(self):
+        return None
+
+    def get_trend(self):
+        return "UNKNOWN"
+
+    def get_volatility(self):
+        return "UNKNOWN"
+
+    def get_market_regime(self):
+        return "UNKNOWN"
