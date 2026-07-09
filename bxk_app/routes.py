@@ -14,6 +14,7 @@ from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scanner_engine import find_best_iron_condor
 from bxk_app.option_scanner import generate_candidate_condors
 from bxk_app.wing_optimizer import find_best_trade
+from bxk_app.strategy_ranking_engine import rank_strategies
 router = APIRouter()
 
 @router.get("/api/test-env")
@@ -398,3 +399,6 @@ def debug_market():
         "expected_move": market_data.expected_move,
         "snapshot": market_data.get_snapshot(),
     }
+@router.get("/api/strategy-rankings")
+def strategy_rankings():
+    return rank_strategies()
