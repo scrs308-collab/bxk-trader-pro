@@ -24,22 +24,30 @@ def find_best_trade(
                 trade["days_to_expiration"] = dte
                 all_candidates.append(trade)
 
+    all_candidates = [
+        trade for trade in all_candidates
+        if trade.get("valid_credit") is True
+        and trade.get("live_credit", 0) > 0
+        and trade.get("put_credit", 0) > 0
+        and trade.get("call_credit", 0) > 0
+    ]
+
     if not all_candidates:
         return None
 
-    all_candidates.sort(
-        key=lambda t: (
-            t.get("trade_score", 0),
-            t.get("live_credit", 0),
-            t.get("return_on_risk", 0),
-        ),
-        reverse=True,
-    )
+        all_candidates.sort(
+            key=lambda t: (
+                t.get("trade_score", 0),
+                t.get("live_credit", 0),
+                t.get("return_on_risk", 0),
+            ),
+            reverse=True,
+        )
 
-    best = dict(all_candidates[0])
-    best["candidates_evaluated"] = len(all_candidates)
+        best = dict(all_candidates[0])
+        best["candidates_evaluated"] = len(all_candidates)
 
-    # TEMP
-    best["top_candidates"] = []
+        # TEMP
+        best["top_candidates"] = []
 
-    return best
+        return best

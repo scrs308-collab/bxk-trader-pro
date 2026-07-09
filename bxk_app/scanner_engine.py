@@ -14,6 +14,7 @@ def enrich_candidate(trade: dict) -> dict:
 
     wing_width = trade.get("wing_width", scanner_settings.wing_width)
 
+    trade["valid_credit"] = live.get("valid_credit", False)
     trade["credit"] = credit
     trade["live_credit"] = credit
     trade["target_credit"] = credit
@@ -66,6 +67,15 @@ def find_top_iron_condors(
         )
 
         enriched = enrich_candidate(trade)
+
+        if enriched.get("valid_credit") is not True:
+            continue
+
+        if enriched.get("put_credit", 0) <= 0:
+            continue
+
+        if enriched.get("call_credit", 0) <= 0:
+            continue
 
         if enriched.get("live_credit", 0) < scanner_settings.minimum_credit:
             continue

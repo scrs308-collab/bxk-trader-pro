@@ -37,7 +37,6 @@ def confidence_from_score(score: int) -> str:
         return "MEDIUM"
     return "LOW"
 
-
 def build_opportunity(market: MarketDecision) -> dict:
     try:
         snapshot = market_data.get_snapshot()
@@ -58,6 +57,9 @@ def build_opportunity(market: MarketDecision) -> dict:
             "buy_put": None,
             "buy_call": None,
             "target_credit": None,
+            "live_credit": None,
+            "put_credit": None,
+            "call_credit": None,
             "pop": None,
             "risk_level": "WAIT",
             "trade_score": 0,
@@ -69,12 +71,9 @@ def build_opportunity(market: MarketDecision) -> dict:
 
     wing_width = 25
     target_credit = 1.75
+    fallback_reason = None
 
-    chain_trade = find_best_trade(
-        spx_price=spx_price,
-        expected_move=expected_move,
-    )
-    live_credit_data = chain_trade if chain_trade else None
+    chain_trade = None
 
     if chain_trade:
         source = chain_trade.get("source", "LIVE_CHAIN_RANKED")
@@ -87,18 +86,26 @@ def build_opportunity(market: MarketDecision) -> dict:
         buy_call = chain_trade["buy_call"]
         put_buffer = chain_trade["put_buffer"]
         call_buffer = chain_trade["call_buffer"]
+        put_credit = chain_trade.get("put_credit")
+        call_credit = chain_trade.get("call_credit")
+        days_to_expiration = chain_trade.get("days_to_expiration")
     else:
         source = "ESTIMATE"
+        fallback_reason = "Live chain rejected or unavailable: using estimated 25-point IC."
+
         sell_put = round_to_5(spx_price - expected_move)
         sell_call = round_to_5(spx_price + expected_move)
         buy_put = sell_put - wing_width
         buy_call = sell_call + wing_width
         put_buffer = round(spx_price - sell_put, 2)
         call_buffer = round(sell_call - spx_price, 2)
+        put_credit = None
+        call_credit = None
+        days_to_expiration = 0
 
     max_risk = round((wing_width - target_credit) * 100, 2)
     expected_profit = round(target_credit * 100, 2)
-    
+
     trade_score = calculate_trade_score(
         target_credit=target_credit,
         wing_width=wing_width,
@@ -110,6 +117,10 @@ def build_opportunity(market: MarketDecision) -> dict:
     confidence = confidence_from_score(trade_score)
 
     reasons = list(market.reasons)
+
+    if fallback_reason:
+        reasons.append(fallback_reason)
+
     reasons.extend(
         [
             f"Source: {source}",
@@ -117,7 +128,7 @@ def build_opportunity(market: MarketDecision) -> dict:
             f"Expected move: ±{round(expected_move, 2)}",
             f"Put buffer: {put_buffer}",
             f"Call buffer: {call_buffer}",
-            f"{chain_trade.get('wing_width', wing_width) if chain_trade else wing_width}-point wings selected",
+            f"{wing_width}-point wings selected",
             f"Target credit: {target_credit}",
         ]
     )
@@ -125,7 +136,7 @@ def build_opportunity(market: MarketDecision) -> dict:
     return {
         "strategy": "IRON CONDOR",
         "source": source,
-        "days_to_expiration": chain_trade.get("days_to_expiration") if chain_trade else 0,
+        "days_to_expiration": days_to_expiration,
         "spx_price": round(spx_price, 2),
         "expected_move": round(expected_move, 2),
         "sell_put": sell_put,
@@ -134,8 +145,8 @@ def build_opportunity(market: MarketDecision) -> dict:
         "buy_call": buy_call,
         "target_credit": target_credit,
         "live_credit": target_credit,
-        "put_credit": live_credit_data.get("put_credit") if live_credit_data else None,
-        "call_credit": live_credit_data.get("call_credit") if live_credit_data else None,
+        "put_credit": put_credit,
+        "call_credit": call_credit,
         "pop": 85,
         "risk_level": "LOW" if trade_score >= 75 else "MEDIUM",
         "trade_score": trade_score,

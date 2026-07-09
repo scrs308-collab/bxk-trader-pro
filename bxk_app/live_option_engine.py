@@ -37,7 +37,11 @@ async def fetch_live_quotes(symbols: list[str]) -> dict:
 
         while len(quotes) < len(symbols) and attempts < max_attempts:
             attempts += 1
-            quote = await streamer.get_event(Quote)
+
+            try:
+                quote = await streamer.get_event(Quote)
+            except Exception:
+                continue
 
             symbol = getattr(quote, "event_symbol", None)
 
@@ -57,16 +61,19 @@ async def fetch_live_quotes(symbols: list[str]) -> dict:
 def get_live_quotes(symbols: list[str]) -> dict:
     try:
         return asyncio.run(fetch_live_quotes(symbols))
+
     except RuntimeError:
         loop = asyncio.new_event_loop()
+
         try:
             return loop.run_until_complete(fetch_live_quotes(symbols))
         finally:
             loop.close()
+
     except Exception as e:
         print(f"LIVE QUOTE ERROR: {e}")
-        return {}        
-    
+        return {}
+
 
 def mid_price(quote: dict) -> float:
     bid = to_float(quote.get("bid"))
@@ -79,34 +86,53 @@ def mid_price(quote: dict) -> float:
 
 
 def calculate_iron_condor_credit(trade: dict) -> dict:
+    """
+    Returns live pricing for an Iron Condor.
+
+    Supports either:
+        *_symbol
+    or
+        *_streamer
+    """
+
     symbols = [
-        trade["sell_put_streamer"],
-        trade["buy_put_streamer"],
-        trade["sell_call_streamer"],
-        trade["buy_call_streamer"],
+        trade.get("sell_put_symbol") or trade.get("sell_put_streamer"),
+        trade.get("buy_put_symbol") or trade.get("buy_put_streamer"),
+        trade.get("sell_call_symbol") or trade.get("sell_call_streamer"),
+        trade.get("buy_call_symbol") or trade.get("buy_call_streamer"),
     ]
 
     quotes = get_live_quotes(symbols)
 
-    sell_put = quotes.get(trade["sell_put_streamer"], {})
-    buy_put = quotes.get(trade["buy_put_streamer"], {})
-    sell_call = quotes.get(trade["sell_call_streamer"], {})
-    buy_call = quotes.get(trade["buy_call_streamer"], {})
+    sell_put = quotes.get(symbols[0], {})
+    buy_put = quotes.get(symbols[1], {})
+    sell_call = quotes.get(symbols[2], {})
+    buy_call = quotes.get(symbols[3], {})
 
     sell_put_mid = mid_price(sell_put)
     buy_put_mid = mid_price(buy_put)
     sell_call_mid = mid_price(sell_call)
     buy_call_mid = mid_price(buy_call)
 
-    put_credit = sell_put_mid - buy_put_mid
-    call_credit = sell_call_mid - buy_call_mid
-
+    put_credit = round(sell_put_mid - buy_put_mid, 2)
+    call_credit = round(sell_call_mid - buy_call_mid, 2)
     total_credit = round(put_credit + call_credit, 2)
 
+    valid_credit = (
+        sell_put_mid > 0
+        and buy_put_mid > 0
+        and sell_call_mid > 0
+        and buy_call_mid > 0
+        and put_credit > 0
+        and call_credit > 0
+        and total_credit > 0
+    )
+
     return {
-        "live_credit": round(max(total_credit, 0), 2),
-        "put_credit": round(put_credit, 2),
-        "call_credit": round(call_credit, 2),
+        "valid_credit": valid_credit,
+        "live_credit": total_credit if valid_credit else 0,
+        "put_credit": put_credit,
+        "call_credit": call_credit,
         "sell_put_mid": sell_put_mid,
         "buy_put_mid": buy_put_mid,
         "sell_call_mid": sell_call_mid,

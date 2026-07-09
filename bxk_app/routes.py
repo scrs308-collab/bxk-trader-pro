@@ -42,10 +42,11 @@ def api_health():
 def recommend_short():
     return recommend()
 
-
 @router.get("/api/recommend")
 def recommend():
+    market_engine.update()
     market = run_trade_quality()
+
 
     strategies = rank_strategies(
         market.score,
