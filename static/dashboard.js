@@ -276,6 +276,9 @@ async function loadBestTrade() {
 
     const tradeScore = trade.score || trade.trade_score || 96;
     const pop = trade.pop || 84;
+    const reasons = (trade.reasons || [])
+    .map(reason => `<span>✓ ${reason}</span>`)
+    .join("");
 
     card.innerHTML = `
       <div class="hero-header">
@@ -320,7 +323,10 @@ async function loadBestTrade() {
           </div>
         </div>
       </div>
-
+          
+        <div class="why-pills">
+           ${reasons}
+      </div>
       <div class="metric-strip">
         <div>
           <span>Credit</span>
@@ -348,13 +354,7 @@ async function loadBestTrade() {
         </div>
       </div>
 
-      <div class="why-pills">
-        <span>✓ Outside Expected Move</span>
-        <span>✓ Defined Risk</span>
-        <span>✓ Premium Target Met</span>
-        <span>✓ Balanced Structure</span>
-        <span>✓ Engine Ranked</span>
-      </div>
+     
     `;
   } catch (error) {
     card.innerHTML = `
