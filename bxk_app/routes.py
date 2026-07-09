@@ -1,6 +1,6 @@
 from bxk_app.market_engine import market_engine
 from datetime import datetime
-
+from bxk_app.trade_builder import build_best_trade
 from fastapi import APIRouter
 from bxk_app.option_scanner import generate_candidate_condors, normalize_candidate
 from bxk_app.live_option_engine import calculate_iron_condor_credit
@@ -381,3 +381,20 @@ def test_candidate_grid():
             })
 
     return {"results": results}
+@router.get("/api/best-trade")
+def best_trade():
+    return build_best_trade(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
+@router.get("/api/debug/market")
+def debug_market():
+    return {
+        "status": "OK",
+        "spx": market_data.spx,
+        "vix": market_data.vix,
+        "vix1d": market_data.vix1d,
+        "expected_move": market_data.expected_move,
+        "snapshot": market_data.get_snapshot(),
+    }
