@@ -1,7 +1,7 @@
 from bxk_app.models import MarketDecision
 from bxk_app.market_data import market_data
 from bxk_app.wing_optimizer import find_best_trade
-
+from bxk_app.scanner_v2 import find_best_iron_condor_v2
 def round_to_5(value: float) -> int:
     return int(round(value / 5) * 5)
 
@@ -73,7 +73,14 @@ def build_opportunity(market: MarketDecision) -> dict:
     target_credit = 1.75
     fallback_reason = None
 
-    chain_trade = None
+    scanner_result = find_best_iron_condor_v2(
+        spx_price=spx_price,
+        expected_move=expected_move,
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    chain_trade = scanner_result.get("best_trade")
 
     if chain_trade:
         source = chain_trade.get("source", "LIVE_CHAIN_RANKED")

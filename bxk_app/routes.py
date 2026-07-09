@@ -2,7 +2,7 @@ from bxk_app.market_engine import market_engine
 from datetime import datetime
 
 from fastapi import APIRouter
-from bxk_app.option_scanner import generate_candidate_condors, normalize_candidate
+from bxk_app.option_scanner import generate_candidate_condors, normalize_candidate, build_chain_based_iron_condor
 from bxk_app.live_option_engine import calculate_iron_condor_credit
 from bxk_app.market_data import market_data
 from bxk_app.scoring import run_trade_quality
@@ -14,6 +14,11 @@ from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scanner_engine import find_best_iron_condor
 from bxk_app.option_scanner import generate_candidate_condors
 from bxk_app.wing_optimizer import find_best_trade
+from bxk_app.quote_cache import quote_cache
+from bxk_app.option_scanner import generate_candidate_condors
+from bxk_app.cache_builder import build_symbol_list
+from bxk_app.scanner_engine import find_top_iron_condors
+
 router = APIRouter()
 
 @router.get("/api/test-env")
@@ -53,6 +58,16 @@ def recommend():
         market.trend,
         market.vix_state,
     )
+    snapshot = market_data.get_snapshot()
+
+    cache = build_symbol_list(
+        spx_price=snapshot["price"],
+        expected_move=snapshot["expected_move"],
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    quote_cache.refresh(cache["symbols"])
 
     opportunity = build_opportunity(market)
 
@@ -76,7 +91,6 @@ def recommend():
         "strategies": strategies,
         "opportunity": opportunity,
     }
-
 
 @router.get("/api/debug")
 def debug():
@@ -127,6 +141,55 @@ def market_brief():
 def live_market():
     return market_engine.update()
 
+@router.get("/api/test-scanner")
+def test_scanner():
+    
+    snapshot = market_data.get_snapshot()
+
+    trades = find_top_iron_condors(
+        spx_price=snapshot["price"],
+        expected_move=snapshot["expected_move"],
+        wing_width=25,
+        limit=3,
+        days_to_expiration=1,
+    )
+
+    if not trades:
+        return {
+            "status": "No valid trades"
+        }
+
+    return {
+        "best": trades[0],
+        "rejected": trades[0].get("rejected_candidates", []),
+    }
+
+@router.get("/api/test-scanner-v2")
+def test_scanner_v2():
+    from bxk_app.cache_builder import build_symbol_list
+    from bxk_app.quote_cache import quote_cache
+    from bxk_app.scanner_v2 import find_best_iron_condor_v2
+
+    snapshot = market_data.get_snapshot()
+
+    cache = build_symbol_list(
+        spx_price=snapshot["price"],
+        expected_move=snapshot["expected_move"],
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    quote_cache.refresh(cache["symbols"])
+
+    result = find_best_iron_condor_v2(
+        spx_price=snapshot["price"],
+        expected_move=snapshot["expected_move"],
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    return result
+
 @router.get("/api/test-tastytrade")
 def test_tastytrade():
     connected = tastytrade_client.connect()
@@ -167,6 +230,28 @@ def test_tastytrade_positions():
         "status": tastytrade_api.get_status(),
         "positions": positions,
     }
+@router.get("/api/test-candidate-cache")
+def test_candidate_cache():
+    from bxk_app.cache_builder import build_symbol_list
+    from bxk_app.quote_cache import quote_cache
+
+    snapshot = market_data.get_snapshot()
+
+    cache = build_symbol_list(
+        spx_price=snapshot["price"],
+        expected_move=snapshot["expected_move"],
+        wing_width=25,
+        days_to_expiration=1,
+    )
+
+    quote_cache.refresh(cache["symbols"])
+
+    return {
+        "symbol_count": len(cache["symbols"]),
+        "trade_count": len(cache["trades"]),
+        "cache_status": quote_cache.status(),
+        "symbols": cache["symbols"],
+    }
 
 @router.get("/api/positions-summary")
 def positions_summary():
@@ -188,6 +273,34 @@ def test_wing_optimizer():
 
     return {
         "trade": trade,
+    }
+@router.get("/api/test-quote-cache")
+def test_quote_cache():
+    
+    trade = build_chain_based_iron_condor(
+        spx_price=7540,
+        expected_move=62.5,
+        wing_width=25,
+    )
+
+    if not trade:
+        return {
+            "error": "Unable to build trade."
+        }
+
+    symbols = [
+        trade["sell_put_streamer"],
+        trade["buy_put_streamer"],
+        trade["sell_call_streamer"],
+        trade["buy_call_streamer"],
+    ]
+
+    quote_cache.refresh(symbols)
+
+    return {
+        "trade": trade,
+        "cache_status": quote_cache.status(),
+        "quotes": quote_cache.quotes,
     }
 @router.get("/api/account-summary")
 def account_summary():
@@ -275,8 +388,8 @@ def test_spx_option_quotes():
         price = float(strike["strike-price"])
 
         if 7450 <= price <= 7625:
-            sample_symbols.append(strike["put-streamer-symbol"])
-            sample_symbols.append(strike["call-streamer-symbol"])
+            sample_symbols.append(strike["put"])
+            sample_symbols.append(strike["call"])
 
         if len(sample_symbols) >= 10:
             break
@@ -284,7 +397,7 @@ def test_spx_option_quotes():
     quotes = tastytrade_api.get_option_quotes(sample_symbols)
 
     return {
-        "using": "streamer-symbols",
+        "using": "standard-option-symbols",
         "sample_symbols": sample_symbols,
         "quote_count": len(quotes),
         "quotes": quotes,
@@ -362,8 +475,7 @@ def test_expirations():
     }
 @router.get("/api/test-candidate-grid")
 def test_candidate_grid():
-    from bxk_app.option_scanner import generate_candidate_condors
-
+    
     results = []
 
     for dte in [0, 1, 2, 3]:
@@ -380,5 +492,38 @@ def test_candidate_grid():
                 "wing": wing,
                 "count": len(candidates),
             })
+@router.get("/api/test-dxlink-quotes")
+def test_dxlink_quotes():
+    from bxk_app.live_option_engine import get_live_quotes
 
+    chain = tastytrade_api.get_spx_option_chain()
+
+    if not chain:
+        return {"error": "No chain"}
+
+    item = chain["items"][0]
+    expiration = item["expirations"][0]
+    strikes = expiration["strikes"]
+
+    test_symbols = []
+
+    for strike in strikes:
+        price = float(strike["strike-price"])
+
+        if 7450 <= price <= 7470:
+            test_symbols.append(strike["put-streamer-symbol"])
+            test_symbols.append(strike["call-streamer-symbol"])
+            test_symbols.append(strike["put"])
+            test_symbols.append(strike["call"])
+
+        if len(test_symbols) >= 8:
+            break
+
+    quotes = get_live_quotes(test_symbols)
+
+    return {
+        "test_symbols": test_symbols,
+        "quote_count": len(quotes),
+        "quotes": quotes,
+    }
     return {"results": results}

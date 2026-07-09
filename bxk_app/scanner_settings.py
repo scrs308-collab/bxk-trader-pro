@@ -11,8 +11,8 @@ class ScannerSettings:
     wing_width: int = 25
 
     # Candidate search
-    search_points: int = 30
-    strike_increment: int = 5
+    search_points: int = 30         # was 30
+    strike_increment: int = 13
 
     # Premium
     minimum_credit: float = 0.01
@@ -27,7 +27,7 @@ class ScannerSettings:
     max_delta: float = 0.15
 
     # Scanner
-    max_candidates: int = 50
+    max_candidates: int = 3         # was 50
 
     # Liquidity
     minimum_bid_size: int = 1

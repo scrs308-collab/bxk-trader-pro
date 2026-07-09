@@ -1,7 +1,7 @@
 from bxk_app.scanner_engine import find_top_iron_condors
 
-WING_WIDTHS = [5, 10, 20, 25]
-DTE_CHOICES = [0, 1, 2, 3]
+WING_WIDTHS = [25]
+DTE_CHOICES = [0]
 
 def find_best_trade(
     spx_price: float,
@@ -15,7 +15,7 @@ def find_best_trade(
                 spx_price=spx_price,
                 expected_move=expected_move,
                 wing_width=wing,
-                limit=10,
+                limit=1,
                 days_to_expiration=dte,
             )
 

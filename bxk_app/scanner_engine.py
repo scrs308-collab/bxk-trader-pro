@@ -2,14 +2,18 @@ from bxk_app.option_scanner import (
     generate_candidate_condors,
     normalize_candidate,
 )
-
+from bxk_app.quote_cache import quote_cache
+from bxk_app.live_option_engine import calculate_iron_condor_credit_from_quotes
 from bxk_app.live_option_engine import calculate_iron_condor_credit
 from bxk_app.trade_quality import score_candidate
 from bxk_app.scanner_settings import scanner_settings
 
 
 def enrich_candidate(trade: dict) -> dict:
-    live = calculate_iron_condor_credit(trade)
+    live = calculate_iron_condor_credit_from_quotes(
+    trade,
+    quote_cache.quotes,
+)
     credit = live.get("live_credit", 0)
 
     wing_width = trade.get("wing_width", scanner_settings.wing_width)
@@ -58,6 +62,7 @@ def find_top_iron_condors(
     )
 
     ranked: list[dict] = []
+    rejected: list[dict] = []
 
     for raw in raw_candidates:
         trade = normalize_candidate(
@@ -65,19 +70,28 @@ def find_top_iron_condors(
             spx_price=spx_price,
             expected_move=expected_move,
         )
+        trade["cached_quotes"] = quote_cache.quotes
 
         enriched = enrich_candidate(trade)
 
         if enriched.get("valid_credit") is not True:
+            enriched["reject_reason"] = "Invalid live credit"
+            rejected.append(enriched)
             continue
 
         if enriched.get("put_credit", 0) <= 0:
+            enriched["reject_reason"] = "Put spread credit <= 0"
+            rejected.append(enriched)
             continue
 
         if enriched.get("call_credit", 0) <= 0:
+            enriched["reject_reason"] = "Call spread credit <= 0"
+            rejected.append(enriched)
             continue
 
         if enriched.get("live_credit", 0) < scanner_settings.minimum_credit:
+            enriched["reject_reason"] = "Credit below minimum"
+            rejected.append(enriched)
             continue
 
         ranked.append(enriched)
@@ -92,7 +106,8 @@ def find_top_iron_condors(
         ),
         reverse=True,
     )
-
+    if ranked:
+        ranked[0]["rejected_candidates"] = rejected
     return ranked[:limit]
 
 
