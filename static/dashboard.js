@@ -181,74 +181,6 @@ setInterval(fetchRecommendation, 30000);
 setInterval(updateClock, 1000);
 
 async function loadBestTrade() {
-  try {
-    const response = await fetch("/api/best-trade");
-    const data = await response.json();
-
-    const trade = data.best_trade;
-
-    if (!trade) {
-      document.getElementById("bestTradeCard").innerHTML = `
-        <h2>Today's Best Trade</h2>
-        <div class="trade-warning">No trade available</div>
-        <p>${data.reason || "Trade engine did not return a setup."}</p>
-      `;
-      return;
-    }
-
-    const statusClass =
-      data.status === "OK" ? "trade-green" :
-      data.status === "DEMO" ? "trade-yellow" :
-      "trade-red";
-
-    document.getElementById("bestTradeCard").innerHTML = `
-      <h2>Today's Best Trade</h2>
-
-      <div class="trade-status ${statusClass}">
-        ${data.status === "OK" ? "LIVE TRADE" : data.status}
-      </div>
-
-      <h1>${trade.strategy}</h1>
-
-      <div class="trade-grid">
-        <div><span>SPX</span><strong>${trade.spx_price}</strong></div>
-        <div><span>DTE</span><strong>${trade.dte}</strong></div>
-        <div><span>Expected Move</span><strong>±${trade.expected_move}</strong></div>
-        <div><span>Credit</span><strong>${trade.credit}</strong></div>
-      </div>
-
-      <div class="legs">
-        <div class="leg call">SELL ${trade.sell_call} CALL</div>
-        <div class="leg call">BUY ${trade.buy_call} CALL</div>
-        <div class="leg put">SELL ${trade.sell_put} PUT</div>
-        <div class="leg put">BUY ${trade.buy_put} PUT</div>
-      </div>
-
-      <div class="trade-grid">
-        <div><span>Max Profit</span><strong>$${trade.max_profit}</strong></div>
-        <div><span>Max Risk</span><strong>$${trade.max_risk}</strong></div>
-        <div><span>Risk / Reward</span><strong>${trade.risk_reward}</strong></div>
-        <div><span>Wing Width</span><strong>${trade.wing_width}</strong></div>
-      </div>
-
-      <div class="why-box">
-        <h3>Why this trade?</h3>
-        <p>✓ Outside expected move</p>
-        <p>✓ Defined risk</p>
-        <p>✓ Premium target met</p>
-        <p>✓ Balanced call and put structure</p>
-      </div>
-    `;
-  } catch (error) {
-    document.getElementById("bestTradeCard").innerHTML = `
-      <h2>Today's Best Trade</h2>
-      <div class="trade-red">ERROR</div>
-      <p>Could not load best trade.</p>
-    `;
-  }
-}
-
-async function loadBestTrade() {
   const card = document.getElementById("bestTradeCard");
 
   try {
@@ -269,12 +201,20 @@ async function loadBestTrade() {
       `;
       return;
     }
-
+    console.log(trade);
     const isDemo = data.status === "DEMO";
-    const recommendation = isDemo ? "DEMO MODE" : "ENTER TRADE";
-    const badgeClass = isDemo ? "demo" : "enter";
+   const recommendation =
+     trade.market_regime === "TRADE"
+       ? "ENTER TRADE"
+    :   "NO TRADE";
+   const badgeClass =
+  isDemo
+    ? "demo"
+    : trade.market_regime === "TRADE"
+      ? "enter"
+      : "no-trade";
 
-    const tradeScore = trade.score || trade.trade_score || 96;
+    const tradeScore = trade.trade_score || 0;
     const pop = trade.pop || 84;
     const reasons = (trade.reasons || [])
     .map(reason => `<span>✓ ${reason}</span>`)

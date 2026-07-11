@@ -1,3 +1,5 @@
+
+
 def analyze_trade(trade: dict):
     """
     Weighted trade scoring engine.
@@ -6,9 +8,12 @@ def analyze_trade(trade: dict):
 
     score = 0
     reasons = []
-
     credit = float(trade.get("credit", 0))
     pop = float(trade.get("pop", 0))
+
+    touch_raw = trade.get("probability_of_touch")
+    touch = float(touch_raw) if touch_raw is not None else None
+
     risk_reward = float(trade.get("risk_reward", 99))
     wing = int(trade.get("wing_width", 25))
 
@@ -87,16 +92,41 @@ def analyze_trade(trade: dict):
     # ---------------------------
 
     if pop >= 90:
-        score += 10
+        score += 20
 
     elif pop >= 85:
-        score += 9
+        score += 18
 
     elif pop >= 80:
-        score += 8
+        score += 16
 
     elif pop >= 75:
-        score += 6
+        score += 12
+
+    elif pop >= 70:
+        score += 8
+
+    # ---------------------------
+    # Probability of Touch
+    # ---------------------------
+
+    if touch is not None:
+
+        if touch <= 25:
+            score += 15
+            reasons.append("Very low touch probability")
+
+        elif touch <= 35:
+            score += 12
+            reasons.append("Low touch probability")
+
+        elif touch <= 45:
+            score += 8
+            reasons.append("Moderate touch probability")
+
+        else:
+            score += 4
+            reasons.append("High touch probability")
 
     reasons.append(f"Probability of profit {pop:.0f}%")
 
@@ -130,24 +160,43 @@ def analyze_trade(trade: dict):
         score += 3
 
     score = round(score)
-
     if score >= 95:
-        rating = "A+ Elite"
+        grade = "A+"
+        rating = "Elite"
 
     elif score >= 90:
-        rating = "A Excellent"
+        grade = "A"
+        rating = "Excellent"
+
+    elif score >= 85:
+        grade = "A-"
+        rating = "Strong"
 
     elif score >= 80:
-        rating = "B Good"
+        grade = "B+"
+        rating = "Good"
+
+    elif score >= 75:
+        grade = "B"
+        rating = "Acceptable"
 
     elif score >= 70:
-        rating = "C Fair"
+        grade = "C"
+        rating = "Fair"
+
+    elif score >= 60:
+        grade = "D"
+        rating = "Weak"
 
     else:
-        rating = "D Poor"
+        grade = "F"
+        rating = "Poor"
 
     return {
-        "trade_score": score,
-        "rating": rating,
-        "reasons": reasons,
-    }
+    "trade_score": score,
+    "grade": grade,
+    "rating": rating,
+    "quality_label": f"{grade} {rating}",
+    "reasons": reasons,
+}
+    

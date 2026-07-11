@@ -14,7 +14,7 @@ from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scanner_engine import find_best_iron_condor
 from bxk_app.option_scanner import generate_candidate_condors
 from bxk_app.wing_optimizer import find_best_trade
-from bxk_app.strategy_ranking_engine import rank_strategies
+
 router = APIRouter()
 
 @router.get("/api/test-env")
@@ -53,6 +53,40 @@ def recommend():
         market.trend,
         market.vix_state,
     )
+
+    opportunity = build_opportunity(market)
+
+    best_trade = build_best_trade(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
+
+    return {
+        "app": "BXK Trader Pro",
+        "version": "6.1",
+        "status": "OK",
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+
+        "trade": market.market_regime,
+        "market_regime": market.market_regime,
+        "confidence": market.confidence,
+        "score": market.score,
+        "trend": market.trend,
+        "vix_state": market.vix_state,
+        "expected_move_state": market.expected_move_state,
+        "iv_rank_state": market.iv_rank_state,
+        "recommendation": market.recommendation,
+        "reasons": market.reasons,
+
+        "strategies": strategies,
+
+        # Legacy V4 opportunity data
+        "opportunity": opportunity,
+
+        # V5 live trade recommendation
+        "best_trade": best_trade,
+    }
 
     opportunity = build_opportunity(market)
 
@@ -298,23 +332,36 @@ def test_scanner_engine():
         spx_price=7535.54,
         expected_move=62.5,
         wing_width=25,
+        days_to_expiration=1,
     )
+
+    return {"trade": trade}
 @router.get("/api/test-candidates")
 def test_candidates():
     candidates = generate_candidate_condors(
         spx_price=7535.54,
         expected_move=62.5,
         wing_width=25,
+        days_to_expiration=1,
     )
 
     return {
+        "requested_dte": 1,
         "count": len(candidates),
+        "selected_dte": (
+            candidates[0]["sell_put"].get("days_to_expiration")
+            if candidates
+            else None
+        ),
+        "expiration_date": (
+            candidates[0]["sell_put"].get("expiration_date")
+            if candidates
+            else None
+        ),
         "first": candidates[0] if candidates else None,
         "last": candidates[-1] if candidates else None,
     }
-    return {
-        "trade": trade,
-    }
+    
 @router.get("/api/test-first-candidate-credit")
 def test_first_candidate_credit():
     raw = generate_candidate_condors(
@@ -402,3 +449,48 @@ def debug_market():
 @router.get("/api/strategy-rankings")
 def strategy_rankings():
     return rank_strategies()
+
+@router.get("/api/test-option-quote-fields")
+def test_option_quote_fields():
+    result = build_best_trade(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
+
+    trade = result.get("best_trade")
+
+    if not trade:
+        return {
+            "error": "No best trade returned",
+            "result": result,
+        }
+
+    symbols = [
+        trade.get("sell_put_symbol"),
+        trade.get("buy_put_symbol"),
+        trade.get("sell_call_symbol"),
+        trade.get("buy_call_symbol"),
+    ]
+
+    symbols = [
+        symbol
+        for symbol in symbols
+        if symbol
+    ]
+
+    quotes = tastytrade_api.get_option_quotes(symbols)
+
+    return {
+        "symbols_sent": symbols,
+        "quote_count": len(quotes),
+        "first_quote_keys": (
+            list(quotes[0].keys())
+            if quotes
+            else []
+        ),
+        "quotes": quotes,
+        "status": tastytrade_api.get_status(),
+    }
+
+    

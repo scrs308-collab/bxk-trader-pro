@@ -123,21 +123,37 @@ def build_best_trade(
         best_candidate = {
             "strategy": "SPX Iron Condor",
             "symbol": "SPX",
-            "dte": days_to_expiration,
+            "dte": trade.get("dte", days_to_expiration),
+            "expiration": trade.get("expiration"),
+            "settlement_type": trade.get("settlement_type"),
             "spx_price": round(spx_price, 2),
             "expected_move": round(expected_move, 2),
             "sell_put": sell_put,
-            "buy_put": buy_put,
-            "sell_call": sell_call,
-            "buy_call": buy_call,
-            "wing_width": wing_width,
+"buy_put": buy_put,
+"sell_call": sell_call,
+"buy_call": buy_call,
+
+"sell_put_symbol": trade.get("sell_put_symbol"),
+"buy_put_symbol": trade.get("buy_put_symbol"),
+"sell_call_symbol": trade.get("sell_call_symbol"),
+"buy_call_symbol": trade.get("buy_call_symbol"),
+
+"sell_put_streamer": trade.get("sell_put_streamer"),
+"buy_put_streamer": trade.get("buy_put_streamer"),
+"sell_call_streamer": trade.get("sell_call_streamer"),
+"buy_call_streamer": trade.get("buy_call_streamer"),
+
+"expiration": trade.get("expiration"),
+"settlement_type": trade.get("settlement_type"),
+
+"wing_width": wing_width,
             "credit": round(credit, 2),
             "max_profit": max_profit,
             "max_risk": max_risk,
             "risk_reward": round(max_risk / max_profit, 2) if max_profit else None,
             "put_distance": put_distance,
             "call_distance": call_distance,
-            "score": score,
+            "candidate_rank_score": score,
             "pop": 84,
             "market_score": market.score,
             "market_regime": market.market_regime,
@@ -147,6 +163,24 @@ def build_best_trade(
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "credit_details": credit_data,
         }
+        # Use live probability metrics when available
+        if credit_data.get("pop") is not None:
+            best_candidate["pop"] = credit_data["pop"]
+
+        if credit_data.get("probability_of_touch") is not None:
+            best_candidate["probability_of_touch"] = (
+                credit_data["probability_of_touch"]
+            )
+
+        if credit_data.get("short_put_delta") is not None:
+            best_candidate["short_put_delta"] = (
+                credit_data["short_put_delta"]
+            )
+
+        if credit_data.get("short_call_delta") is not None:
+            best_candidate["short_call_delta"] = (
+                credit_data["short_call_delta"]
+            )
 
         analysis = analyze_trade(best_candidate)
         best_candidate.update(analysis)
