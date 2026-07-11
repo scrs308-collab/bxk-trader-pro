@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 
@@ -12,8 +12,10 @@ class MarketDecision(BaseModel):
     iv_rank_state: str
     recommendation: str
     reasons: List[str]
-
-
+    grade: str | None = None
+    quality_label: str | None = None
+    strengths: list[dict] = Field(default_factory=list)
+    weaknesses: list[dict] = Field(default_factory=list)
 class TradeRecommendation(BaseModel):
     trade: str
     confidence: int

@@ -237,13 +237,22 @@ async function loadBestTrade() {
 
       <div class="hero-main">
         <div class="score-block">
-          <div class="score-number">${tradeScore}</div>
-          <div class="score-label">Trade Score</div>
-          <div class="score-bar">
-            <div class="score-fill" style="width:${Math.min(tradeScore, 100)}%"></div>
-          </div>
-        </div>
+  <div class="grade-badge">${trade.grade || "F"}</div>
 
+  <div class="score-number">${tradeScore}</div>
+
+  <div class="score-label">
+    ${trade.quality_label || "BXK Trade Quality"}
+  </div>
+
+  <div class="score-bar">
+    <div
+      class="score-fill"
+      style="width:${Math.min(tradeScore, 100)}%"
+    ></div>
+  </div>
+</div>
+      
         <div class="legs-grid">
           <div class="option-leg sell">
             <span>SELL</span>
@@ -288,10 +297,21 @@ async function loadBestTrade() {
           <span>Risk / Reward</span>
           <strong>${trade.risk_reward}</strong>
         </div>
-        <div>
-          <span>Wing</span>
-          <strong>${trade.wing_width}</strong>
-        </div>
+       <div>
+  <span>Touch Probability</span>
+  <strong>
+    ${
+      trade.probability_of_touch !== undefined
+        ? `${trade.probability_of_touch}%`
+        : "--"
+    }
+  </strong>
+</div>
+
+<div>
+  <span>Wing</span>
+  <strong>${trade.wing_width}</strong>
+</div> 
       </div>
 
      

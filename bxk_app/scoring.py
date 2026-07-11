@@ -1,10 +1,12 @@
 from bxk_app.models import MarketDecision
 from bxk_app.market_data import market_data
+from bxk_app.trade_quality_engine import TradeQualityEngine
 
 
 def run_trade_quality() -> MarketDecision:
     try:
         snapshot = market_data.get_snapshot()
+
     except Exception as e:
         return MarketDecision(
             market_regime="WAIT",
@@ -50,9 +52,8 @@ def run_trade_quality() -> MarketDecision:
         reasons.append("IV rank low")
 
     trend = "MIXED"
+
     score_percent = int((score / 3) * 100)
-    confidence = score_percent
-   
 
     if score == 3:
         market_regime = "TRADE"
@@ -64,7 +65,20 @@ def run_trade_quality() -> MarketDecision:
         market_regime = "WAIT"
         recommendation = "No trade"
 
-    return MarketDecision(
+    # ------------------------------------------
+    # BXK Trade Quality Engine
+    # ------------------------------------------
+
+    tq = TradeQualityEngine().run({
+        "trend": trend,
+        "vix_state": vix_state,
+        "expected_move_state": expected_move_state,
+        "iv_rank_state": iv_rank_state,
+    })
+
+    confidence = score_percent
+
+    market = MarketDecision(
         market_regime=market_regime,
         confidence=confidence,
         score=score_percent,
@@ -75,3 +89,22 @@ def run_trade_quality() -> MarketDecision:
         recommendation=recommendation,
         reasons=reasons,
     )
+    # Attach BXK explainability
+    market = MarketDecision(
+        market_regime=market_regime,
+        confidence=confidence,
+        score=score_percent,
+        trend=trend,
+        vix_state=vix_state,
+        expected_move_state=expected_move_state,
+        iv_rank_state=iv_rank_state,
+        recommendation=recommendation,
+        reasons=reasons,
+
+        grade=tq["grade"],
+        quality_label=tq["quality_label"],
+        strengths=tq["strengths"],
+        weaknesses=tq["weaknesses"],
+    )
+
+    return market
