@@ -573,3 +573,217 @@ body {
         font-size: 60px;
     }
 }
+
+   /* =========================================
+   BXK MARKET READINESS
+========================================= */
+
+.thermo-card {
+    width: 100%;
+    margin: 24px 0 32px;
+    padding: 28px;
+}
+
+.thermo-status {
+    margin-bottom: 12px;
+    font-size: 34px;
+    font-weight: 900;
+    color: #f8fafc;
+}
+
+.thermo-status.wait {
+    color: #ef4444;
+}
+
+.thermo-status.caution {
+    color: #f97316;
+}
+
+.thermo-status.warming {
+    color: #facc15;
+}
+
+.thermo-status.ready {
+    color: #22c55e;
+}
+
+.thermo-bar {
+    position: relative;
+    width: 100%;
+    height: 22px;
+    margin-top: 42px;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        #ef4444 0%,
+        #f97316 30%,
+        #facc15 60%,
+        #22c55e 100%
+    );
+    box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.35),
+        0 0 16px rgba(34, 197, 94, 0.08);
+}
+
+.thermo-pointer {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    transform: translate(-50%, -50%);
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 900;
+    transition: left 0.6s ease;
+    box-shadow:
+        0 0 0 5px rgba(248, 250, 252, 0.16),
+        0 0 18px rgba(255, 255, 255, 0.45);
+    z-index: 2;
+}
+
+.thermo-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 14px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.thermo-score {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 64px;
+    font-weight: 900;
+    color: #f8fafc;
+    line-height: 1;
+}
+
+.thermo-message {
+    margin-top: 12px;
+    text-align: center;
+    color: #cbd5e1;
+    font-size: 19px;
+    font-weight: 600;
+}
+
+.thermo-blockers {
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.thermo-blockers-title {
+    margin-bottom: 14px;
+    color: #93c5fd;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+#thermoBlockers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.thermo-condition {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.thermo-condition.passed {
+    background: rgba(34, 197, 94, 0.10);
+    border: 1px solid rgba(34, 197, 94, 0.28);
+    color: #bbf7d0;
+}
+
+.thermo-condition.blocked {
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    color: #fecaca;
+}
+
+.condition-icon {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 900;
+}
+
+.thermo-condition.passed .condition-icon {
+    background: #22c55e;
+    color: #052e16;
+}
+
+.thermo-condition.blocked .condition-icon {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+@media (max-width: 800px) {
+    #thermoBlockers {
+        grid-template-columns: 1fr;
+    }
+
+    .thermo-score {
+        font-size: 52px;
+    }
+.checklist-card{
+
+    margin-top:25px;
+
+}
+
+.check-item{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:14px;
+
+    padding:12px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.05);
+
+    font-size:17px;
+
+}
+
+.check-item span{
+
+    width:28px;
+
+    text-align:center;
+
+    font-size:20px;
+
+}
+
+.pass{
+
+    color:#26d96b;
+
+}
+
+.fail{
+
+    color:#ff5d5d;
+
+}

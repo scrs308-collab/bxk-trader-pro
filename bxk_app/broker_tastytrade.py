@@ -148,31 +148,52 @@ class TastytradeAPI:
         except Exception as e:
             self.last_error = str(e)
             return []
+    
     def get_position_summary(self):
         positions = self.get_positions()
 
         summary = []
 
         for pos in positions:
-            symbol = pos.get("symbol", "")
-            underlying = pos.get("underlying-symbol", "")
-            quantity = pos.get("quantity", "0")
-            direction = pos.get("quantity-direction", "")
-            close_price = pos.get("close-price", "0")
-            average_open_price = pos.get("average-open-price", "0")
-            instrument_type = pos.get("instrument-type", "")
+            quantity = float(pos.get("quantity", 0))
+            multiplier = float(pos.get("multiplier", 100))
+
+            open_price = float(pos.get("average-open-price", 0))
+            current_price = float(pos.get("close-price", 0))
+
+            cost_effect = pos.get("cost-effect", "").upper()
+
+            if cost_effect == "DEBIT":
+                pnl = (open_price - current_price) * quantity * multiplier
+            else:
+                pnl = (current_price - open_price) * quantity * multiplier
+
+            pnl_percent = 0
+
+            if open_price > 0:
+                pnl_percent = (
+                    (open_price - current_price)
+                    / open_price
+                ) * 100
 
             summary.append({
-                "symbol": symbol,
-                "underlying": underlying,
-                "instrument_type": instrument_type,
+                "symbol": pos.get("symbol", ""),
+                "underlying": pos.get("underlying-symbol", ""),
+                "instrument_type": pos.get("instrument-type", ""),
+
                 "quantity": quantity,
-                "direction": direction,
-                "average_open_price": average_open_price,
-                "close_price": close_price,
-                "cost_effect": pos.get("cost-effect", ""),
+                "direction": pos.get("quantity-direction", ""),
+
+                "average_open_price": round(open_price, 2),
+                "current_price": round(current_price, 2),
+
+                "cost_effect": cost_effect,
+
                 "expires_at": pos.get("expires-at", ""),
-                "multiplier": pos.get("multiplier", "100.0"),
+                "multiplier": multiplier,
+
+                "pnl": round(pnl, 2),
+                "pnl_percent": round(pnl_percent, 1),
             })
 
         return summary

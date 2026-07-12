@@ -6,7 +6,7 @@
 
   <title>BXK Trader Pro</title>
 
-  <link rel="stylesheet" href="/static/style.css?v=6" />
+  <link rel="stylesheet" href="/static/style.css?v=12" />
   <link rel="icon" href="/static/favicon.ico" />
 </head>
 
@@ -24,11 +24,108 @@
       </div>
     </header>
 
-      <<section id="bestTradeCard" class="trade-hero">
-        <div class="hero-loading">Loading BXK Trade Engine...</div>
-      </section>
+      <section id="bestTradeCard" class="trade-hero">
+    <div class="hero-loading">Loading BXK Trade Engine...</div>
+</section>
 
-    <main class="dashboard">
+<section class="card thermo-card">
+
+    <div class="card-label">
+        BXK Market Readiness
+    </div>
+
+    <div class="thermo-status" id="thermoStatus">
+        WAIT
+    </div>
+
+    <div class="thermo-bar">
+
+        <div class="thermo-fill" id="thermoFill"></div>
+
+        <div class="thermo-pointer" id="thermoPointer">
+            ▲
+        </div>
+
+    </div>
+
+    <div class="thermo-scale">
+        <span>0</span>
+        <span>25</span>
+        <span>50</span>
+        <span>75</span>
+        <span>100</span>
+    </div>
+
+    <div class="thermo-score">
+        <span id="thermoValue">0</span>
+    </div>
+
+    <div class="thermo-message" id="thermoMessage">
+        Waiting for market...
+    </div>
+
+    <div class="thermo-blockers">
+  <div class="thermo-blockers-title">
+    Market Conditions
+  </div>
+
+  <div id="thermoBlockers">
+    Waiting for market data...
+  </div>
+</div>
+</section>
+      <section class="card checklist-card">
+
+    <div class="card-label">
+        Today's Trade Checklist
+    </div>
+
+    <div id="tradeChecklist">
+
+        <div class="check-item">
+            <span id="checkVix">⬜</span>
+            VIX in preferred range
+        </div>
+
+        <div class="check-item">
+            <span id="checkMove">⬜</span>
+            Expected Move healthy
+        </div>
+
+        <div class="check-item">
+            <span id="checkIV">⬜</span>
+            IV Rank supports premium selling
+        </div>
+
+        <div class="check-item">
+            <span id="checkTrend">⬜</span>
+            Trend confirmed
+        </div>
+
+        <div class="check-item">
+            <span id="checkCredit">⬜</span>
+            Credit exceeds minimum
+        </div>
+
+        <div class="check-item">
+            <span id="checkPOP">⬜</span>
+            Probability of Profit acceptable
+        </div>
+
+        <div class="check-item">
+            <span id="checkTouch">⬜</span>
+            Touch probability acceptable
+        </div>
+
+        <div class="check-item">
+            <span id="checkRisk">⬜</span>
+            Risk / Reward acceptable
+        </div>
+
+    </div>
+
+</section>
+<main class="dashboard">
 
       <section class="card hero-card">
         <div class="card-label">Recommendation</div>
@@ -128,11 +225,19 @@
     <div><span>Candidates</span><strong id="candidatesEvaluated">--</strong></div>
   </div>
 </section>
+<section class="card position-monitor-card">
 
-      <section class="card placeholder">
-        <div class="card-label">Open Positions</div>
-        <p>Coming in Phase 3</p>
-      </section>
+    <div class="card-label">
+        Live Position Monitor
+    </div>
+
+    <div id="positionMonitor">
+
+        Loading open position...
+
+    </div>
+
+</section>
 
       <section class="card placeholder">
         <div class="card-label">Today’s P/L</div>
@@ -142,8 +247,7 @@
     </main>
 
   </div>
-
-  <script src="/static/dashboard.js?v=6"></script>
+<script src="/static/dashboard.js?v=12"></script>
 
 </body>
 </html>
