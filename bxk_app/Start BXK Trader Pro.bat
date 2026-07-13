@@ -10,9 +10,8 @@ echo ============================
 echo.
 
 call .venv\Scripts\activate.bat
-
-git checkout v4
-git pull
+git checkout main
+git pull origin main
 
 start "" http://127.0.0.1:8000
 

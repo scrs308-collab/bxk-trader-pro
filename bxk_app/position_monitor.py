@@ -278,6 +278,10 @@ def build_iron_condor_summary(
                 "open_price": open_price,
                 "current_price": current_price,
                 "pnl": leg_pnl,
+
+                "broker_open_pnl": safe_float(
+                    position.get("pnl")
+),
                 "expires_at": position.get(
                     "expires_at"
                 ),
@@ -342,6 +346,14 @@ def build_iron_condor_summary(
         leg["quantity"]
         for leg in parsed_legs
     )
+
+    broker_open_pnl = sum(
+    leg.get(
+        "broker_open_pnl",
+        0,
+    )
+    for leg in parsed_legs
+)
 
     multiplier = short_put["multiplier"]
 
@@ -482,14 +494,20 @@ def build_iron_condor_summary(
         ),
 
         "pnl": round(
-            pnl,
-            2,
-        ),
-        "pnl_percent": round(
-            pnl_percent,
-            1,
-        ),
+    broker_open_pnl,
+    2,
+),
 
+"pnl_percent": round(
+    (
+        broker_open_pnl
+        / opening_credit_dollars
+        * 100
+    )
+    if opening_credit_dollars > 0
+    else 0,
+    1,
+),
         "max_profit": round(
             max_profit,
             2,
