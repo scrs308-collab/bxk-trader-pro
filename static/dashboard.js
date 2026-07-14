@@ -1189,9 +1189,50 @@ function renderPositionMonitor(position) {
     position.strategy ||
     "SPX Iron Condor";
 
+  const putSpread =
+    `${position.sell_put ?? "--"} / ${
+      position.buy_put ?? "--"
+    }`;
+
+  const callSpread =
+    `${position.sell_call ?? "--"} / ${
+      position.buy_call ?? "--"
+    }`;
+
+  const priceSource =
+    position.price_source ||
+    (
+      Array.isArray(position.legs) &&
+      position.legs.some(
+        (leg) =>
+          leg.price_source === "live-mid",
+      )
+        ? "live-mid"
+        : "close-price"
+    );
+
+  const sourceLabel =
+    priceSource === "live-mid"
+      ? "Live midpoint"
+      : "Close price fallback";
+
+  const sourceClass =
+    priceSource === "live-mid"
+      ? "live"
+      : "stale";
+
+  const dteLabel =
+    Number(position.dte) === 0
+      ? "Expires today"
+      : `${position.dte ?? "--"} DTE`;
+
   container.innerHTML = `
     <div class="position-header">
       <div>
+        <div class="eyebrow">
+          LIVE POSITION
+        </div>
+
         <div class="position-strategy">
           ${strategy}
         </div>
@@ -1201,7 +1242,7 @@ function renderPositionMonitor(position) {
             quantity === 1 ? "" : "s"
           }
           •
-          ${position.dte ?? "--"} DTE
+          ${dteLabel}
           •
           Expires ${expiration}
         </div>
@@ -1214,7 +1255,7 @@ function renderPositionMonitor(position) {
       </div>
     </div>
 
-    <div class="position-main-grid">
+    <div class="position-summary-grid">
       <div class="position-pnl-box ${pnlClass}">
         <div class="position-label">
           Current P/L
@@ -1230,72 +1271,73 @@ function renderPositionMonitor(position) {
             1,
           )}%
         </div>
-      </div>
 
-      <div class="position-details">
-        <div class="position-detail-row">
-          <span>Opening Credit</span>
-          <strong>
-            ${formatMoney(openingCredit)}
-          </strong>
-        </div>
-
-        <div class="position-detail-row">
-          <span>Current Debit</span>
-          <strong>
-            ${formatMoney(currentDebit)}
-          </strong>
-        </div>
-
-        <div class="position-detail-row">
-          <span>Max Profit</span>
-          <strong>
-            ${formatMoney(maxProfit)}
-          </strong>
-        </div>
-
-        <div class="position-detail-row">
-          <span>Max Risk</span>
-          <strong>
-            ${formatMoney(maxRisk)}
-          </strong>
+        <div class="position-source ${sourceClass}">
+          P/L source: ${sourceLabel}
         </div>
       </div>
 
-      <div class="position-strikes">
-        <div class="position-leg-row">
-          <span>Long Put</span>
-          <strong>
-            ${position.buy_put ?? "--"}
-          </strong>
+      <div class="position-metrics-panel">
+        <div class="position-panel-title">
+          Broker Values
         </div>
 
-        <div class="position-leg-row short-leg">
-          <span>Short Put</span>
-          <strong>
-            ${position.sell_put ?? "--"}
-          </strong>
+        <div class="position-metric-grid">
+          <div>
+            <span>Opening Credit</span>
+            <strong>
+              ${formatMoney(openingCredit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Current Debit</span>
+            <strong>
+              ${formatMoney(currentDebit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Max Profit</span>
+            <strong>
+              ${formatMoney(maxProfit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Max Risk</span>
+            <strong>
+              ${formatMoney(maxRisk)}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="position-spreads-panel">
+        <div class="position-panel-title">
+          Position Structure
         </div>
 
-        <div class="position-leg-row short-leg">
-          <span>Short Call</span>
-          <strong>
-            ${position.sell_call ?? "--"}
-          </strong>
+        <div class="spread-card">
+          <span>Put Credit Spread</span>
+          <strong>${putSpread}</strong>
         </div>
 
-        <div class="position-leg-row">
-          <span>Long Call</span>
-          <strong>
-            ${position.buy_call ?? "--"}
-          </strong>
+        <div class="spread-card">
+          <span>Call Credit Spread</span>
+          <strong>${callSpread}</strong>
+        </div>
+
+        <div class="position-wing-note">
+          Wing width:
+          ${position.wing_width ?? "--"} points
         </div>
       </div>
     </div>
 
     <div class="position-progress-section">
       <div class="position-progress-header">
-        <span>Profit Progress</span>
+        <span>Profit Target Progress</span>
 
         <strong>
           ${formatNumber(
@@ -1313,8 +1355,18 @@ function renderPositionMonitor(position) {
       </div>
     </div>
 
-    <div class="position-recommendation">
-      ${recommendation.message}
+    <div class="position-coach">
+      <div class="position-coach-label">
+        BXK POSITION COACH
+      </div>
+
+      <div class="position-coach-decision">
+        ${recommendation.label}
+      </div>
+
+      <div class="position-coach-message">
+        ${recommendation.message}
+      </div>
     </div>
   `;
 }
