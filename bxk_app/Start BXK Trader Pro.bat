@@ -4,13 +4,12 @@ title BXK Trader Pro
 cd /d "%~dp0"
 
 echo.
-echo ===========================
-echo     Starting BXK Trader Pro
-echo ===========================
+echo ============================
+echo    Starting BXK Trader Pro
+echo ============================
 echo.
 
 call .venv\Scripts\activate.bat
-
 git checkout main
 git pull origin main
 
