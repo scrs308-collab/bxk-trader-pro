@@ -26,7 +26,11 @@ def run_trade_quality() -> MarketDecision:
     vix = snapshot["vix"]
     expected_move = snapshot["expected_move"]
     iv_rank = snapshot["iv_rank"]
-
+    print("\n--- BXK MARKET READINESS DEBUG ---")
+    print(f"VIX: {vix}")
+    print(f"Expected Move: {expected_move}")
+    print(f"IV Rank: {iv_rank}")
+    print("----------------------------------\n")
     if 12 <= vix <= 20:
         score += 1
         vix_state = "IDEAL"
@@ -43,22 +47,34 @@ def run_trade_quality() -> MarketDecision:
         expected_move_state = "LOW"
         reasons.append("Expected move too small")
 
-    if iv_rank >= 20:
-        score += 1
-        iv_rank_state = "GOOD"
-        reasons.append("IV rank good")
+    if iv_rank is not None and iv_rank > 0:
+        if iv_rank >= 20:
+            score += 1
+            iv_rank_state = "GOOD"
+            reasons.append("IV rank good")
+        else:
+            iv_rank_state = "LOW"
+            reasons.append("IV rank low")
     else:
-        iv_rank_state = "LOW"
-        reasons.append("IV rank low")
+        iv_rank_state = "UNAVAILABLE"
+        reasons.append("IV rank unavailable")
 
     trend = "MIXED"
 
-    score_percent = int((score / 3) * 100)
+    available_conditions = 2
 
-    if score == 3:
+    # If IV rank data is available, include it in the available conditions count
+    if iv_rank is not None and iv_rank > 0:
+        available_conditions += 1
+
+    score_percent = int(
+        (score / available_conditions) * 100
+    )
+
+    if score_percent >= 100:
         market_regime = "TRADE"
         recommendation = "Trade allowed"
-    elif score == 2:
+    elif score_percent >= 50:
         market_regime = "CAUTION"
         recommendation = "Small size only"
     else:
