@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.brokers.tastytrade import broker as new_tastytrade_broker
+from bxk_app.market_engine import MarketEngine
 from bxk_app.live_option_engine import calculate_iron_condor_credit
 from bxk_app.market_data import market_data
 from bxk_app.market_engine import market_engine
@@ -84,16 +85,204 @@ def api_health():
 def recommend_short():
     return recommend()
 
-
 @router.get("/api/recommend")
 def recommend():
+    """
+    Return one consistent BXK decision.
+
+    The live analyzed trade is the source of truth for:
+    - score
+    - grade
+    - readiness
+    - market regime
+    - recommendation
+    - final decision
+
+    The older market engine remains available for descriptive
+    fields such as trend and VIX state.
+    """
+
+    # Refresh live market information.
+    try:
+        MarketEngine().update()
+    except Exception as error:
+        print(f"Market engine update failed: {error}")
+
+    # Older market-condition model.
+    # Retained for descriptive fields and fallback behavior.
     market = run_trade_quality()
 
-    market_score = safe_market_value(
-        market,
-        "score",
-        0,
+    # Build the actual live trade.
+    try:
+        best_trade_result = build_best_trade(
+            wing_width=25,
+            days_to_expiration=1,
+            min_credit=1.00,
+        )
+    except Exception as error:
+        print(f"Best trade build failed: {error}")
+        best_trade_result = {
+            "status": "ERROR",
+            "best_trade": None,
+            "message": str(error),
+        }
+
+    # build_best_trade() normally returns a wrapper dictionary
+    # containing the analyzed trade under "best_trade".
+    if isinstance(best_trade_result, dict):
+        best_trade = best_trade_result.get(
+            "best_trade"
+        )
+
+        if not isinstance(best_trade, dict):
+            best_trade = {}
+    else:
+        best_trade_result = {}
+        best_trade = {}
+
+    # =====================================================
+    # CANONICAL TRADE SCORE
+    # =====================================================
+
+    trade_score = safe_market_value(
+        best_trade,
+        "trade_quality_score",
+        None,
     )
+
+    if trade_score is None:
+        trade_score = safe_market_value(
+            best_trade,
+            "trade_score",
+            None,
+        )
+
+    if trade_score is None:
+        trade_score = safe_market_value(
+            best_trade,
+            "score",
+            0,
+        )
+
+    try:
+        trade_score = int(
+            round(float(trade_score or 0))
+        )
+    except (TypeError, ValueError):
+        trade_score = 0
+
+    trade_grade = safe_market_value(
+        best_trade,
+        "grade",
+        None,
+    )
+
+    trade_rating = safe_market_value(
+        best_trade,
+        "rating",
+        None,
+    )
+
+    trade_quality_label = safe_market_value(
+        best_trade,
+        "quality_label",
+        None,
+    )
+
+    if not trade_quality_label:
+        if trade_grade and trade_rating:
+            trade_quality_label = (
+                f"{trade_grade} {trade_rating}"
+            )
+        else:
+            trade_quality_label = "No rated trade"
+
+    final_decision = str(
+        safe_market_value(
+            best_trade,
+            "final_decision",
+            "",
+        )
+        or ""
+    ).upper()
+
+    market_permission = str(
+        safe_market_value(
+            best_trade,
+            "market_permission",
+            "",
+        )
+        or ""
+    ).upper()
+
+  
+    # =====================================================
+    # CANONICAL BXK DECISION
+    # Trade quality score is the single source of truth.
+    # =====================================================
+
+    if trade_score >= 85:
+        canonical_regime = "TRADE"
+        canonical_recommendation = "Trade allowed"
+        final_decision = "ENTER TRADE"
+
+    elif trade_score >= 75:
+        canonical_regime = "CAUTION"
+        canonical_recommendation = "Small size only"
+        final_decision = "TRADE SMALL"
+
+    elif market_permission == "TRADE":
+        canonical_regime = "TRADE"
+        canonical_recommendation = "Trade allowed"
+
+    elif market_permission == "CAUTION":
+        canonical_regime = "CAUTION"
+        canonical_recommendation = "Small size only"
+
+    else:
+        canonical_regime = "WAIT"
+        canonical_recommendation = "No trade"
+        final_decision = "NO TRADE"
+
+    # If no live trade score was returned, fall back to the
+    # older market-condition score rather than returning zero.
+    if trade_score <= 0:
+        trade_score = safe_market_value(
+            market,
+            "score",
+            0,
+        )
+
+        try:
+            trade_score = int(
+                round(float(trade_score or 0))
+            )
+        except (TypeError, ValueError):
+            trade_score = 0
+
+        canonical_regime = safe_market_value(
+            market,
+            "market_regime",
+            "WAIT",
+        )
+
+        canonical_recommendation = safe_market_value(
+            market,
+            "recommendation",
+            "No trade",
+        )
+
+        trade_grade = safe_market_value(
+            market,
+            "grade",
+            trade_grade,
+        )
+
+        trade_quality_label = safe_market_value(
+            market,
+            "quality_label",
+            trade_quality_label,
+        )
 
     market_trend = safe_market_value(
         market,
@@ -108,66 +297,80 @@ def recommend():
     )
 
     strategies = rank_strategies(
-        market_score,
+        trade_score,
         market_trend,
         market_vix_state,
     )
 
-    opportunity = build_opportunity(market)
-
-    best_trade = build_best_trade(
-        wing_width=25,
-        days_to_expiration=1,
-        min_credit=1.00,
+    # Keep the old opportunity object for dashboard
+    # compatibility. The live best_trade remains authoritative.
+    opportunity = build_opportunity(
+        market
     )
+
+    strengths = safe_market_value(
+        best_trade,
+        "strengths",
+        None,
+    )
+
+    if strengths is None:
+        strengths = safe_market_value(
+            market,
+            "strengths",
+            [],
+        )
+
+    weaknesses = safe_market_value(
+        best_trade,
+        "weaknesses",
+        None,
+    )
+
+    if weaknesses is None:
+        weaknesses = safe_market_value(
+            market,
+            "weaknesses",
+            [],
+        )
+
+    reasons = safe_market_value(
+        best_trade,
+        "reasons",
+        None,
+    )
+
+    if reasons is None:
+        reasons = safe_market_value(
+            market,
+            "reasons",
+            [],
+        )
 
     return {
         "app": "BXK Trader Pro",
         "version": "6.1",
+        "routes_version": "CANONICAL_V2",
         "status": "OK",
         "timestamp": datetime.now().isoformat(
             timespec="seconds"
         ),
 
-        "trade": safe_market_value(
-            market,
-            "market_regime",
-            "WAIT",
-        ),
-        "market_regime": safe_market_value(
-            market,
-            "market_regime",
-            "WAIT",
-        ),
-        "confidence": safe_market_value(
-            market,
-            "confidence",
-            0,
-        ),
-        "score": market_score,
+        # One authoritative decision
+        "trade": canonical_regime,
+        "market_regime": canonical_regime,
+        "confidence": trade_score,
+        "score": trade_score,
+        "recommendation": canonical_recommendation,
+        "final_decision": final_decision,
 
-        # Explainability fields
-        "grade": safe_market_value(
-            market,
-            "grade",
-            None,
-        ),
-        "quality_label": safe_market_value(
-            market,
-            "quality_label",
-            None,
-        ),
-        "strengths": safe_market_value(
-            market,
-            "strengths",
-            [],
-        ),
-        "weaknesses": safe_market_value(
-            market,
-            "weaknesses",
-            [],
-        ),
+        # Trade-quality explainability
+        "grade": trade_grade,
+        "quality_label": trade_quality_label,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
 
+        # Descriptive market fields
         "trend": market_trend,
         "vix_state": market_vix_state,
         "expected_move_state": safe_market_value(
@@ -180,26 +383,17 @@ def recommend():
             "iv_rank_state",
             "UNKNOWN",
         ),
-        "recommendation": safe_market_value(
-            market,
-            "recommendation",
-            "No trade",
-        ),
-        "reasons": safe_market_value(
-            market,
-            "reasons",
-            [],
-        ),
+        "reasons": reasons,
 
         "strategies": strategies,
 
-        # Legacy V4 opportunity data
+        # Legacy compatibility
         "opportunity": opportunity,
 
-        # V5 live trade recommendation
+        # Full live result plus extracted live trade
+        "best_trade_result": best_trade_result,
         "best_trade": best_trade,
     }
-
 
 # =========================================================
 # MARKET DEBUGGING
@@ -234,6 +428,12 @@ def refresh_market():
 @router.get("/api/market-brief")
 def market_brief():
     market = run_trade_quality()
+    
+    best_trade = build_best_trade(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
 
     market_regime = safe_market_value(
         market,

@@ -152,49 +152,158 @@ class TastytradeAPI:
     def get_position_summary(self):
         positions = self.get_positions()
 
+        if not positions:
+            return []
+
+        streamer_symbols = [
+            pos.get("streamer-symbol")
+            for pos in positions
+            if pos.get("streamer-symbol")
+        ]
+
+        quotes = self.get_option_quotes(
+            streamer_symbols
+        )
+
+        quote_map = {}
+
+        for quote in quotes:
+            symbol = (
+                quote.get("eventSymbol")
+                or quote.get("streamer-symbol")
+                or quote.get("symbol")
+            )
+
+            if symbol:
+                quote_map[symbol] = quote
+
         summary = []
 
         for pos in positions:
-            quantity = float(pos.get("quantity", 0))
-            multiplier = float(pos.get("multiplier", 100))
+            quantity = abs(
+                float(pos.get("quantity", 0))
+            )
 
-            open_price = float(pos.get("average-open-price", 0))
-            current_price = float(pos.get("close-price", 0))
+            multiplier = float(
+                pos.get("multiplier", 100)
+            )
 
-            cost_effect = pos.get("cost-effect", "").upper()
+            open_price = float(
+                pos.get("average-open-price", 0)
+            )
 
-            if cost_effect == "DEBIT":
-                pnl = (open_price - current_price) * quantity * multiplier
+            streamer_symbol = pos.get(
+                "streamer-symbol"
+            )
+
+            quote = quote_map.get(
+                streamer_symbol,
+                {},
+            )
+
+            bid = float(
+                quote.get(
+                    "bidPrice",
+                    quote.get("bid-price", 0),
+                )
+                or 0
+            )
+
+            ask = float(
+                quote.get(
+                    "askPrice",
+                    quote.get("ask-price", 0),
+                )
+                or 0
+            )
+
+            if bid > 0 and ask > 0:
+                current_price = (
+                    bid + ask
+                ) / 2
+                price_source = "live-mid"
             else:
-                pnl = (current_price - open_price) * quantity * multiplier
+                current_price = float(
+                    pos.get("close-price", 0)
+                )
+                price_source = "close-price"
 
-            pnl_percent = 0
+            direction = str(
+                pos.get(
+                    "quantity-direction",
+                    "",
+                )
+            ).upper()
 
-            if open_price > 0:
-                pnl_percent = (
-                    (open_price - current_price)
-                    / open_price
-                ) * 100
+            if direction == "SHORT":
+                pnl = (
+                    open_price
+                    - current_price
+                ) * quantity * multiplier
+            else:
+                pnl = (
+                    current_price
+                    - open_price
+                ) * quantity * multiplier
 
-            summary.append({
-                "symbol": pos.get("symbol", ""),
-                "underlying": pos.get("underlying-symbol", ""),
-                "instrument_type": pos.get("instrument-type", ""),
+            position_cost = (
+                open_price
+                * quantity
+                * multiplier
+            )
 
-                "quantity": quantity,
-                "direction": pos.get("quantity-direction", ""),
+            pnl_percent = (
+                pnl / position_cost * 100
+                if position_cost > 0
+                else 0
+            )
 
-                "average_open_price": round(open_price, 2),
-                "current_price": round(current_price, 2),
-
-                "cost_effect": cost_effect,
-
-                "expires_at": pos.get("expires-at", ""),
-                "multiplier": multiplier,
-
-                "pnl": round(pnl, 2),
-                "pnl_percent": round(pnl_percent, 1),
-            })
+            summary.append(
+                {
+                    "symbol": pos.get(
+                        "symbol",
+                        "",
+                    ),
+                    "streamer_symbol": streamer_symbol,
+                    "underlying": pos.get(
+                        "underlying-symbol",
+                        "",
+                    ),
+                    "instrument_type": pos.get(
+                        "instrument-type",
+                        "",
+                    ),
+                    "quantity": quantity,
+                    "direction": direction,
+                    "average_open_price": round(
+                        open_price,
+                        4,
+                    ),
+                    "current_price": round(
+                        current_price,
+                        4,
+                    ),
+                    "bid": round(bid, 4),
+                    "ask": round(ask, 4),
+                    "price_source": price_source,
+                    "cost_effect": str(
+                        pos.get(
+                            "cost-effect",
+                            "",
+                        )
+                    ).upper(),
+                    "expires_at": pos.get(
+                        "expires-at",
+                        "",
+                    ),
+                    "multiplier": multiplier,
+                    "pnl": round(pnl, 2),
+                    "pnl_percent": round(
+                        pnl_percent,
+                        1,
+                    ),
+                }
+            )
 
         return summary
 
@@ -221,6 +330,7 @@ class TastytradeAPI:
             "margin_equity": money(balances.get("margin-equity")),
             "open_positions": len(positions),
         }
+
     def get_equity_quote(self, symbol: str):
         headers = self.headers()
 

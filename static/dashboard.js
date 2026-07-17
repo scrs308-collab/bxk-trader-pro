@@ -2,7 +2,7 @@ console.log("BXK Trader Pro Dashboard - V9");
 
 const API_URL = "/api/recommend";
 const BEST_TRADE_URL = "/api/best-trade";
-
+const POSITIONS_URL = "/api/position-monitor";
 const el = (id) => document.getElementById(id);
 
 
@@ -704,10 +704,14 @@ async function loadBestTrade() {
         <div class="hero-header">
           <div>
             <div class="eyebrow">
-              Today's Best Trade
+              Market Decision
             </div>
 
-            <h1>No Trade Available</h1>
+            <h1>Stand Aside</h1>
+
+            <div class="subline">
+                Best candidate found • Not approved for entry
+           </div>
           </div>
 
           <div class="hero-badge no-trade">
@@ -715,12 +719,12 @@ async function loadBestTrade() {
           </div>
         </div>
 
-        <p>
+        <div class="no-trade-message">
           ${
             data.reason ||
-            "The trade engine did not return a setup."
+            "The trade engine did not return an approved setup."
           }
-        </p>
+        </div>
       `;
 
       return;
@@ -729,16 +733,28 @@ async function loadBestTrade() {
     console.log("Best trade:", trade);
 
     const recommendation =
-      getHeroRecommendation(
-        data,
-        trade,
-      );
+      String(
+        trade.final_decision ||
+        trade.market_regime ||
+        "NO TRADE",
+      )
+        .trim()
+        .toUpperCase();
+
+    const tradeApproved =
+      recommendation === "ENTER TRADE" ||
+      recommendation === "TRADE" ||
+      recommendation === "TRADE SMALL";
 
     const badgeClass =
-      getHeroBadgeClass(
-        data,
-        recommendation,
-      );
+      tradeApproved
+        ? "enter"
+        : "no-trade";
+
+    const badgeText =
+      tradeApproved
+        ? recommendation
+        : "NO TRADE";
 
     const tradeScore = safeNumber(
       trade.trade_quality_score ??
@@ -758,9 +774,6 @@ async function loadBestTrade() {
       0,
     );
 
-    const reasons =
-      renderHeroReasons(trade);
-
     const touchProbability =
       Number.isFinite(
         Number(trade.probability_of_touch),
@@ -770,6 +783,44 @@ async function loadBestTrade() {
             1,
           )}%`
         : "--";
+
+    const tradeReasons =
+      Array.isArray(trade.reasons)
+        ? trade.reasons
+        : [];
+
+    const reasons = tradeReasons.length
+      ? tradeReasons
+          .map((reason) => {
+            const text =
+              typeof reason === "string"
+                ? reason
+                : reason.reason ||
+                  "Unknown trade condition";
+
+            return `<span>✓ ${text}</span>`;
+          })
+          .join("")
+      : `
+          <span>
+            No detailed trade reasons returned.
+          </span>
+        `;
+
+    /*
+      NO TRADE / WAIT DISPLAY
+
+      We still show the quality score and candidate
+      measurements, but we do not show actionable strikes.
+    */
+
+    /*
+      APPROVED TRADE DISPLAY
+
+      Full strikes are shown only after BXK approves
+      the setup.
+    */
+
 
     card.innerHTML = `
       <div class="hero-header">
@@ -786,7 +837,7 @@ async function loadBestTrade() {
               2,
             )}
             •
-            ${trade.dte ?? "--"} DTE
+            ${trade.dte != null ? trade.dte : "--"} DTE
             •
             Expected Move ±${formatNumber(
               trade.expected_move,
@@ -796,7 +847,7 @@ async function loadBestTrade() {
         </div>
 
         <div class="hero-badge ${badgeClass}">
-          ${recommendation}
+          ${badgeText}
         </div>
       </div>
 
@@ -828,6 +879,7 @@ async function loadBestTrade() {
         <div class="legs-grid">
           <div class="option-leg sell">
             <span>SELL</span>
+
             <strong>
               ${trade.sell_call} CALL
             </strong>
@@ -835,6 +887,7 @@ async function loadBestTrade() {
 
           <div class="option-leg buy">
             <span>BUY</span>
+
             <strong>
               ${trade.buy_call} CALL
             </strong>
@@ -842,6 +895,7 @@ async function loadBestTrade() {
 
           <div class="option-leg sell">
             <span>SELL</span>
+
             <strong>
               ${trade.sell_put} PUT
             </strong>
@@ -849,6 +903,7 @@ async function loadBestTrade() {
 
           <div class="option-leg buy">
             <span>BUY</span>
+
             <strong>
               ${trade.buy_put} PUT
             </strong>
@@ -909,7 +964,7 @@ async function loadBestTrade() {
         <div>
           <span>Wing</span>
           <strong>
-            ${trade.wing_width ?? "--"}
+            ${trade.wing_width != null ? trade.wing_width : "--"}
           </strong>
         </div>
       </div>
@@ -941,8 +996,444 @@ async function loadBestTrade() {
     `;
   }
 }
+/* =========================================================
+   LIVE POSITION MONITOR
+========================================================= */
+
+function formatSignedMoney(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+
+  const sign = number > 0 ? "+" : "";
+
+  return `${sign}$${number.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 
+function formatSignedNumber(value, decimals = 2) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+
+  const sign = number > 0 ? "+" : "";
+
+  return `${sign}${number.toFixed(decimals)}`;
+}
+
+
+function getPositionStatusClass(pnl) {
+  const value = Number(pnl);
+
+  if (!Number.isFinite(value)) {
+    return "neutral";
+  }
+
+  if (value > 0) {
+    return "profit";
+  }
+
+  if (value < 0) {
+    return "loss";
+  }
+
+  return "neutral";
+}
+
+
+function getPositionRecommendation(position) {
+  const pnlPercent = Number(
+    position.pnl_percent,
+  );
+
+  const dte = Number(position.dte);
+
+  if (
+    Number.isFinite(pnlPercent) &&
+    pnlPercent >= 50
+  ) {
+    return {
+      label: "CONSIDER EXIT",
+      className: "profit",
+      message:
+        "Position has reached at least 50% of maximum profit.",
+    };
+  }
+
+  if (
+    Number.isFinite(pnlPercent) &&
+    pnlPercent <= -100
+  ) {
+    return {
+      label: "REVIEW NOW",
+      className: "loss",
+      message:
+        "Loss has reached or exceeded the original credit.",
+    };
+  }
+
+  if (
+    Number.isFinite(dte) &&
+    dte <= 0
+  ) {
+    return {
+      label: "EXPIRATION DAY",
+      className: "warning",
+      message:
+        "Position expires today. Monitor short strikes closely.",
+    };
+  }
+
+  return {
+    label: "HOLD",
+    className: "neutral",
+    message:
+      "Position remains open and has not reached an exit threshold.",
+  };
+}
+
+
+function renderNoOpenPosition(container, message) {
+  container.innerHTML = `
+    <div class="position-empty">
+      <div class="position-empty-title">
+        No Open SPX Position
+      </div>
+
+      <div class="position-empty-text">
+        ${
+          message ||
+          "The broker connection returned no active position."
+        }
+      </div>
+    </div>
+  `;
+}
+
+
+function renderPositionMonitor(position) {
+  const container = el("positionMonitor");
+
+  if (!container) {
+    return;
+  }
+
+  if (!position) {
+    renderNoOpenPosition(container);
+    return;
+  }
+
+  const pnl = safeNumber(
+    position.pnl,
+    0,
+  );
+
+  const pnlPercent = safeNumber(
+    position.pnl_percent,
+    0,
+  );
+
+  const openingCredit = safeNumber(
+    position.opening_credit_dollars,
+    0,
+  );
+
+  const maxProfit = safeNumber(
+    position.max_profit,
+    openingCredit,
+  );
+
+  const maxRisk = safeNumber(
+    position.max_risk,
+    0,
+  );
+
+  const currentDebit = safeNumber(
+    position.current_debit,
+    0,
+  );
+
+  const quantity = safeNumber(
+    position.quantity,
+    0,
+  );
+
+  const progress =
+    maxProfit > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            (pnl / maxProfit) * 100,
+          ),
+        )
+      : 0;
+
+  const pnlClass =
+    getPositionStatusClass(pnl);
+
+  const recommendation =
+    getPositionRecommendation(position);
+
+  const expiration =
+    position.expiration || "--";
+
+  const strategy =
+    position.strategy ||
+    "SPX Iron Condor";
+
+  const putSpread =
+    `${position.sell_put ?? "--"} / ${
+      position.buy_put ?? "--"
+    }`;
+
+  const callSpread =
+    `${position.sell_call ?? "--"} / ${
+      position.buy_call ?? "--"
+    }`;
+
+  const priceSource =
+    position.price_source ||
+    (
+      Array.isArray(position.legs) &&
+      position.legs.some(
+        (leg) =>
+          leg.price_source === "live-mid",
+      )
+        ? "live-mid"
+        : "close-price"
+    );
+
+  const sourceLabel =
+    priceSource === "live-mid"
+      ? "Live midpoint"
+      : "Close price fallback";
+
+  const sourceClass =
+    priceSource === "live-mid"
+      ? "live"
+      : "stale";
+
+  const dteLabel =
+    Number(position.dte) === 0
+      ? "Expires today"
+      : `${position.dte ?? "--"} DTE`;
+
+  container.innerHTML = `
+    <div class="position-header">
+      <div>
+        <div class="eyebrow">
+          LIVE POSITION
+        </div>
+
+        <div class="position-strategy">
+          ${strategy}
+        </div>
+
+        <div class="position-subline">
+          ${quantity} contract${
+            quantity === 1 ? "" : "s"
+          }
+          •
+          ${dteLabel}
+          •
+          Expires ${expiration}
+        </div>
+      </div>
+
+      <div
+        class="position-action ${recommendation.className}"
+      >
+        ${recommendation.label}
+      </div>
+    </div>
+
+    <div class="position-summary-grid">
+      <div class="position-pnl-box ${pnlClass}">
+        <div class="position-label">
+          Current P/L
+        </div>
+
+        <div class="position-pnl-value">
+          ${formatSignedMoney(pnl)}
+        </div>
+
+        <div class="position-pnl-percent">
+          ${formatSignedNumber(
+            pnlPercent,
+            1,
+          )}%
+        </div>
+
+        <div class="position-source ${sourceClass}">
+          P/L source: ${sourceLabel}
+        </div>
+      </div>
+
+      <div class="position-metrics-panel">
+        <div class="position-panel-title">
+          Broker Values
+        </div>
+
+        <div class="position-metric-grid">
+          <div>
+            <span>Opening Credit</span>
+            <strong>
+              ${formatMoney(openingCredit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Current Debit</span>
+            <strong>
+              ${formatMoney(currentDebit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Max Profit</span>
+            <strong>
+              ${formatMoney(maxProfit)}
+            </strong>
+          </div>
+
+          <div>
+            <span>Max Risk</span>
+            <strong>
+              ${formatMoney(maxRisk)}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="position-spreads-panel">
+        <div class="position-panel-title">
+          Position Structure
+        </div>
+
+        <div class="spread-card">
+          <span>Put Credit Spread</span>
+          <strong>${putSpread}</strong>
+        </div>
+
+        <div class="spread-card">
+          <span>Call Credit Spread</span>
+          <strong>${callSpread}</strong>
+        </div>
+
+        <div class="position-wing-note">
+          Wing width:
+          ${position.wing_width ?? "--"} points
+        </div>
+      </div>
+    </div>
+
+    <div class="position-progress-section">
+      <div class="position-progress-header">
+        <span>Profit Target Progress</span>
+
+        <strong>
+          ${formatNumber(
+            progress,
+            1,
+          )}%
+        </strong>
+      </div>
+
+      <div class="position-progress-bar">
+        <div
+          class="position-progress-fill ${pnlClass}"
+          style="width:${progress}%"
+        ></div>
+      </div>
+    </div>
+
+    <div class="position-coach">
+      <div class="position-coach-label">
+        BXK POSITION COACH
+      </div>
+
+      <div class="position-coach-decision">
+        ${recommendation.label}
+      </div>
+
+      <div class="position-coach-message">
+        ${recommendation.message}
+      </div>
+    </div>
+  `;
+}
+
+
+async function loadPositions() {
+  const container = el("positionMonitor");
+
+  if (!container) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${POSITIONS_URL}?_=${Date.now()}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Positions API error ${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+
+    const position =
+      data.position ||
+      (
+        Array.isArray(data.positions) &&
+        data.positions.length > 0
+          ? data.positions[0]
+          : null
+      );
+
+    if (!position) {
+      renderNoOpenPosition(
+        container,
+        data.message ||
+        "No open SPX Iron Condor was found.",
+      );
+
+      return;
+    }
+
+    renderPositionMonitor(position);
+  } catch (error) {
+    console.error(
+      "Position monitor fetch failed:",
+      error,
+    );
+
+    container.innerHTML = `
+      <div class="position-empty">
+        <div class="position-empty-title">
+          Position Monitor Offline
+        </div>
+
+        <div class="position-empty-text">
+          Could not load open positions from the broker connection.
+        </div>
+      </div>
+    `;
+  }
+}
 /* =========================================================
    CLOCK
 ========================================================= */
@@ -961,6 +1452,7 @@ function updateClock() {
 
 fetchRecommendation();
 loadBestTrade();
+loadPositions();
 updateClock();
 
 setInterval(

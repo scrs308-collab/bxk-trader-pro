@@ -1,4 +1,3 @@
-
 @echo off
 title BXK Trader Pro
 
