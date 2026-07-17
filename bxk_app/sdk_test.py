@@ -21,7 +21,7 @@ async def test_dxlink():
         ".SPXW260706P7475"
     )
 
-    print(quote)
+    
 
     await streamer.close()
 

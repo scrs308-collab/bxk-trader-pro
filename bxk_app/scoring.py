@@ -26,11 +26,7 @@ def run_trade_quality() -> MarketDecision:
     vix = snapshot["vix"]
     expected_move = snapshot["expected_move"]
     iv_rank = snapshot["iv_rank"]
-    print("\n--- BXK MARKET READINESS DEBUG ---")
-    print(f"VIX: {vix}")
-    print(f"Expected Move: {expected_move}")
-    print(f"IV Rank: {iv_rank}")
-    print("----------------------------------\n")
+    
     if 12 <= vix <= 20:
         score += 1
         vix_state = "IDEAL"

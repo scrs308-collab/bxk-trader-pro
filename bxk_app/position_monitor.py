@@ -265,28 +265,22 @@ def build_iron_condor_summary(
             quantity=quantity,
             multiplier=multiplier,
         )
-
-        parsed_legs.append(
-            {
-                **parsed,
-                "symbol": position.get(
-                    "symbol"
-                ),
-                "direction": direction,
-                "quantity": quantity,
-                "multiplier": multiplier,
-                "open_price": open_price,
-                "current_price": current_price,
-                "pnl": leg_pnl,
-
-                "broker_open_pnl": safe_float(
-                    position.get("pnl")
-),
-                "expires_at": position.get(
-                    "expires_at"
-                ),
-            }
-        )
+        parsed_legs.append({
+            **parsed,
+            "symbol": position.get("symbol"),
+            "direction": direction,
+            "quantity": quantity,
+            "multiplier": multiplier,
+            "open_price": open_price,
+            "current_price": current_price,
+            "price_source": position.get(
+                "price_source",
+                "close-price",
+            ),
+            "pnl": leg_pnl,
+            "broker_open_pnl": safe_float(position.get("pnl")),
+            "expires_at": position.get("expires_at"),
+        })
 
     if len(parsed_legs) != 4:
         return None

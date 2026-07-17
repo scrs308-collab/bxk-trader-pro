@@ -1,5 +1,6 @@
 import threading
 import time
+import logging
 
 from bxk_app.market_data import market_data
 
@@ -50,8 +51,8 @@ class LiveMarketEngine:
                     expected_move=expected_move,
                 )
 
-            except Exception as e:
-                print("Market update:", e)
+            except Exception:
+                logging.exception("Market update failed")
 
             time.sleep(15)
 

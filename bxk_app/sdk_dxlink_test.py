@@ -27,7 +27,7 @@ async def main():
 
         for _ in range(4):
             quote = await streamer.get_event(Quote)
-            print(quote)
+            
 
 
 if __name__ == "__main__":

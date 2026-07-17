@@ -1,3 +1,8 @@
+from email.utils import quote
+from turtle import pos
+from urllib import response
+
+from numpy import rint
 import requests
 
 from bxk_app.config import (
@@ -70,7 +75,7 @@ class TastytradeAPI:
                 headers=headers,
                 timeout=15,
             )
-
+           
             if response.status_code != 200:
                 self.last_error = f"{response.status_code}: {response.text}"
                 return []
@@ -155,14 +160,14 @@ class TastytradeAPI:
         if not positions:
             return []
 
-        streamer_symbols = [
-            pos.get("streamer-symbol")
+        option_symbols = [
+            pos.get("symbol")
             for pos in positions
-            if pos.get("streamer-symbol")
+            if pos.get("symbol")
         ]
 
         quotes = self.get_option_quotes(
-            streamer_symbols
+            option_symbols
         )
 
         quote_map = {}
@@ -192,27 +197,44 @@ class TastytradeAPI:
                 pos.get("average-open-price", 0)
             )
 
-            streamer_symbol = pos.get(
-                "streamer-symbol"
-            )
+            option_symbol = pos.get("symbol")
+
+            streamer_symbol = pos.get("streamer-symbol")
 
             quote = quote_map.get(
-                streamer_symbol,
+                option_symbol,
                 {},
             )
 
             bid = float(
                 quote.get(
-                    "bidPrice",
-                    quote.get("bid-price", 0),
+                    "bid",
+                    quote.get(
+                        "bidPrice",
+                        quote.get("bid-price", 0),
+                    ),
                 )
                 or 0
             )
 
             ask = float(
                 quote.get(
-                    "askPrice",
-                    quote.get("ask-price", 0),
+                    "ask",
+                    quote.get(
+                        "askPrice",
+                        quote.get("ask-price", 0),
+                    ),
+                )
+                or 0
+            )
+
+            mid = float(
+                quote.get(
+                    "mid",
+                    quote.get(
+                        "mark",
+                        quote.get("dx-mark", 0),
+                    ),
                 )
                 or 0
             )
@@ -222,6 +244,11 @@ class TastytradeAPI:
                     bid + ask
                 ) / 2
                 price_source = "live-mid"
+
+            elif mid > 0:
+                current_price = mid
+                price_source = "live-mid"
+
             else:
                 current_price = float(
                     pos.get("close-price", 0)
@@ -434,7 +461,10 @@ class TastytradeAPI:
     def get_spx_option_chain(self):
         return self.get_nested_option_chain("SPX")
 
-    def get_option_quotes(self, symbols: list[str]):
+    def get_option_quotes(
+        self,
+        symbols: list[str],
+    ):
         headers = self.headers()
 
         if not headers:
@@ -445,19 +475,29 @@ class TastytradeAPI:
 
         try:
             response = requests.get(
-                f"{TASTYTRADE_BASE_URL}/market-data/by-type",
+                (
+                    f"{TASTYTRADE_BASE_URL}"
+                    "/market-data/by-type"
+                ),
                 headers=headers,
                 params={
-                    "option": ",".join(symbols),
+                    "equity-option": ",".join(symbols),
                 },
                 timeout=20,
             )
-
+            
             if response.status_code != 200:
-                self.last_error = f"{response.status_code}: {response.text}"
+                self.last_error = (
+                    f"{response.status_code}: "
+                    f"{response.text}"
+                )
                 return []
 
-            return response.json().get("data", {}).get("items", [])
+            return (
+                response.json()
+                .get("data", {})
+                .get("items", [])
+            )
 
         except Exception as e:
             self.last_error = str(e)

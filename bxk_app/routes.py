@@ -218,36 +218,26 @@ def recommend():
   
     # =====================================================
     # CANONICAL BXK DECISION
-    # Trade quality score is the single source of truth.
+    # The analyzed trade decision is the source of truth.
     # =====================================================
 
-    if trade_score >= 85:
-        canonical_regime = "TRADE"
-        canonical_recommendation = "Trade allowed"
-        final_decision = "ENTER TRADE"
-
-    elif trade_score >= 75:
-        canonical_regime = "CAUTION"
-        canonical_recommendation = "Small size only"
-        final_decision = "TRADE SMALL"
-
-    elif market_permission == "TRADE":
+    if final_decision == "ENTER TRADE":
         canonical_regime = "TRADE"
         canonical_recommendation = "Trade allowed"
 
-    elif market_permission == "CAUTION":
+    elif final_decision == "TRADE SMALL":
         canonical_regime = "CAUTION"
         canonical_recommendation = "Small size only"
 
     else:
+        final_decision = "NO TRADE"
         canonical_regime = "WAIT"
         canonical_recommendation = "No trade"
-        final_decision = "NO TRADE"
 
-    # If no live trade score was returned, fall back to the
-    # older market-condition score rather than returning zero.
-    if trade_score <= 0:
-        trade_score = safe_market_value(
+        # If no live trade score was returned, fall back to the
+        # older market-condition score rather than returning zero.
+        if trade_score <= 0:
+            trade_score = safe_market_value(
             market,
             "score",
             0,
@@ -304,9 +294,59 @@ def recommend():
 
     # Keep the old opportunity object for dashboard
     # compatibility. The live best_trade remains authoritative.
-    opportunity = build_opportunity(
-        market
-    )
+    trade_payload = best_trade
+
+    if trade_payload:
+        opportunity = {
+            "strategy": trade_payload.get(
+                "strategy",
+                "WAIT",
+            ),
+            "source": "LIVE",
+            "spx_price": trade_payload.get(
+                "spx_price"
+            ),
+            "expected_move": trade_payload.get(
+                "expected_move"
+            ),
+            "sell_put": trade_payload.get(
+                "sell_put"
+            ),
+            "sell_call": trade_payload.get(
+                "sell_call"
+            ),
+            "buy_put": trade_payload.get(
+                "buy_put"
+            ),
+            "buy_call": trade_payload.get(
+                "buy_call"
+            ),
+            "target_credit": trade_payload.get(
+                "credit"
+            ),
+            "pop": trade_payload.get(
+                "pop"
+            ),
+            "risk_level": canonical_regime,
+            "trade_score": trade_score,
+            "confidence": trade_quality_label,
+            "max_risk": trade_payload.get(
+                "max_risk"
+            ),
+            "expected_profit": trade_payload.get(
+                "max_profit"
+            ),
+            "final_decision": final_decision,
+            "reasons": trade_payload.get(
+                "reasons",
+                [],
+            ),
+        }
+
+    else:
+        opportunity = build_opportunity(
+            market
+        )
 
     strengths = safe_market_value(
         best_trade,
@@ -352,48 +392,45 @@ def recommend():
         "version": "6.1",
         "routes_version": "CANONICAL_V2",
         "status": "OK",
-        "timestamp": datetime.now().isoformat(
-            timespec="seconds"
-        ),
+        "timestamp": datetime.now().isoformat(),
+            # One authoritative decision
+            "trade": canonical_regime,
+            "market_regime": canonical_regime,
+            "confidence": trade_score,
+            "score": trade_score,
+            "recommendation": canonical_recommendation,
+            "final_decision": final_decision,
 
-        # One authoritative decision
-        "trade": canonical_regime,
-        "market_regime": canonical_regime,
-        "confidence": trade_score,
-        "score": trade_score,
-        "recommendation": canonical_recommendation,
-        "final_decision": final_decision,
+            # Trade-quality explainability
+            "grade": trade_grade,
+            "quality_label": trade_quality_label,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
 
-        # Trade-quality explainability
-        "grade": trade_grade,
-        "quality_label": trade_quality_label,
-        "strengths": strengths,
-        "weaknesses": weaknesses,
+            # Descriptive market fields
+            "trend": market_trend,
+            "vix_state": market_vix_state,
+            "expected_move_state": safe_market_value(
+                market,
+                "expected_move_state",
+                "UNKNOWN",
+            ),
+            "iv_rank_state": safe_market_value(
+                market,
+                "iv_rank_state",
+                "UNKNOWN",
+            ),
+            "reasons": reasons,
 
-        # Descriptive market fields
-        "trend": market_trend,
-        "vix_state": market_vix_state,
-        "expected_move_state": safe_market_value(
-            market,
-            "expected_move_state",
-            "UNKNOWN",
-        ),
-        "iv_rank_state": safe_market_value(
-            market,
-            "iv_rank_state",
-            "UNKNOWN",
-        ),
-        "reasons": reasons,
+            "strategies": strategies,
 
-        "strategies": strategies,
+            # Legacy compatibility
+            "opportunity": opportunity,
 
-        # Legacy compatibility
-        "opportunity": opportunity,
-
-        # Full live result plus extracted live trade
-        "best_trade_result": best_trade_result,
-        "best_trade": best_trade,
-    }
+            # Full live result plus extracted live trade
+            "best_trade_result": best_trade_result,
+            "best_trade": best_trade,
+        }
 
 # =========================================================
 # MARKET DEBUGGING

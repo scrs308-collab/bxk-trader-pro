@@ -29,9 +29,6 @@ class MarketEngine:
         spx = broker.get_quote("SPX")
         vix = broker.get_quote("VIX")
         vix1d = broker.get_quote("VIX1D")
-        print("\n--- VIX1D QUOTE DEBUG ---")
-        print("Raw VIX1D response:", vix1d)
-        print("-------------------------\n")
         qqq = broker.get_quote("QQQ")
 
         account = broker.get_account_summary()
