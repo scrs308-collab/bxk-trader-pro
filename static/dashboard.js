@@ -4,7 +4,10 @@ const API_URL = "/api/recommend";
 const BEST_TRADE_URL = "/api/best-trade";
 const POSITIONS_URL = "/api/position-monitor";
 const el = (id) => document.getElementById(id);
+let lastSuccessfulUpdate = null;
 
+const STALE_AFTER_MS = 30000;
+const OFFLINE_AFTER_MS = 60000;
 
 /* =========================================================
    GENERAL HELPERS
@@ -78,23 +81,50 @@ function formatNumber(value, decimals = 2) {
    API STATUS
 ========================================================= */
 
-function setApiStatus(isOnline) {
-  const apiStatus = el("apiStatus");
+function setApiStatus(status) {
 
-  if (!apiStatus) {
+    const apiStatus = el("apiStatus");
+
+    if (!apiStatus) {
+        return;
+    }
+
+    if (status === "live") {
+        apiStatus.textContent = "● LIVE";
+        apiStatus.className = "status-pill online";
+        return;
+    }
+
+    if (status === "stale") {
+        apiStatus.textContent = "● STALE";
+        apiStatus.className = "status-pill stale";
+        return;
+    }
+
+    apiStatus.textContent = "● OFFLINE";
+    apiStatus.className = "status-pill offline";
+}
+function updateApiFreshness() {
+  if (!lastSuccessfulUpdate) {
+    setApiStatus("offline");
     return;
   }
 
-  if (isOnline) {
-    apiStatus.textContent = "● LIVE";
-    apiStatus.className = "status-pill online";
-  } else {
-    apiStatus.textContent = "● OFFLINE";
-    apiStatus.className = "status-pill offline";
+  const age =
+    Date.now() - lastSuccessfulUpdate;
+
+  if (age >= OFFLINE_AFTER_MS) {
+    setApiStatus("offline");
+    return;
   }
+
+  if (age >= STALE_AFTER_MS) {
+    setApiStatus("stale");
+    return;
+  }
+
+  setApiStatus("live");
 }
-
-
 /* =========================================================
    MARKET SCORE
 ========================================================= */
@@ -421,10 +451,9 @@ function updateDashboard(data) {
   renderReasons(data.reasons);
 
   setText(
-    "lastUpdate",
-    data.timestamp || nowTime(),
-  );
-
+  "lastUpdate",
+  nowTime(),
+);
   updateOpportunityCard(data);
   updateChecklist(data);
 }
@@ -585,15 +614,19 @@ async function fetchRecommendation() {
 
     const data = await response.json();
 
-    updateDashboard(data);
-    setApiStatus(true);
+     updateDashboard(data);
+
+     lastSuccessfulUpdate = Date.now();
+
+     setApiStatus("live");
+
   } catch (error) {
     console.error(
       "Dashboard fetch failed:",
       error,
     );
 
-    setApiStatus(false);
+    setApiStatus("offline");
 
     setText(
       "recommendation",
@@ -1447,26 +1480,71 @@ function updateClock() {
 
 
 /* =========================================================
+   AUTO-REFRESH CONTROLLER
+========================================================= */
+
+const DASHBOARD_REFRESH_MS = 15000;
+
+let dashboardRefreshInProgress = false;
+let dashboardRefreshTimer = null;
+
+
+async function refreshDashboard() {
+  if (dashboardRefreshInProgress) {
+    return;
+  }
+
+  dashboardRefreshInProgress = true;
+
+  try {
+    await Promise.allSettled([
+      fetchRecommendation(),
+      loadBestTrade(),
+      loadPositions(),
+    ]);
+  } finally {
+    dashboardRefreshInProgress = false;
+  }
+}
+
+
+function startDashboardRefresh() {
+  if (dashboardRefreshTimer) {
+    clearInterval(dashboardRefreshTimer);
+  }
+
+  refreshDashboard();
+
+  dashboardRefreshTimer = setInterval(
+    refreshDashboard,
+    DASHBOARD_REFRESH_MS,
+  );
+}
+
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (!document.hidden) {
+      refreshDashboard();
+    }
+  },
+);
+
+
+/* =========================================================
    START DASHBOARD
 ========================================================= */
 
-fetchRecommendation();
-loadBestTrade();
-loadPositions();
 updateClock();
-
-setInterval(
-  fetchRecommendation,
-  30000,
-);
-
-setInterval(
-  loadBestTrade,
-  60000,
-);
+startDashboardRefresh();
 
 setInterval(
   updateClock,
+  1000,
+);
+setInterval(
+  updateApiFreshness,
   1000,
 );
 

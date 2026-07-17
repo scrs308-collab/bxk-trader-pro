@@ -68,11 +68,27 @@ def analyze_trade(trade: dict):
         "probability_of_touch"
     )
 
+    if touch_raw is None:
+        touch_raw = trade.get(
+            "touch_probability"
+        )
+
     touch = (
-        safe_float(touch_raw)
-        if touch_raw is not None
-        else None
-    )
+    safe_float(touch_raw)
+    if touch_raw is not None
+    else None
+)
+
+    # Fall back to a POP-based estimate when live deltas
+    # are unavailable, such as after market hours.
+    if touch is None and pop > 0:
+        touch = min(
+            100,
+            round(
+                2 * (100 - pop),
+                1,
+            ),
+        )
 
     risk_reward = safe_float(
         trade.get("risk_reward"),
