@@ -5,8 +5,6 @@ cd /d "%~dp0"
 
 call .venv\Scripts\activate.bat
 
-git pull origin main
-
 start "" http://127.0.0.1:8000
 
 python -m uvicorn bxk_app.main:app --reload
