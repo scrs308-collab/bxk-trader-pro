@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from typing import Any
-
+from bxk_app.position_coach import evaluate_position
 
 OPTION_PATTERN = re.compile(
     r"^(?P<root>[A-Z]+)\s+"
@@ -438,29 +438,19 @@ def build_iron_condor_summary(
         )
     )
 
-    return {
+    position_summary = {
         "strategy": "SPX Iron Condor",
         "underlying": "SPX",
         "quantity": int(quantity),
-        "expiration": short_put[
+        "expiration": short_put.get(
             "expiration"
-        ],
+        ),
         "expires_at": expires_at,
         "dte": dte,
-
-        "buy_put": int(
-            long_put["strike"]
-        ),
-        "sell_put": int(
-            short_put["strike"]
-        ),
-        "sell_call": int(
-            short_call["strike"]
-        ),
-        "buy_call": int(
-            long_call["strike"]
-        ),
-
+        "buy_put": long_put["strike"],
+        "sell_put": short_put["strike"],
+        "sell_call": short_call["strike"],
+        "buy_call": long_call["strike"],
         "put_wing_width": int(
             put_wing_width
         ),
@@ -470,7 +460,6 @@ def build_iron_condor_summary(
         "wing_width": int(
             wing_width
         ),
-
         "opening_credit": round(
             opening_credit,
             2,
@@ -483,22 +472,20 @@ def build_iron_condor_summary(
             current_debit,
             2,
         ),
-
         "pnl": round(
-    broker_open_pnl,
-    2,
-),
-
-"pnl_percent": round(
-    (
-        broker_open_pnl
-        / opening_credit_dollars
-        * 100
-    )
-    if opening_credit_dollars > 0
-    else 0,
-    1,
-),
+            broker_open_pnl,
+            2,
+        ),
+        "pnl_percent": round(
+            (
+                broker_open_pnl
+                / opening_credit_dollars
+                * 100
+            )
+            if opening_credit_dollars > 0
+            else 0,
+            1,
+        ),
         "max_profit": round(
             max_profit,
             2,
@@ -507,17 +494,22 @@ def build_iron_condor_summary(
             max_risk,
             2,
         ),
-
-      "spx_price": (
-         round(spx_price, 2)
-         if spx_price is not None and spx_price > 0
-         else None
-),
+        "spx_price": (
+            round(spx_price, 2)
+            if spx_price is not None
+            else None
+        ),
         "put_distance": put_distance,
         "call_distance": call_distance,
-
         "status": status,
         "recommendation": recommendation,
-
         "legs": parsed_legs,
     }
+
+    position_summary["coach"] = (
+        evaluate_position(
+            position_summary
+        )
+    )
+
+    return position_summary

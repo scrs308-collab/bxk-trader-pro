@@ -227,7 +227,7 @@ def recommend():
 
     elif final_decision == "TRADE SMALL":
         canonical_regime = "CAUTION"
-        canonical_recommendation = "Small size only"
+        canonical_recommendation = "TRADE SMALL"
 
     else:
         final_decision = "NO TRADE"

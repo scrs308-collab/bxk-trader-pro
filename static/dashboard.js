@@ -252,15 +252,20 @@ function updateThermometer(score, data = {}) {
   const status = el("thermoStatus");
 
   if (status) {
-    status.classList.remove(
-      "wait",
-      "caution",
-      "warming",
-      "ready",
-    );
+    status.className = "thermo-status";
   }
 
-  if (safeScore >= 90) {
+  const finalDecision = String(
+    data.final_decision || "NO TRADE",
+  ).toUpperCase();
+
+  const marketPermission = String(
+    data.market_permission ||
+    data.market_regime ||
+    "WAIT",
+  ).toUpperCase();
+
+  if (finalDecision === "ENTER TRADE") {
     setText(
       "thermoStatus",
       "TRADE WINDOW OPEN",
@@ -272,18 +277,36 @@ function updateThermometer(score, data = {}) {
     );
 
     status?.classList.add("ready");
-  } else if (safeScore >= 75) {
+
+  } else if (finalDecision === "TRADE SMALL") {
     setText(
       "thermoStatus",
-      "ALMOST READY",
+      "TRADE SMALL",
     );
 
     setText(
       "thermoMessage",
-      "Waiting for final confirmation.",
+      "Strong setup with one or more market limitations.",
     );
 
     status?.classList.add("warming");
+
+  } else if (
+    marketPermission === "CAUTION" ||
+    safeScore >= 75
+  ) {
+    setText(
+      "thermoStatus",
+      "CAUTION",
+    );
+
+    setText(
+      "thermoMessage",
+      "Trade quality is acceptable, but conditions do not support full size.",
+    );
+
+    status?.classList.add("caution");
+
   } else if (safeScore >= 50) {
     setText(
       "thermoStatus",
@@ -296,18 +319,7 @@ function updateThermometer(score, data = {}) {
     );
 
     status?.classList.add("warming");
-  } else if (safeScore >= 25) {
-    setText(
-      "thermoStatus",
-      "CAUTION",
-    );
 
-    setText(
-      "thermoMessage",
-      "Some conditions support trading, but entry is not ready.",
-    );
-
-    status?.classList.add("caution");
   } else {
     setText(
       "thermoStatus",
@@ -316,7 +328,7 @@ function updateThermometer(score, data = {}) {
 
     setText(
       "thermoMessage",
-      "Market not ready.",
+      "No approved trade setup.",
     );
 
     status?.classList.add("wait");
@@ -324,9 +336,7 @@ function updateThermometer(score, data = {}) {
 
   renderMarketBlockers(data);
 }
-
-
-function renderMarketBlockers(data) {
+  function renderMarketBlockers(data) {
   const box = el("thermoBlockers");
 
   if (!box) {
@@ -334,39 +344,55 @@ function renderMarketBlockers(data) {
   }
 
   const vixState = String(
-    data.vix_state || "",
+    data.vix_state || "UNKNOWN",
   ).toUpperCase();
 
   const expectedMoveState = String(
-    data.expected_move_state || "",
+    data.expected_move_state || "UNKNOWN",
   ).toUpperCase();
 
   const ivRankState = String(
-    data.iv_rank_state || "",
+    data.iv_rank_state || "UNAVAILABLE",
   ).toUpperCase();
 
   const trend = String(
-    data.trend || "",
+    data.trend || "UNKNOWN",
   ).toUpperCase();
 
   const conditions = [
     {
-      label: "VIX in preferred range",
+      label:
+        vixState === "IDEAL"
+          ? "VIX is in the preferred range"
+          : `VIX state: ${vixState}`,
       passed: vixState === "IDEAL",
     },
     {
-      label: "Expected move is healthy",
+      label:
+        expectedMoveState === "HEALTHY"
+          ? "Expected move is healthy"
+          : expectedMoveState === "LOW"
+            ? "Expected move is below the preferred range"
+            : `Expected move state: ${expectedMoveState}`,
       passed: expectedMoveState === "HEALTHY",
     },
     {
-      label: "IV rank supports premium selling",
-      passed: ivRankState === "GOOD",
+      label:
+        ivRankState === "GOOD"
+          ? "IV rank supports premium selling"
+          : ivRankState === "UNAVAILABLE"
+            ? "IV rank is unavailable and not used"
+            : `IV rank state: ${ivRankState}`,
+      passed:
+        ivRankState === "GOOD" ||
+        ivRankState === "UNAVAILABLE",
     },
     {
-      label: "Trend is identified",
-      passed:
-        trend !== "" &&
-        trend !== "UNKNOWN",
+      label:
+        trend !== "UNKNOWN"
+          ? `Trend is identified: ${trend}`
+          : "Trend is unavailable",
+      passed: trend !== "UNKNOWN",
     },
   ];
 
@@ -389,6 +415,7 @@ function renderMarketBlockers(data) {
     })
     .join("");
 }
+ 
 
 
 /* =========================================================
@@ -761,10 +788,9 @@ async function loadBestTrade() {
       `;
 
       return;
-    }
-
-    console.log("Best trade:", trade);
-
+      
+        }
+        
     const recommendation =
       String(
         trade.final_decision ||
@@ -1548,59 +1574,176 @@ setInterval(
   1000,
 );
 
-function updateChecklist(data){
+function updateChecklist(data) {
 
-    setCheck(
-        "checkVix",
-        data.vix_state === "IDEAL"
+    const container =
+        document.getElementById(
+            "tradeChecklist"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    const score =
+        Number(
+            data.score ??
+            data.trade_score ??
+            0
+        );
+
+    const strengths =
+        Array.isArray(data.strengths)
+            ? data.strengths
+            : [];
+
+    const weaknesses =
+        Array.isArray(data.weaknesses)
+            ? data.weaknesses
+            : [];
+
+    let html = "";
+
+    strengths.forEach((item) => {
+
+        const reason =
+            typeof item === "string"
+                ? item
+                : item.reason;
+
+        html += `
+            <div class="check-item">
+                <span style="color:#39d353;">✔</span>
+                ${reason}
+            </div>
+        `;
+
+    });
+
+    weaknesses.forEach((item) => {
+
+        const reason =
+            typeof item === "string"
+                ? item
+                : item.reason;
+
+        html += `
+            <div class="check-item">
+                <span style="color:#ff5d5d;">✖</span>
+                ${reason}
+            </div>
+        `;
+
+    });
+
+    if (!html) {
+
+        html = `
+            <div class="check-item">
+                No trade-quality explanation available.
+            </div>
+        `;
+
+    }
+
+    container.innerHTML = html;
+
+  function updateChecklist(data) {
+  const container =
+    document.getElementById(
+      "tradeChecklist"
     );
 
-    setCheck(
-        "checkMove",
-        data.expected_move_state === "HEALTHY"
-    );
+  if (!container) {
+    return;
+  }
 
-    setCheck(
-        "checkIV",
-        data.iv_rank_state === "GOOD"
-    );
+  const score = Number(
+    data.score ??
+    data.trade_score ??
+    data.best_trade?.trade_score ??
+    0
+  );
 
-    setCheck(
-        "checkTrend",
-        data.trend !== "UNKNOWN"
-    );
+  const strengths =
+    Array.isArray(data.strengths)
+      ? data.strengths
+      : [];
 
-    const t = data.opportunity || {};
+  const weaknesses =
+    Array.isArray(data.weaknesses)
+      ? data.weaknesses
+      : [];
 
-    setCheck(
-        "checkCredit",
-        (t.credit || 0) >= 1
-    );
+  const items = [];
 
-    setCheck(
-        "checkPOP",
-        (t.pop || 0) >= 80
-    );
+  strengths.forEach((item) => {
+    const reason =
+      typeof item === "string"
+        ? item
+        : item?.reason;
 
-    setCheck(
-        "checkTouch",
-        (t.touch_probability || 100) <= 35
-    );
+    if (reason) {
+      items.push({
+        label: reason,
+        passed: true,
+      });
+    }
+  });
 
-    setCheck(
-        "checkRisk",
-        (t.risk_reward || 0) >= 4
-    );
+  weaknesses.forEach((item) => {
+    const reason =
+      typeof item === "string"
+        ? item
+        : item?.reason;
 
+    if (reason) {
+      items.push({
+        label: reason,
+        passed: false,
+      });
+    }
+  });
+
+  const title =
+    score > 0
+      ? `WHY THIS TRADE SCORES ${Math.round(score)}`
+      : "TRADE EVALUATION";
+
+  let html = `
+    <div class="checklist-title">
+      ${title}
+    </div>
+  `;
+
+  if (items.length === 0) {
+    html += `
+      <div class="check-item">
+        No trade-quality explanation available.
+      </div>
+    `;
+  } else {
+    html += items
+      .map(
+        (item) => `
+          <div class="check-item">
+            <span class="${
+              item.passed
+                ? "pass"
+                : "fail"
+            }">
+              ${item.passed ? "✔" : "✖"}
+            </span>
+
+            <span>
+              ${item.label}
+            </span>
+          </div>
+        `
+      )
+      .join("");
+  }
+
+  container.innerHTML = html;
 }
-function setCheck(id, pass){
-
-    const e = el(id);
-
-    if(!e) return;
-
-    e.textContent = pass ? "✅" : "❌";
-
-    e.className = pass ? "pass" : "fail";
-
 }

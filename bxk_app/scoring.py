@@ -72,7 +72,7 @@ def run_trade_quality() -> MarketDecision:
         recommendation = "Trade allowed"
     elif score_percent >= 50:
         market_regime = "CAUTION"
-        recommendation = "Small size only"
+        recommendation = "TRADE SMALL"
     else:
         market_regime = "WAIT"
         recommendation = "No trade"
