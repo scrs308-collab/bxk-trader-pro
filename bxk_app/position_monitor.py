@@ -217,7 +217,7 @@ def build_iron_condor_summary(
     """
     Group four SPX option legs into one iron condor summary.
     """
-
+    
     parsed_legs = []
 
     for position in positions:
@@ -229,10 +229,7 @@ def build_iron_condor_summary(
             continue
 
         direction = str(
-            position.get(
-                "direction",
-                "",
-            )
+            position.get("direction", ""),
         ).upper()
 
         quantity = abs(
@@ -281,7 +278,7 @@ def build_iron_condor_summary(
             "broker_open_pnl": safe_float(position.get("pnl")),
             "expires_at": position.get("expires_at"),
         })
-
+        
     if len(parsed_legs) != 4:
         return None
 
