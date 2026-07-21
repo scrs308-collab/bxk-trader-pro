@@ -390,11 +390,19 @@ class TastytradeAPI:
         except Exception as e:
             self.last_error = str(e)
             return None
-        
+
     def get_index_quote(self, symbol: str):
+        print(
+            "RUNNING get_index_quote FROM:",
+            __file__,
+            "SYMBOL:",
+            symbol,
+        )
+
         headers = self.headers()
 
         if not headers:
+            print(f"INDEX QUOTE {symbol}: no authentication headers")
             return None
 
         try:
@@ -407,21 +415,47 @@ class TastytradeAPI:
                 timeout=15,
             )
 
+            print(
+                f"INDEX QUOTE {symbol}:",
+                response.status_code,
+                response.url,
+            )
+
+            print(
+                f"INDEX RESPONSE {symbol}:",
+                response.text,
+            )
+
             if response.status_code != 200:
-                self.last_error = f"{response.status_code}: {response.text}"
+                self.last_error = (
+                    f"{response.status_code}: "
+                    f"{response.text}"
+                )
                 return None
 
             data = response.json()
-            items = data.get("data", {}).get("items", [])
+            items = (
+                data.get("data", {})
+                .get("items", [])
+            )
 
             if not items:
-                self.last_error = f"No index quote returned for {symbol}"
+                self.last_error = (
+                    f"No index quote returned "
+                    f"for {symbol}"
+                )
                 return None
 
             return items[0]
 
         except Exception as e:
             self.last_error = str(e)
+
+            print(
+                f"INDEX QUOTE ERROR {symbol}:",
+                repr(e),
+            )
+
             return None
 
     def get_quote(self, symbol: str):
