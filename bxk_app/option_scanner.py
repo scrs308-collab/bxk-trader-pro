@@ -385,6 +385,146 @@ def generate_candidate_condors(
     return candidates
 
 
+def generate_bull_put_candidates(
+    wing_width: int = 25,
+    days_to_expiration: int = 1,
+):
+    """
+    Generate Bull Put Credit Spread candidates
+    from the selected SPX expiration.
+    """
+
+    strikes = get_spx_strikes_by_dte(
+        days_to_expiration
+    )
+
+    if not strikes:
+        return []
+
+    candidates = []
+    seen = set()
+
+    for short_put in strikes:
+        short_strike = safe_float(
+            short_put.get("strike")
+        )
+
+        if short_strike <= 0:
+            continue
+
+        long_put = find_nearest_strike(
+            short_strike - wing_width,
+            strikes,
+        )
+
+        if not long_put:
+            continue
+
+        long_strike = safe_float(
+            long_put.get("strike")
+        )
+
+        if long_strike <= 0:
+            continue
+
+        actual_width = round(
+            short_strike - long_strike,
+            2,
+        )
+
+        if actual_width <= 0:
+            continue
+
+        key = (
+            short_strike,
+            long_strike,
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        candidates.append(
+            {
+                "sell_put": short_put,
+                "buy_put": long_put,
+            }
+        )
+
+    return candidates
+
+def generate_bear_call_candidates(
+    wing_width: int = 25,
+    days_to_expiration: int = 1,
+):
+    """
+    Generate Bear Call Credit Spread candidates
+    from the selected SPX expiration.
+    """
+
+    strikes = get_spx_strikes_by_dte(
+        days_to_expiration
+    )
+
+    if not strikes:
+        return []
+
+    candidates = []
+    seen = set()
+
+    for short_call in strikes:
+        short_strike = safe_float(
+            short_call.get("strike")
+        )
+
+        if short_strike <= 0:
+            continue
+
+        long_call = find_nearest_strike(
+            short_strike + wing_width,
+            strikes,
+        )
+
+        if not long_call:
+            continue
+
+        long_strike = safe_float(
+            long_call.get("strike")
+        )
+
+        if long_strike <= 0:
+            continue
+
+        actual_width = round(
+            long_strike - short_strike,
+            2,
+        )
+
+        if actual_width <= 0:
+            continue
+
+        key = (
+            short_strike,
+            long_strike,
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        candidates.append(
+            {
+                "sell_call": short_call,
+                "buy_call": long_call,
+            }
+        )
+
+    return candidates
+
+
+
 def find_best_candidate(
     candidates: list,
 ):
@@ -530,6 +670,148 @@ def normalize_candidate(
             - buy_put["strike"]
         ),
     }
+
+
+def normalize_bull_put_candidate(
+    candidate: dict,
+    spx_price: float,
+    expected_move: float,
+):
+    """
+    Flatten a raw Bull Put candidate into the trade format
+    used by the Bull Put pricing and analysis engines.
+    """
+
+    sell_put = candidate["sell_put"]
+    buy_put = candidate["buy_put"]
+
+    return {
+        "strategy": "BULL PUT CREDIT SPREAD",
+        "source": "LIVE_CHAIN_RANKED",
+        "expiration": sell_put.get(
+            "expiration_date"
+        ),
+        "dte": int(
+            sell_put.get(
+                "days_to_expiration",
+                0,
+            )
+        ),
+        "settlement_type": sell_put.get(
+            "settlement_type"
+        ),
+        "spx_price": round(
+            spx_price,
+            2,
+        ),
+        "expected_move": round(
+            expected_move,
+            2,
+        ),
+
+        "sell_put": int(
+            sell_put["strike"]
+        ),
+        "buy_put": int(
+            buy_put["strike"]
+        ),
+
+        "sell_put_symbol": sell_put["put"],
+        "buy_put_symbol": buy_put["put"],
+
+        "sell_put_streamer": sell_put[
+            "put_streamer"
+        ],
+        "buy_put_streamer": buy_put[
+            "put_streamer"
+        ],
+
+        "put_buffer": round(
+            spx_price - sell_put["strike"],
+            2,
+        ),
+
+        "put_distance": round(
+            spx_price - sell_put["strike"],
+            2,
+        ),
+
+        "wing_width": int(
+            sell_put["strike"]
+            - buy_put["strike"]
+        ),
+    }
+
+def normalize_bear_call_candidate(
+    candidate: dict,
+    spx_price: float,
+    expected_move: float,
+):
+    """
+    Flatten a raw Bear Call candidate into the trade format
+    used by the Bear Call pricing and analysis engines.
+    """
+
+    sell_call = candidate["sell_call"]
+    buy_call = candidate["buy_call"]
+
+    return {
+        "strategy": "BEAR CALL CREDIT SPREAD",
+        "source": "LIVE_CHAIN_RANKED",
+        "expiration": sell_call.get(
+            "expiration_date"
+        ),
+        "dte": int(
+            sell_call.get(
+                "days_to_expiration",
+                0,
+            )
+        ),
+        "settlement_type": sell_call.get(
+            "settlement_type"
+        ),
+        "spx_price": round(
+            spx_price,
+            2,
+        ),
+        "expected_move": round(
+            expected_move,
+            2,
+        ),
+
+        "sell_call": int(
+            sell_call["strike"]
+        ),
+        "buy_call": int(
+            buy_call["strike"]
+        ),
+
+        "sell_call_symbol": sell_call["call"],
+        "buy_call_symbol": buy_call["call"],
+
+        "sell_call_streamer": sell_call[
+            "call_streamer"
+        ],
+        "buy_call_streamer": buy_call[
+            "call_streamer"
+        ],
+
+        "call_buffer": round(
+            sell_call["strike"] - spx_price,
+            2,
+        ),
+
+        "call_distance": round(
+            sell_call["strike"] - spx_price,
+            2,
+        ),
+
+        "wing_width": int(
+            buy_call["strike"]
+            - sell_call["strike"]
+        ),
+    }
+
 
 
 def find_best_ranked_iron_condor(

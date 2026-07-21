@@ -444,3 +444,193 @@ def calculate_iron_condor_credit(
 
         "quotes": quotes,
     }
+
+
+def calculate_bull_put_credit(
+    trade: dict,
+) -> dict:
+    symbols = [
+        trade["sell_put_streamer"],
+        trade["buy_put_streamer"],
+    ]
+
+    quotes = get_live_market_data(
+        symbols
+    )
+
+    sell_put = quotes.get(
+        trade["sell_put_streamer"],
+        {},
+    )
+
+    buy_put = quotes.get(
+        trade["buy_put_streamer"],
+        {},
+    )
+
+    sell_put_mid = mid_price(
+        sell_put
+    )
+
+    buy_put_mid = mid_price(
+        buy_put
+    )
+
+    put_credit = round(
+        sell_put_mid - buy_put_mid,
+        2,
+    )
+
+    short_put_delta = abs(
+        to_float(
+            sell_put.get("delta"),
+            0,
+        )
+    )
+
+    if short_put_delta > 0:
+        put_probability_otm = round(
+            (1 - short_put_delta) * 100,
+            1,
+        )
+
+        probability_of_touch = round(
+            short_put_delta * 200,
+            1,
+        )
+
+        probability_of_touch = min(
+            probability_of_touch,
+            100,
+        )
+
+        short_put_delta_value = round(
+            short_put_delta,
+            4,
+        )
+
+    else:
+        put_probability_otm = None
+        probability_of_touch = None
+        short_put_delta_value = None
+
+    return {
+        "live_credit": round(
+            max(
+                put_credit,
+                0,
+            ),
+            2,
+        ),
+        "put_credit": put_credit,
+        "sell_put_mid": sell_put_mid,
+        "buy_put_mid": buy_put_mid,
+        "short_put_delta": (
+            short_put_delta_value
+        ),
+        "put_probability_otm": (
+            put_probability_otm
+        ),
+        "pop": put_probability_otm,
+        "probability_of_touch": (
+            probability_of_touch
+        ),
+        "quotes": quotes,
+    }
+
+def calculate_bear_call_credit(
+    trade: dict,
+) -> dict:
+    """
+    Calculate live pricing and probability metrics for a
+    Bear Call Credit Spread.
+    """
+
+    symbols = [
+        trade["sell_call_streamer"],
+        trade["buy_call_streamer"],
+    ]
+
+    quotes = get_live_market_data(
+        symbols
+    )
+
+    sell_call = quotes.get(
+        trade["sell_call_streamer"],
+        {},
+    )
+
+    buy_call = quotes.get(
+        trade["buy_call_streamer"],
+        {},
+    )
+
+    sell_call_mid = mid_price(
+        sell_call
+    )
+
+    buy_call_mid = mid_price(
+        buy_call
+    )
+
+    call_credit = round(
+        sell_call_mid - buy_call_mid,
+        2,
+    )
+
+    short_call_delta = abs(
+        to_float(
+            sell_call.get("delta"),
+            0,
+        )
+    )
+
+    if short_call_delta > 0:
+        call_probability_otm = round(
+            (1 - short_call_delta) * 100,
+            1,
+        )
+
+        probability_of_touch = round(
+            short_call_delta * 200,
+            1,
+        )
+
+        probability_of_touch = min(
+            probability_of_touch,
+            100,
+        )
+
+        short_call_delta_value = round(
+            short_call_delta,
+            4,
+        )
+
+    else:
+        call_probability_otm = None
+        probability_of_touch = None
+        short_call_delta_value = None
+
+    return {
+        "live_credit": round(
+            max(
+                call_credit,
+                0,
+            ),
+            2,
+        ),
+        "call_credit": call_credit,
+        "sell_call_mid": sell_call_mid,
+        "buy_call_mid": buy_call_mid,
+        "short_call_delta": (
+            short_call_delta_value
+        ),
+        "call_probability_otm": (
+            call_probability_otm
+        ),
+        "pop": call_probability_otm,
+        "probability_of_touch": (
+            probability_of_touch
+        ),
+        "quotes": quotes,
+    }

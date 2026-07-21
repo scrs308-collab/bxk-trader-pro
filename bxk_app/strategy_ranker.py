@@ -1,69 +1,165 @@
 from typing import List, Dict
 
 
-def rank_strategies(market_score: int, trend: str, vix_state: str) -> List[Dict]:
-    """
-    Early placeholder Strategy Ranking Engine.
-    Later this will use live VWAP, option chain, IV, positions, and time of day.
-    """
+def build_strategy(
+    name: str,
+    score: int,
+    reason: str,
+) -> Dict:
+
+    return {
+        "name": name,
+        "score": max(
+            0,
+            min(score, 100),
+        ),
+        "confidence": (
+            "High"
+            if score >= 80
+            else "Medium"
+            if score >= 60
+            else "Low"
+        ),
+        "reason": reason,
+    }
+
+
+def rank_strategies(
+    market_score: int,
+    trend: str,
+    vix_state: str,
+) -> List[Dict]:
 
     strategies = []
 
+    # ============================================
     # Iron Condor
-    ic_score = market_score
+    # ============================================
+
+    score = market_score
+
     if vix_state == "IDEAL":
-        ic_score += 10
+        score += 10
+
     if trend == "MIXED":
-        ic_score += 10
+        score += 10
 
-    strategies.append({
-        "name": "Iron Condor",
-        "score": min(ic_score, 100),
-        "confidence": "High" if ic_score >= 80 else "Medium" if ic_score >= 60 else "Low",
-        "reason": "Best when volatility is healthy and trend is not aggressively directional."
-    })
+    strategies.append(
+        build_strategy(
+            "Iron Condor",
+            score,
+            "Balanced market with healthy premium.",
+        )
+    )
 
-    # Debit Call
-    call_score = 35
+    # ============================================
+    # Bull Put Credit Spread
+    # ============================================
+
+    score = 45
+
     if trend == "BULL":
-        call_score += 35
+        score += 30
+
     if vix_state == "IDEAL":
-        call_score += 10
+        score += 10
 
-    strategies.append({
-        "name": "Debit Call Spread",
-        "score": min(call_score, 100),
-        "confidence": "High" if call_score >= 80 else "Medium" if call_score >= 60 else "Low",
-        "reason": "Best when trend is bullish and price is not extended."
-    })
+    strategies.append(
+        build_strategy(
+            "Bull Put Credit Spread",
+            score,
+            "Bullish conditions favor selling put premium.",
+        )
+    )
 
-    # Debit Put
-    put_score = 35
+    # ============================================
+    # Bear Call Credit Spread
+    # ============================================
+
+    score = 45
+
     if trend == "BEAR":
-        put_score += 35
+        score += 30
+
     if vix_state == "IDEAL":
-        put_score += 10
+        score += 10
 
-    strategies.append({
-        "name": "Debit Put Spread",
-        "score": min(put_score, 100),
-        "confidence": "High" if put_score >= 80 else "Medium" if put_score >= 60 else "Low",
-        "reason": "Best when trend is bearish and downside momentum is confirmed."
-    })
+    strategies.append(
+        build_strategy(
+            "Bear Call Credit Spread",
+            score,
+            "Bearish conditions favor selling call premium.",
+        )
+    )
 
+    # ============================================
+    # Debit Call
+    # ============================================
+
+    score = 35
+
+    if trend == "BULL":
+        score += 35
+
+    strategies.append(
+        build_strategy(
+            "Debit Call Spread",
+            score,
+            "Directional bullish strategy.",
+        )
+    )
+
+    # ============================================
+    # Debit Put
+    # ============================================
+
+    score = 35
+
+    if trend == "BEAR":
+        score += 35
+
+    strategies.append(
+        build_strategy(
+            "Debit Put Spread",
+            score,
+            "Directional bearish strategy.",
+        )
+    )
+
+    # ============================================
     # Butterfly
-    fly_score = 50
+    # ============================================
+
+    score = 50
+
     if trend == "MIXED":
-        fly_score += 20
+        score += 20
 
-    strategies.append({
-        "name": "Butterfly",
-        "score": min(fly_score, 100),
-        "confidence": "High" if fly_score >= 80 else "Medium" if fly_score >= 60 else "Low",
-        "reason": "Best when price is consolidating near a magnet level."
-    })
+    strategies.append(
+        build_strategy(
+            "Butterfly",
+            score,
+            "Best near price magnets and low movement.",
+        )
+    )
+    strategy_priority = {
+        "Iron Condor": 6,
+        "Bull Put Credit Spread": 5,
+        "Bear Call Credit Spread": 5,
+        "Butterfly": 4,
+        "Debit Call Spread": 3,
+        "Debit Put Spread": 3,
+    }
 
-    # Highest scoring strategy first
-    strategies.sort(key=lambda s: s["score"], reverse=True)
+    strategies.sort(
+        key=lambda s: (
+            s["score"],
+            strategy_priority.get(
+                s["name"],
+                0,
+            ),
+        ),
+        reverse=True,
+    )
 
     return strategies

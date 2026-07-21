@@ -18,10 +18,13 @@ from bxk_app.scanner_engine import find_best_iron_condor
 from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.tastytrade_client import tastytrade_client
-from bxk_app.trade_builder import build_best_trade
 from bxk_app.wing_optimizer import find_best_trade
 from bxk_app.position_monitor import build_iron_condor_summary
-
+from bxk_app.trade_builder import (
+    build_best_trade,
+    build_best_bull_put,
+    build_best_bear_call,
+)
 router = APIRouter()
 
 
@@ -1009,6 +1012,21 @@ def best_trade():
         min_credit=1.00,
     )
 
+@router.get("/api/best-bull-put")
+def best_bull_put():
+    return build_best_bull_put(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
+
+@router.get("/api/best-bear-call")
+def best_bear_call():
+    return build_best_bear_call(
+        wing_width=25,
+        days_to_expiration=1,
+        min_credit=1.00,
+    )
 
 @router.get("/api/strategy-rankings")
 def strategy_rankings():
