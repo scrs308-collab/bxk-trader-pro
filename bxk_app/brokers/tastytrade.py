@@ -439,10 +439,27 @@ class TastytradeBroker(BrokerBase):
         return items[0] if items else None
 
     def get_index_quote(self, symbol: str):
-        items = self.get_market_data_by_type(
-            "index",
-            [symbol],
+        response = self._request(
+            "GET",
+            "/market-data/by-type",
+            params={"index": symbol},
         )
+
+        if response is None:
+            print(
+                "INDEX QUOTE FAILED:",
+                symbol,
+                self.last_error,
+            )
+            return None
+
+        print(
+            "INDEX RAW RESPONSE:",
+            symbol,
+            response.text,
+        )
+
+        items = self._items_from_response(response)
 
         return items[0] if items else None
 

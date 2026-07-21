@@ -42,41 +42,47 @@ def get_quote_price(quote):
     
 class MarketEngine:
 
-    def update(self, spx=None, vix=None, vix1d=None, account=None, positions=None, qqq=None):
+    def update(
+        self,
+        spx=None,
+        vix=None,
+        vix1d=None,
+        account=None,
+        positions=None,
+        qqq=None,
+    ):
+        """
+        Fetch live Tastytrade data when values are not supplied,
+        then update the shared market-data cache.
+        """
 
         broker.authenticate()
+
+        if spx is None:
+            spx = broker.get_quote("SPX")
+
+        if vix is None:
+            vix = broker.get_quote("VIX")
+
+        if vix1d is None:
+            vix1d = broker.get_quote("$VIX1D")
+
+        if qqq is None:
+            qqq = broker.get_quote("QQQ")
+
+        if account is None:
+            account = broker.get_account_summary()
+
+        if positions is None:
+            positions = broker.get_position_summary()
 
         spx_price = get_quote_price(spx)
         vix_value = get_quote_price(vix)
         vix1d_value = get_quote_price(vix1d)
 
-        print("SPX QUOTE:", spx)
-        print("VIX QUOTE:", vix)
-        print("VIX1D QUOTE:", vix1d)
+        volatility_value = vix1d_value if vix1d_value > 0 else vix_value
 
-        print(
-            "VALUES:",
-            {
-                "spx": spx_price,
-                "vix": vix_value,
-                "vix1d": vix1d_value,
-            },
-        )
-
-        if vix:
-            vix_value = float(
-                vix.get("last", 0) or 0
-            )
-
-        if vix1d:
-            vix1d_value = float(
-                vix1d.get("last", 0) or 0
-            )
-
-        expected_move = calculate_expected_move(
-            spx_price,
-            vix1d_value,
-        )
+        expected_move = calculate_expected_move(spx_price, volatility_value)
 
         market_data.update(
             spx=spx_price,
@@ -85,10 +91,25 @@ class MarketEngine:
             expected_move=expected_move,
         )
 
-        market_data.account = account
-        market_data.positions = positions
-        market_data.qqq = qqq
+        market_data.account = account or {}
+        market_data.positions = positions or []
+        market_data.qqq = qqq or {}
 
+        print(
+            "LIVE MARKET VALUES:",
+            {
+                "spx": spx_price,
+                "vix": vix_value,
+                "vix1d": vix1d_value,
+                "expected_move": expected_move,
+                "broker_error": broker.last_error,
+                "expected_move_source": (
+                    "VIX1D"
+                    if vix1d_value > 0
+                    else "VIX_FALLBACK"
+                ),
+            },
+        )
         return market_data.get_header()
 
 
