@@ -8,6 +8,7 @@ class MarketData:
         self.vix = "--"
         self.vix1d = "--"
         self.expected_move = "--"
+        self.iv_rank = None
         self.account = {}
         self.positions = []
         self.qqq = {}
@@ -28,7 +29,15 @@ class MarketData:
 
         return "AFTER HOURS"
 
-    def update(self, spx=None, spx_change=None, vix=None, vix1d=None, expected_move=None):
+    def update(
+        self,
+        spx=None,
+        spx_change=None,
+        vix=None,
+        vix1d=None,
+        expected_move=None,
+        iv_rank=None,
+    ):
         if spx is not None:
             self.spx = round(float(spx), 2)
 
@@ -44,6 +53,9 @@ class MarketData:
         if expected_move is not None:
             self.expected_move = round(float(expected_move), 2)
 
+        if iv_rank is not None:
+            self.iv_rank = round(float(iv_rank), 2)
+
     def get_snapshot(self):
         """
         Returns backend-safe market snapshot data.
@@ -56,7 +68,7 @@ class MarketData:
             "vix": float(self.vix) if self.vix != "--" else 0,
             "vix1d": float(self.vix1d) if self.vix1d != "--" else 0,
             "atr": 0,
-            "iv_rank": 0,
+            "iv_rank": self.iv_rank,
             "expected_move": float(self.expected_move) if self.expected_move != "--" else 0,
             "market_status": self.market_status(),
             "timestamp": datetime.now().isoformat(timespec="seconds"),

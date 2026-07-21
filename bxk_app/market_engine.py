@@ -19,29 +19,49 @@ def calculate_expected_move(spx_price: float, vix1d_value: float) -> float:
         2,
     )
 
+def get_quote_price(quote):
+    """
+    Safely extract a price from a Tastytrade quote.
+    """
 
+    if not quote:
+        return 0.0
+
+    value = (
+        quote.get("last")
+        or quote.get("last_price")
+        or quote.get("mark")
+        or quote.get("mid")
+        or 0
+    )
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    
 class MarketEngine:
 
-    def update(self):
+    def update(self, spx=None, vix=None, vix1d=None, account=None, positions=None, qqq=None):
 
         broker.authenticate()
 
-        spx = broker.get_quote("SPX")
-        vix = broker.get_quote("VIX")
-        vix1d = broker.get_quote("VIX1D")
-        qqq = broker.get_quote("QQQ")
+        spx_price = get_quote_price(spx)
+        vix_value = get_quote_price(vix)
+        vix1d_value = get_quote_price(vix1d)
 
-        account = broker.get_account_summary()
-        positions = broker.get_position_summary()
+        print("SPX QUOTE:", spx)
+        print("VIX QUOTE:", vix)
+        print("VIX1D QUOTE:", vix1d)
 
-        spx_price = 0.0
-        vix_value = 0.0
-        vix1d_value = 0.0
-
-        if spx:
-            spx_price = float(
-                spx.get("last", 0) or 0
-            )
+        print(
+            "VALUES:",
+            {
+                "spx": spx_price,
+                "vix": vix_value,
+                "vix1d": vix1d_value,
+            },
+        )
 
         if vix:
             vix_value = float(

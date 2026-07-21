@@ -42,7 +42,12 @@ class LiveMarketEngine:
                 vix1d = 10.94
 
                 expected_move = calculate_expected_move(spx, vix1d)
-
+                logging.info(
+                    "SPX=%s VIX1D=%s EXPECTED_MOVE=%s",
+                    spx,
+                    vix1d,
+                    expected_move,
+                )
                 market_data.update(
                     spx=spx,
                     spx_change=spx_change,
