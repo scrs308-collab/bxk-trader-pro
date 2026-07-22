@@ -109,7 +109,7 @@ def recommend():
     try:
         MarketEngine().update()
     except Exception as error:
-        print(f"Market engine update failed: {error}")
+        pass
 
     # Older market-condition model.
     # Retained for descriptive fields and fallback behavior.
@@ -123,7 +123,6 @@ def recommend():
             min_credit=1.00,
         )
     except Exception as error:
-        print(f"Best trade build failed: {error}")
         best_trade_result = {
             "status": "ERROR",
             "best_trade": None,

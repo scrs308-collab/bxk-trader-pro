@@ -95,21 +95,7 @@ class MarketEngine:
         market_data.positions = positions or []
         market_data.qqq = qqq or {}
 
-        print(
-            "LIVE MARKET VALUES:",
-            {
-                "spx": spx_price,
-                "vix": vix_value,
-                "vix1d": vix1d_value,
-                "expected_move": expected_move,
-                "broker_error": broker.last_error,
-                "expected_move_source": (
-                    "VIX1D"
-                    if vix1d_value > 0
-                    else "VIX_FALLBACK"
-                ),
-            },
-        )
+        
         return market_data.get_header()
 
 

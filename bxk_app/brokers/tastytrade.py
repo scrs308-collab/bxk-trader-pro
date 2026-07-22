@@ -452,13 +452,7 @@ class TastytradeBroker(BrokerBase):
                 self.last_error,
             )
             return None
-
-        print(
-            "INDEX RAW RESPONSE:",
-            symbol,
-            response.text,
-        )
-
+        
         items = self._items_from_response(response)
 
         return items[0] if items else None

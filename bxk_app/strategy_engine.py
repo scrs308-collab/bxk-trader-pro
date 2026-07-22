@@ -9,7 +9,46 @@ based on trade quality, market permission, and Market DNA.
 """
 
 from typing import Any
+def create_strategy_result(
+    strategy,
+    score=0,
+    confidence=0,
+    grade="",
+    status="INVALID",
+    credit=0,
+    expected_profit=0,
+    max_risk=0,
+    pop=0,
+    touch_probability=0,
+    risk_reward=0,
+    reasoning=None,
+    strengths=None,
+    weaknesses=None,
+    trade=None,
+):
+    """
+    Creates a standardized strategy result.
 
+    Every strategy evaluator should return this same structure.
+    """
+
+    return {
+        "strategy": strategy,
+        "score": score,
+        "confidence": confidence,
+        "grade": grade,
+        "status": status,
+        "credit": credit,
+        "expected_profit": expected_profit,
+        "max_risk": max_risk,
+        "pop": pop,
+        "touch_probability": touch_probability,
+        "risk_reward": risk_reward,
+        "reasoning": reasoning or [],
+        "strengths": strengths or [],
+        "weaknesses": weaknesses or [],
+        "trade": trade or {},
+    }
 
 class StrategyEngine:
     """
@@ -251,13 +290,91 @@ class StrategyEngine:
             2,
         )
 
-        ranked_trade = dict(
-            trade
+        ranked_trade = create_strategy_result(
+            strategy=strategy_name,
+            score=trade_score,
+            confidence=self._safe_float(
+                trade.get(
+                    "confidence",
+                    trade_score,
+                )
+            ),
+            grade=trade.get(
+                "grade",
+                trade.get(
+                    "rating",
+                    "",
+                ),
+            ),
+            status=result.get(
+                "status",
+                "INVALID",
+            ),
+            credit=self._safe_float(
+                trade.get(
+                    "credit",
+                    0,
+                )
+            ),
+            expected_profit=self._safe_float(
+                trade.get(
+                    "expected_profit",
+                    0,
+                )
+            ),
+            max_risk=self._safe_float(
+                trade.get(
+                    "max_risk",
+                    0,
+                )
+            ),
+            pop=self._safe_float(
+                trade.get(
+                    "pop",
+                    trade.get(
+                        "probability_of_profit",
+                        0,
+                    ),
+                )
+            ),
+            touch_probability=self._safe_float(
+                trade.get(
+                    "probability_of_touch",
+                    trade.get(
+                        "touch_probability",
+                        0,
+                    ),
+                )
+            ),
+            risk_reward=self._safe_float(
+                trade.get(
+                    "risk_reward",
+                    trade.get(
+                        "risk_reward_ratio",
+                        0,
+                    ),
+                )
+            ),
+            reasoning=trade.get(
+                "reasons",
+                trade.get(
+                    "reasoning",
+                    [],
+                ),
+            ),
+            strengths=trade.get(
+                "strengths",
+                [],
+            ),
+            weaknesses=trade.get(
+                "weaknesses",
+                [],
+            ),
+            trade=trade,
         )
 
         ranked_trade.update(
             {
-                "strategy": strategy_name,
                 "base_trade_score": trade_score,
                 "dna_adjustment": dna_adjustment,
                 "selection_score": selection_score,

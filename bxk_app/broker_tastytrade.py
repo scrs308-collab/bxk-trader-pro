@@ -392,13 +392,7 @@ class TastytradeAPI:
             return None
 
     def get_index_quote(self, symbol: str):
-        print(
-            "RUNNING get_index_quote FROM:",
-            __file__,
-            "SYMBOL:",
-            symbol,
-        )
-
+        
         headers = self.headers()
 
         if not headers:
@@ -450,12 +444,7 @@ class TastytradeAPI:
 
         except Exception as e:
             self.last_error = str(e)
-
-            print(
-                f"INDEX QUOTE ERROR {symbol}:",
-                repr(e),
-            )
-
+            
             return None
 
     def get_quote(self, symbol: str):
