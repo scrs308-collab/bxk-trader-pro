@@ -1176,7 +1176,6 @@ function renderNoOpenPosition(container, message) {
   `;
 }
 
-
 function renderPositionMonitor(position) {
   const container = el("positionMonitor");
 
@@ -1223,6 +1222,26 @@ function renderPositionMonitor(position) {
     position.quantity,
     0,
   );
+
+  const openingCreditPerSpread =
+    quantity > 0
+      ? openingCredit / 100 / quantity
+      : 0;
+
+  const stopDebit =
+    openingCreditPerSpread * 2;
+
+  const stopLossAmount =
+    quantity > 0
+      ? -(
+          (
+            stopDebit -
+            openingCreditPerSpread
+          ) *
+          100 *
+          quantity
+        )
+      : 0;
 
   const progress =
     maxProfit > 0
@@ -1286,110 +1305,140 @@ function renderPositionMonitor(position) {
       : `${position.dte ?? "--"} DTE`;
 
   container.innerHTML = `
-    <div class="position-header">
+    <div class="position-wide-header">
       <div>
         <div class="eyebrow">
-          LIVE POSITION
+          LIVE POSITION MONITOR
         </div>
 
-        <div class="position-strategy">
+        <div class="position-strategy-large">
           ${strategy}
         </div>
+      </div>
 
-        <div class="position-subline">
+      <div class="position-header-meta">
+        <span>
           ${quantity} contract${
             quantity === 1 ? "" : "s"
           }
-          •
-          ${dteLabel}
-          •
-          Expires ${expiration}
-        </div>
-      </div>
+        </span>
 
-      <div
-        class="position-action ${recommendation.className}"
-      >
-        ${recommendation.label}
+        <span>•</span>
+
+        <span>${dteLabel}</span>
+
+        <span>•</span>
+
+        <span>Expires ${expiration}</span>
       </div>
     </div>
 
-    <div class="position-summary-grid">
-      <div class="position-pnl-box ${pnlClass}">
+    <div class="position-wide-grid">
+      <div class="position-feature-card ${pnlClass}">
         <div class="position-label">
           Current P/L
         </div>
 
-        <div class="position-pnl-value">
+        <div class="position-pnl-value-large">
           ${formatSignedMoney(pnl)}
         </div>
 
-        <div class="position-pnl-percent">
+        <div class="position-pnl-percent-large">
           ${formatSignedNumber(
             pnlPercent,
             1,
           )}%
         </div>
-
-        <div class="position-source ${sourceClass}">
-          P/L source: ${sourceLabel}
-        </div>
       </div>
 
-      <div class="position-metrics-panel">
+      <div class="position-data-card">
         <div class="position-panel-title">
           Broker Values
         </div>
 
-        <div class="position-metric-grid">
-          <div>
-            <span>Opening Credit</span>
-            <strong>
-              ${formatMoney(openingCredit)}
-            </strong>
-          </div>
+        <div class="position-data-row">
+          <span>Opening Credit</span>
+          <strong>
+            ${formatMoney(openingCredit)}
+          </strong>
+        </div>
 
-          <div>
-            <span>Current Debit</span>
-            <strong>
-              ${formatMoney(currentDebit)}
-            </strong>
-          </div>
+        <div class="position-data-row">
+          <span>Current Debit</span>
+          <strong>
+            ${formatMoney(currentDebit)}
+          </strong>
+        </div>
 
-          <div>
-            <span>Max Profit</span>
-            <strong>
-              ${formatMoney(maxProfit)}
-            </strong>
-          </div>
-
-          <div>
-            <span>Max Risk</span>
-            <strong>
-              ${formatMoney(maxRisk)}
-            </strong>
-          </div>
+        <div class="position-source ${sourceClass}">
+          ${sourceLabel}
         </div>
       </div>
 
-      <div class="position-spreads-panel">
+      <div class="position-data-card">
+        <div class="position-panel-title">
+          Risk & Profit
+        </div>
+
+        <div class="position-data-row">
+          <span>Max Profit</span>
+          <strong class="positive-value">
+            ${formatMoney(maxProfit)}
+          </strong>
+        </div>
+
+        <div class="position-data-row">
+          <span>Max Risk</span>
+          <strong class="negative-value">
+            ${formatMoney(maxRisk)}
+          </strong>
+        </div>
+      </div>
+
+      <div class="position-data-card">
         <div class="position-panel-title">
           Position Structure
         </div>
 
-        <div class="spread-card">
-          <span>Put Credit Spread</span>
+        <div class="position-data-row">
+          <span>Put Spread</span>
           <strong>${putSpread}</strong>
         </div>
 
-        <div class="spread-card">
-          <span>Call Credit Spread</span>
+        <div class="position-data-row">
+          <span>Call Spread</span>
           <strong>${callSpread}</strong>
         </div>
 
         <div class="position-wing-note">
           Wing width:
           ${position.wing_width ?? "--"} points
+        </div>
+      </div>
+
+      <div class="position-data-card">
+        <div class="position-panel-title">
+          Stop Loss
+        </div>
+
+        <div class="position-data-row">
+          <span>Stop Debit</span>
+          <strong class="negative-value">
+            ${formatMoney(stopDebit)}
+          </strong>
+        </div>
+
+        <div class="position-data-row">
+          <span>Stop P/L</span>
+          <strong class="negative-value">
+            ${formatSignedMoney(
+              stopLossAmount,
+            )}
+          </strong>
+        </div>
+
+        <div class="position-wing-note">
+          2× opening credit rule
         </div>
       </div>
     </div>
@@ -1429,6 +1478,7 @@ function renderPositionMonitor(position) {
     </div>
   `;
 }
+
 
 
 async function loadPositions() {
