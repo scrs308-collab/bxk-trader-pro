@@ -1931,6 +1931,129 @@ body {
   }
 }
 /* =========================================
+   COMPACT BEST TRADE — ACTUAL CLASSES
+========================================= */
+
+.hero-header {
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.hero-header h1 {
+  margin: 2px 0 4px;
+  font-size: 1.65rem;
+  line-height: 1.05;
+}
+
+.hero-header .eyebrow {
+  font-size: 0.68rem;
+}
+
+.hero-header .subline {
+  font-size: 0.76rem;
+}
+
+.hero-badge {
+  padding: 7px 12px;
+  font-size: 0.68rem;
+}
+
+.hero-main {
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.score-block {
+  padding: 12px;
+}
+
+.grade-badge {
+  width: 40px;
+  height: 40px;
+  font-size: 1.15rem;
+}
+
+.score-number {
+  margin-top: 4px;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.score-label {
+  margin-top: 3px;
+  font-size: 0.7rem;
+}
+
+.score-bar {
+  margin-top: 8px;
+  height: 5px;
+}
+
+.legs-grid {
+  gap: 8px;
+}
+
+.option-leg {
+  min-height: 66px;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.option-leg span {
+  margin-bottom: 4px;
+  font-size: 0.62rem;
+}
+
+.option-leg strong {
+  font-size: 0.9rem;
+}
+
+.why-pills {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.why-pills > * {
+  padding: 5px 9px;
+  font-size: 0.68rem;
+}
+
+.metric-strip {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.metric-strip > div {
+  min-height: 58px;
+  padding: 8px;
+  border-radius: 9px;
+}
+
+.metric-strip span {
+  margin-bottom: 3px;
+  font-size: 0.58rem;
+}
+
+.metric-strip strong {
+  font-size: 0.82rem;
+}
+
+@media (min-width: 1000px) {
+  .hero-main {
+    grid-template-columns:
+      minmax(150px, 0.32fr)
+      minmax(0, 1.68fr);
+  }
+
+  .legs-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metric-strip {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+/* =========================================
    COMPACT DASHBOARD MODE
 ========================================= */
 
