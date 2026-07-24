@@ -13,15 +13,13 @@ def get_position_monitor():
     """
 
     try:
-        positions = (
-            tastytrade_api
-            .get_position_summary()
-        )
 
-        connected = (
-            tastytrade_api
-            .get_status()
-            .get("connected", False)
+        connected = tastytrade_api.authenticate()
+
+        positions = (
+            tastytrade_api.get_position_summary()
+            if connected
+            else []
         )
 
         if not positions:

@@ -27,6 +27,64 @@ function getPositionStatusClass(pnl) {
 }
 
 function getPositionRecommendation(position) {
+  const coach = position?.coach;
+
+  if (
+    coach &&
+    typeof coach.recommendation === "string" &&
+    coach.recommendation.trim()
+  ) {
+    const label =
+      coach.recommendation
+        .trim()
+        .toUpperCase();
+
+    const riskLevel =
+      String(
+        coach.risk_level || "",
+      ).toUpperCase();
+
+    let className = "neutral";
+
+    if (
+      label.includes("CLOSE") ||
+      label.includes("EXIT")
+    ) {
+      className = "profit";
+    }
+
+    if (
+      riskLevel === "MODERATE" ||
+      riskLevel === "HIGH"
+    ) {
+      className = "warning";
+    }
+
+    if (
+      riskLevel === "CRITICAL" ||
+      label.includes("REVIEW")
+    ) {
+      className = "loss";
+    }
+
+    const messages = Array.isArray(
+      coach.messages,
+    )
+      ? coach.messages.filter(Boolean)
+      : [];
+
+    const message =
+      coach.headline ||
+      messages[0] ||
+      "Follow the Position Coach recommendation.";
+
+    return {
+      label,
+      className,
+      message,
+    };
+  }
+
   const pnlPercent = Number(
     position.pnl_percent,
   );
@@ -102,6 +160,7 @@ function getPositionRecommendation(position) {
       "Position remains open and has not reached an exit threshold.",
   };
 }
+
 
 function renderNoOpenPosition(container, message) {
   container.innerHTML = `

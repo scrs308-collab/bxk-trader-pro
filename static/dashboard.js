@@ -172,3 +172,38 @@ setInterval(
   updateApiFreshness,
   1000,
 );
+
+function initializeDashboardTabs() {
+  const tabs = document.querySelectorAll(
+    ".dashboard-tab",
+  );
+
+  const panels = document.querySelectorAll(
+    ".dashboard-tab-panel",
+  );
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const targetId = tab.dataset.tab;
+      const targetPanel =
+        document.getElementById(targetId);
+
+      if (!targetPanel) {
+        return;
+      }
+
+      tabs.forEach((item) => {
+        item.classList.remove("active");
+      });
+
+      panels.forEach((panel) => {
+        panel.classList.remove("active");
+      });
+
+      tab.classList.add("active");
+      targetPanel.classList.add("active");
+    });
+  });
+}
+
+initializeDashboardTabs();

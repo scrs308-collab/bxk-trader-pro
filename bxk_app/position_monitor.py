@@ -534,15 +534,16 @@ def build_position_summaries(
     spx_price: float | None = None,
 ) -> list[dict]:
     """
-    Group raw option legs by root and expiration, then build
-    one iron-condor summary for each complete four-leg group.
+    Group raw option legs by root, expiration, and quantity,
+    then build one iron-condor summary for each complete
+    four-leg group.
     """
 
     if not positions:
         return []
 
     grouped_positions: dict[
-        tuple[str, str],
+        tuple[str, str, float],
         list[dict],
     ] = {}
 
@@ -554,9 +555,29 @@ def build_position_summaries(
         if not parsed:
             continue
 
+        try:
+            quantity = abs(
+                float(
+                    position.get(
+                        "quantity",
+                        0,
+                    )
+                    or 0
+                )
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            quantity = 0.0
+
+        if quantity <= 0:
+            continue
+
         group_key = (
             parsed["root"],
             parsed["expiration"],
+            quantity,
         )
 
         grouped_positions.setdefault(
@@ -568,10 +589,16 @@ def build_position_summaries(
 
     sorted_groups = sorted(
         grouped_positions.items(),
-        key=lambda item: item[0][1],
+        key=lambda item: (
+            item[0][1],
+            item[0][2],
+        ),
     )
 
     for _, grouped_legs in sorted_groups:
+        if len(grouped_legs) != 4:
+            continue
+
         summary = build_iron_condor_summary(
             positions=grouped_legs,
             spx_price=spx_price,
