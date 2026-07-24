@@ -25,7 +25,10 @@
       </div>
     </header>
 
-    <nav class="dashboard-tabs" aria-label="Dashboard sections">
+    <nav
+  class="dashboard-tabs"
+  aria-label="Dashboard sections"
+>
   <button
     type="button"
     class="dashboard-tab active"
@@ -40,6 +43,14 @@
     data-tab="positionMonitorTab"
   >
     Position Monitor
+  </button>
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="marketSummaryTab"
+  >
+    Market Summary
   </button>
 
   <button
@@ -248,20 +259,51 @@
   </section>
 </div>
 
+<div
+  id="marketSummaryTab"
+  class="dashboard-tab-panel"
+>
+  <section class="card">
+    <div class="card-label">
+      Market Summary
+    </div>
 
+    <div id="marketSummary">
+      Loading market summary...
+    </div>
+  </section>
+</div>
 <div
   id="strategiesTab"
   class="dashboard-tab-panel"
-></div>
+>
+  <section class="card">
+    <div class="card-label">
+      BXK Strategy Playbook
+    </div>
+
+    <div id="strategyPlaybook">
+      Loading strategy recommendations...
+    </div>
+  </section>
+</div>
 
 <div
   id="systemTab"
   class="dashboard-tab-panel"
-></div>
+>
+  <section class="card">
+    <div class="card-label">
+      BXK System Control Room
+    </div>
 
+    <div id="systemDashboard">
+      Loading system status...
+    </div>
+  </section>
 </div>
-
-<script type="module" src="/static/dashboard.js?v=17"></script>
+</div>
+<script type="module" src="/static/dashboard.js?v=18"></script>
      
    
 </body>

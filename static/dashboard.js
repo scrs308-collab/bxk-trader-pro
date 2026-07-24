@@ -15,6 +15,7 @@ import {
 
 import {
   updateDashboard,
+  updateMarketSummaryLiveData,
 } from "./market.js";
 
 import {
@@ -120,6 +121,32 @@ function updateClock() {
   setText("clock", nowTime());
 }
 
+async function fetchLiveMarketSummary() {
+  try {
+    const response = await fetch(
+      `/api/live-market?_=${Date.now()}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Live-market error ${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+
+    updateMarketSummaryLiveData(data);
+  } catch (error) {
+    console.error(
+      "Live market summary failed:",
+      error,
+    );
+  }
+}
+
 async function refreshDashboard() {
   if (dashboardRefreshInProgress) {
     return;
@@ -128,8 +155,10 @@ async function refreshDashboard() {
   dashboardRefreshInProgress = true;
 
   try {
+    await fetchRecommendation();
+
     await Promise.allSettled([
-      fetchRecommendation(),
+      fetchLiveMarketSummary(),
       loadBestTrade(),
       loadPositions(),
     ]);
