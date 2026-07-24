@@ -1930,3 +1930,131 @@ body {
     text-align: left;
   }
 }
+/* =========================================
+   COMPACT DASHBOARD MODE
+========================================= */
+
+.dashboard-shell {
+  max-width: 1500px;
+  padding: 12px 18px 24px;
+}
+
+.dashboard-header {
+  padding: 10px 0;
+}
+
+.dashboard-header h1 {
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.dashboard-header p {
+  margin-top: 3px;
+  font-size: 0.78rem;
+}
+
+.dashboard-tabs {
+  gap: 6px;
+  margin: 8px 0 12px;
+  padding: 5px;
+}
+
+.dashboard-tab {
+  padding: 8px 14px;
+  font-size: 0.78rem;
+}
+
+.card {
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.card-label {
+  margin-bottom: 8px;
+  font-size: 0.68rem;
+}
+
+.trade-setup-title,
+.recommendation-title {
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.trade-setup-grid,
+.market-grid,
+.metrics-grid,
+.strike-grid {
+  gap: 8px;
+}
+
+.metric-card,
+.strike-card,
+.condition-card,
+.checklist-item {
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.metric-card span,
+.strike-card span,
+.condition-card span {
+  margin-bottom: 4px;
+  font-size: 0.65rem;
+}
+
+.metric-card strong,
+.strike-card strong,
+.condition-card strong {
+  font-size: 0.95rem;
+}
+
+.checklist-grid {
+  gap: 6px;
+}
+
+.checklist-item {
+  min-height: auto;
+  font-size: 0.75rem;
+}
+
+.status-badge,
+.trade-status,
+.strategy-status {
+  padding: 5px 9px;
+  font-size: 0.65rem;
+}
+
+.score-ring,
+.confidence-ring {
+  width: 86px;
+  height: 86px;
+}
+
+.score-ring strong,
+.confidence-ring strong {
+  font-size: 1.45rem;
+}
+
+.dashboard-tab-panel {
+  gap: 10px;
+}
+
+.dashboard-tab-panel section {
+  margin-bottom: 10px;
+}
+
+button {
+  min-height: 34px;
+}
+
+@media (min-width: 1000px) {
+  body {
+    font-size: 14px;
+  }
+
+  .trade-setup-grid {
+    grid-template-columns:
+      minmax(0, 1.25fr)
+      minmax(260px, 0.75fr);
+  }
+}
