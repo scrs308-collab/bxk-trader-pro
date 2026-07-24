@@ -143,3 +143,61 @@ Build the most practical and intuitive SPX options decision-support platform ava
 Copyright © 2026
 
 BXK Capital
+BXK TRADER PRO DASHBOARD V10
+============================
+
+This package replaces the single 1,800+ line dashboard.js with ES modules.
+
+FILES
+-----
+dashboard.js
+config.js
+utils.js
+market.js
+checklist.js
+best-trade.js
+position.js
+position-v10.css
+
+INSTALL
+-------
+1. Back up your current dashboard.js.
+
+2. Put all seven JavaScript files in the SAME folder where the current
+   dashboard.js is located.
+
+3. Replace your existing dashboard script tag with:
+
+   <script type="module" src="/static/js/dashboard.js"></script>
+
+   Keep your actual existing path if it differs. The important change is:
+   type="module"
+
+4. Add the optional CSS file after your existing dashboard CSS:
+
+   <link rel="stylesheet" href="/static/css/position-v10.css">
+
+   Again, use the actual path where you place the CSS file.
+
+5. Hard refresh the browser:
+   Ctrl + Shift + R
+
+6. Open DevTools > Console. You should see:
+
+   BXK Trader Pro Dashboard - V10
+
+WHAT CHANGED
+------------
+- Multi-position rendering from data.positions
+- Aggregate P/L from data.total_open_pnl
+- Legacy fallback from data.position
+- No nested functions
+- One checklist function
+- Position code isolated in position.js
+- Best-trade code isolated in best-trade.js
+- Market dashboard code isolated in market.js
+- Shared helpers isolated in utils.js
+
+ROLLBACK
+--------
+Restore the old dashboard.js and remove type="module" from the script tag.

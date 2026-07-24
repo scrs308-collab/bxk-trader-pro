@@ -1,0 +1,311 @@
+.position-v10-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.position-v10-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.position-v10-strategy {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.position-v10-contracts {
+  margin-top: 4px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.92rem;
+}
+
+.position-v10-expiration {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+}
+
+.position-v10-expiration strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+}
+
+.position-v10-expiration span {
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.8rem;
+}
+
+.position-v10-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.4fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.position-v10-pnl {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.position-v10-label {
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.position-v10-pnl-value {
+  margin-top: 6px;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.position-v10-pnl-percent {
+  margin-top: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.position-v10-pnl.positive,
+.position-v10-pnl.profit,
+.position-v10-pnl.good {
+  border-color: rgba(45, 205, 125, 0.35);
+  background: rgba(45, 205, 125, 0.08);
+}
+
+.position-v10-pnl.negative,
+.position-v10-pnl.loss,
+.position-v10-pnl.bad {
+  border-color: rgba(244, 86, 86, 0.35);
+  background: rgba(244, 86, 86, 0.08);
+}
+
+.position-v10-progress {
+  min-width: 0;
+}
+
+.position-v10-progress-header,
+.position-v10-progress-targets {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.position-v10-progress-header {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
+.position-v10-progress-header span {
+  color: var(--muted-text, #8d98a8);
+  font-weight: 700;
+}
+
+.position-v10-progress-header strong {
+  font-size: 1rem;
+}
+
+.position-v10-progress-targets {
+  margin-top: 7px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.72rem;
+}
+
+.position-v10-summary .position-source {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.position-v10-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.9fr);
+  gap: 18px;
+}
+
+.position-v10-strikes,
+.position-v10-metrics {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.position-v10-panel-title {
+  margin-bottom: 14px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.position-v10-spread {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.position-v10-spread:first-of-type {
+  border-top: none;
+}
+
+.position-v10-spread-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.position-v10-leg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.position-v10-leg span {
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.position-v10-leg strong {
+  font-size: 0.98rem;
+}
+
+.position-v10-leg.short-leg {
+  border-left: 3px solid rgba(244, 176, 66, 0.9);
+}
+
+.position-v10-leg.long-leg {
+  border-left: 3px solid rgba(84, 146, 255, 0.9);
+}
+
+.position-v10-wing-width {
+  margin-top: 10px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.82rem;
+}
+
+.position-v10-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.position-v10-metric:first-of-type {
+  border-top: none;
+}
+
+.position-v10-metric span {
+  color: var(--muted-text, #8d98a8);
+}
+
+.position-v10-metric strong {
+  text-align: right;
+}
+
+.position-v10-stop-note {
+  margin-top: 10px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.position-v10-coach {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.position-v10-coach-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.position-v10-coach-heading span {
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.position-v10-coach-heading strong {
+  font-size: 1.2rem;
+  letter-spacing: 0.05em;
+}
+
+.position-v10-coach .position-coach-message {
+  line-height: 1.55;
+}
+
+.position-v10-coach.close,
+.position-v10-coach.profit,
+.position-v10-coach.good {
+  border-color: rgba(45, 205, 125, 0.35);
+  background: rgba(45, 205, 125, 0.07);
+}
+
+.position-v10-coach.warning,
+.position-v10-coach.caution,
+.position-v10-coach.manage {
+  border-color: rgba(244, 176, 66, 0.35);
+  background: rgba(244, 176, 66, 0.07);
+}
+
+.position-v10-coach.danger,
+.position-v10-coach.exit,
+.position-v10-coach.loss {
+  border-color: rgba(244, 86, 86, 0.35);
+  background: rgba(244, 86, 86, 0.07);
+}
+
+@media (max-width: 980px) {
+  .position-v10-summary,
+  .position-v10-body {
+    grid-template-columns: 1fr;
+  }
+
+  .position-v10-summary .position-source {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 680px) {
+  .position-v10-header,
+  .position-v10-coach-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .position-v10-expiration {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .position-v10-spread {
+    grid-template-columns: 1fr;
+  }
+}

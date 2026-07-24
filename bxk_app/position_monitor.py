@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from typing import Any
+
 from bxk_app.position_coach import evaluate_position
+
 
 OPTION_PATTERN = re.compile(
     r"^(?P<root>[A-Z]+)\s+"
@@ -56,7 +58,6 @@ def parse_option_symbol(
         / 1000
     )
 
-    
     return {
         "root": match.group("root"),
         "expiration": expiration.isoformat(),
@@ -145,11 +146,19 @@ def position_status(
 
     These thresholds can later move into settings.
     """
-    if put_distance is None or call_distance is None:
-       return (
-           "DATA WAIT",
-           "Current SPX price is unavailable, so strike-distance risk cannot be evaluated.",
-    )
+
+    if (
+        put_distance is None
+        or call_distance is None
+    ):
+        return (
+            "DATA WAIT",
+            (
+                "Current SPX price is unavailable, "
+                "so strike-distance risk cannot be evaluated."
+            ),
+        )
+
     valid_distances = [
         distance
         for distance in (
@@ -217,7 +226,7 @@ def build_iron_condor_summary(
     """
     Group four SPX option legs into one iron condor summary.
     """
-    
+
     parsed_legs = []
 
     for position in positions:
@@ -262,6 +271,7 @@ def build_iron_condor_summary(
             quantity=quantity,
             multiplier=multiplier,
         )
+
         parsed_legs.append({
             **parsed,
             "symbol": position.get("symbol"),
@@ -275,10 +285,14 @@ def build_iron_condor_summary(
                 "close-price",
             ),
             "pnl": leg_pnl,
-            "broker_open_pnl": safe_float(position.get("pnl")),
-            "expires_at": position.get("expires_at"),
+            "broker_open_pnl": safe_float(
+                position.get("pnl")
+            ),
+            "expires_at": position.get(
+                "expires_at"
+            ),
         })
-        
+
     if len(parsed_legs) != 4:
         return None
 
@@ -339,12 +353,12 @@ def build_iron_condor_summary(
     )
 
     broker_open_pnl = sum(
-    leg.get(
-        "broker_open_pnl",
-        0,
+        leg.get(
+            "broker_open_pnl",
+            0,
+        )
+        for leg in parsed_legs
     )
-    for leg in parsed_legs
-)
 
     multiplier = short_put["multiplier"]
 
@@ -513,3 +527,57 @@ def build_iron_condor_summary(
     )
 
     return position_summary
+
+
+def build_position_summaries(
+    positions: list[dict],
+    spx_price: float | None = None,
+) -> list[dict]:
+    """
+    Group raw option legs by root and expiration, then build
+    one iron-condor summary for each complete four-leg group.
+    """
+
+    if not positions:
+        return []
+
+    grouped_positions: dict[
+        tuple[str, str],
+        list[dict],
+    ] = {}
+
+    for position in positions:
+        parsed = parse_option_symbol(
+            position.get("symbol", "")
+        )
+
+        if not parsed:
+            continue
+
+        group_key = (
+            parsed["root"],
+            parsed["expiration"],
+        )
+
+        grouped_positions.setdefault(
+            group_key,
+            [],
+        ).append(position)
+
+    summaries: list[dict] = []
+
+    sorted_groups = sorted(
+        grouped_positions.items(),
+        key=lambda item: item[0][1],
+    )
+
+    for _, grouped_legs in sorted_groups:
+        summary = build_iron_condor_summary(
+            positions=grouped_legs,
+            spx_price=spx_price,
+        )
+
+        if summary is not None:
+            summaries.append(summary)
+
+    return summaries
