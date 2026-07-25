@@ -157,8 +157,57 @@ def get_test_candidate_grid():
         "results": results,
     }
 
-
 def get_best_trade():
+    market = run_trade_quality()
+
+    rankings = rank_strategies(
+        safe_market_value(
+            market,
+            "score",
+            0,
+        ),
+        safe_market_value(
+            market,
+            "trend",
+            "UNKNOWN",
+        ),
+        safe_market_value(
+            market,
+            "vix_state",
+            "UNKNOWN",
+        ),
+    )
+
+    supported_strategies = {
+        "Iron Condor",
+        "Bull Put Credit Spread",
+        "Bear Call Credit Spread",
+    }
+
+    selected_strategy = next(
+        (
+            strategy["name"]
+            for strategy in rankings
+            if strategy.get("name")
+            in supported_strategies
+        ),
+        "Iron Condor",
+    )
+
+    if selected_strategy == "Bull Put Credit Spread":
+        return build_best_bull_put(
+            wing_width=25,
+            days_to_expiration=1,
+            min_credit=1.00,
+        )
+
+    if selected_strategy == "Bear Call Credit Spread":
+        return build_best_bear_call(
+            wing_width=25,
+            days_to_expiration=1,
+            min_credit=1.00,
+        )
+
     return build_best_trade(
         wing_width=25,
         days_to_expiration=1,

@@ -169,7 +169,45 @@ export async function loadBestTrade() {
           </div>
         </div>
 
-        <div class="legs-grid">
+    <div class="legs-grid ${
+  trade.strategy === "Iron Condor"
+    ? ""
+    : "two-leg"
+}">
+  ${
+    trade.strategy === "Bull Put Credit Spread"
+      ? `
+        <div class="option-leg sell">
+          <span>SELL</span>
+          <strong>
+            ${trade.sell_put ?? "--"} PUT
+          </strong>
+        </div>
+
+        <div class="option-leg buy">
+          <span>BUY</span>
+          <strong>
+            ${trade.buy_put ?? "--"} PUT
+          </strong>
+        </div>
+      `
+      : trade.strategy === "Bear Call Credit Spread"
+        ? `
+          <div class="option-leg sell">
+            <span>SELL</span>
+            <strong>
+              ${trade.sell_call ?? "--"} CALL
+            </strong>
+          </div>
+
+          <div class="option-leg buy">
+            <span>BUY</span>
+            <strong>
+              ${trade.buy_call ?? "--"} CALL
+            </strong>
+          </div>
+        `
+        : `
           <div class="option-leg sell">
             <span>SELL</span>
             <strong>
@@ -197,70 +235,57 @@ export async function loadBestTrade() {
               ${trade.buy_put ?? "--"} PUT
             </strong>
           </div>
+        `
+      }
+    </div>
+
+      <div class="trade-reasons">
+        <div class="reasons-label">Trade Reasons</div>
+        <div class="reasons-list">
+          ${reasons}
         </div>
       </div>
 
-      <div class="why-pills">
-        ${reasons}
-      </div>
-
-      <div class="metric-strip">
-        <div>
-          <span>Credit</span>
-          <strong>${formatMoney(trade.credit)}</strong>
+      <div class="trade-stats">
+        <div class="stat">
+          <span class="stat-label">Quality</span>
+          <span class="stat-value">${qualityLabel}</span>
         </div>
-        <div>
-          <span>Max Profit</span>
-          <strong>${formatMoney(trade.max_profit)}</strong>
+        <div class="stat">
+          <span class="stat-label">Probability</span>
+          <span class="stat-value">${touchProbability}</span>
         </div>
-        <div>
-          <span>Max Risk</span>
-          <strong>${formatMoney(trade.max_risk)}</strong>
+        <div class="stat">
+          <span class="stat-label">Max Profit</span>
+          <span class="stat-value">${formatMoney(trade.max_profit, 0)}</span>
         </div>
-        <div>
-          <span>POP</span>
-          <strong>${formatNumber(pop, 1)}%</strong>
-        </div>
-        <div>
-          <span>Risk / Reward</span>
-          <strong>
-            ${formatNumber(trade.risk_reward, 2)}
-          </strong>
-        </div>
-        <div>
-          <span>Touch Probability</span>
-          <strong>${touchProbability}</strong>
-        </div>
-        <div>
-          <span>Wing</span>
-          <strong>
-            ${trade.wing_width ?? "--"}
-          </strong>
+        <div class="stat">
+          <span class="stat-label">Max Loss</span>
+          <span class="stat-value">${formatMoney(trade.max_loss, 0)}</span>
         </div>
       </div>
+    </div>
     `;
   } catch (error) {
-    console.error(
-      "Best-trade fetch failed:",
-      error,
-    );
-
+    console.error("Error loading best trade:", error);
     card.innerHTML = `
       <div class="hero-header">
         <div>
           <div class="eyebrow">
-            Today's Best Trade
+            Market Decision
           </div>
-          <h1>Engine Error</h1>
+          <h1>Error</h1>
+          <div class="subline">
+            Failed to load trade data
+          </div>
         </div>
         <div class="hero-badge no-trade">
           ERROR
         </div>
       </div>
-
-      <p>
-        Could not load the best-trade engine.
-      </p>
+      <div class="no-trade-message">
+        ${error.message}
+      </div>
     `;
   }
 }
