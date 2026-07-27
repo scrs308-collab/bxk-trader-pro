@@ -127,36 +127,152 @@
 </section>
       <section class="card checklist-card">
 
-    <div class="card-label">
-         Why This Trade Scores
-    </div>
+  <div class="card-label">
+    Why This Trade Scores
+  </div>
 
-    <div id="tradeChecklist">
-         Waiting for trade-quality data...
-    </div>
+  <div id="tradeChecklist">
+    Waiting for trade-quality data...
+  </div>
 
 </section>
+
+<section class="card bxk-coach-card">
+
+  <div class="card-label">
+    BXK Coach
+  </div>
+
+  <div class="bxk-coach-grid">
+
+    <div class="coach-command-block">
+
+      <div class="coach-eyebrow">
+        Recommended Action
+      </div>
+
+      <div
+        class="coach-command"
+        id="coachCommand"
+      >
+        Waiting for market data...
+      </div>
+
+      <div
+        class="coach-explanation"
+        id="coachExplanation"
+      >
+        The coach will evaluate market score, trade state,
+        probability, credit quality, and risk.
+      </div>
+
+    </div>
+
+    <div class="coach-metrics">
+
+      <div class="coach-metric">
+        <span>Position Size</span>
+        <strong id="coachSize">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Minimum Credit</span>
+        <strong id="coachCredit">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Take Profit</span>
+        <strong id="coachTakeProfit">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Stop Rule</span>
+        <strong id="coachStop">--</strong>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div
+    class="coach-reasons"
+    id="coachReasons"
+  >
+    <div class="coach-reason neutral">
+      Waiting for the trade engine...
+    </div>
+  </div>
+
+</section>
+
 <main class="dashboard">
+      <section class="card hero-card recommendation-card">
 
-      <section class="card hero-card">
-        <div class="card-label">Recommendation</div>
-        <div class="recommendation" id="recommendation">Loading...</div>
-        <div class="confidence" id="confidence">Confidence: --</div>
-      </section>
+  <div class="card-label">
+    Recommendation
+  </div>
 
-      <section class="card">
-        <div class="card-label">Market Score</div>
-        <div class="score" id="score">--</div>
-        <div class="score-bar">
-          <div id="scoreFill"></div>
-        </div>
-      </section>
+  <div
+      class="recommendation"
+      id="recommendation">
+      Loading...
+  </div>
 
-      <section class="card">
-        <div class="card-label">Market Regime</div>
-        <div class="metric" id="trade">--</div>
-      </section>
+  <div
+      class="confidence"
+      id="confidence">
+      Confidence: --
+  </div>
 
+  <div
+      class="recommendation-action"
+      id="recommendationAction">
+
+      Awaiting market data...
+
+  </div>
+
+</section>
+
+      <section class="card score-card">
+
+  <div class="card-label">
+    Market Score
+  </div>
+
+  <div class="score" id="score">
+    --
+  </div>
+
+  <div class="score-grade" id="scoreGrade">
+    Grade --
+  </div>
+
+  <div class="score-bar">
+    <div id="scoreFill"></div>
+  </div>
+
+</section>
+      <section class="card regime-card">
+
+  <div class="card-label">
+    Market Regime
+  </div>
+
+  <div class="metric" id="trade">
+    --
+  </div>
+
+  <div
+      class="regime-description"
+      id="regimeDescription">
+
+      Waiting for market analysis...
+
+  </div>
+
+</section>
+        
       <section class="card">
         <div class="card-label">Trend</div>
         <div class="metric" id="trend">--</div>
@@ -197,6 +313,7 @@
           <strong id="clock">--</strong>
         </div>
       </section>
+
 
   <section class="card opportunity-card">
   <div class="card-label">Live Opportunity</div>

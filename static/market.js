@@ -1,3 +1,4 @@
+
 import {
   el,
   setText,
@@ -7,6 +8,7 @@ import {
   formatMoney,
   getStatusIcon,
 } from "./utils.js";
+import { updateCoach } from "./coach.js";
 
 export function setScore(score) {
   const safeScore = Math.max(
@@ -15,6 +17,30 @@ export function setScore(score) {
   );
 
   setText("score", Math.round(safeScore));
+
+  let grade = "F";
+
+  if (safeScore >= 95) {
+    grade = "A+";
+  } else if (safeScore >= 90) {
+    grade = "A";
+  } else if (safeScore >= 85) {
+    grade = "A-";
+  } else if (safeScore >= 80) {
+    grade = "B+";
+  } else if (safeScore >= 75) {
+    grade = "B";
+  } else if (safeScore >= 70) {
+    grade = "B-";
+  } else if (safeScore >= 65) {
+    grade = "C+";
+  } else if (safeScore >= 60) {
+    grade = "C";
+  } else if (safeScore >= 50) {
+    grade = "D";
+  }
+
+  setText("scoreGrade", `Grade ${grade}`);
 
   const scoreFill = el("scoreFill");
 
@@ -1016,10 +1042,50 @@ export function updateDashboard(data, updateChecklist) {
     "confidence",
     `Confidence: ${data.confidence ?? "--"}`,
   );
+    const recommendationState = String(
+    data.recommendation ?? "",
+  ).toUpperCase();
 
-  setScore(data.score);
-  updateThermometer(data.score, data);
+  let recommendationAction =
+    "MONITOR MARKET";
 
+  if (
+    recommendationState.includes("TRADE ALLOWED") ||
+    recommendationState.includes("ENTER TRADE")
+  ) {
+    recommendationAction =
+      "OPEN POSITION";
+  } else if (
+    recommendationState.includes("TRADE SMALL") ||
+    tradeState.includes("SMALL")
+  ) {
+    recommendationAction =
+      "REDUCE SIZE";
+  } else if (
+    recommendationState.includes("NO TRADE") ||
+    recommendationState.includes("WAIT") ||
+    tradeState.includes("NO TRADE") ||
+    tradeState.includes("WAIT")
+  ) {
+    recommendationAction =
+      "WAIT FOR BETTER SETUP";
+  } else if (
+    recommendationState.includes("MANAGE") ||
+    recommendationState.includes("CLOSE")
+  ) {
+    recommendationAction =
+      "MANAGE OPEN POSITION";
+  }
+
+  setText(
+    "recommendationAction",
+    recommendationAction,
+  );
+  
+setScore(data.score);
+updateCoach(data);
+updateThermometer(data.score, data);
+   
   setText(
     "trade",
     `${getStatusIcon(data.trade)} ${data.trade ?? "--"}`,
@@ -1045,6 +1111,37 @@ export function updateDashboard(data, updateChecklist) {
     `${getStatusIcon(data.iv_rank_state)} ${
       data.iv_rank_state ?? "--"
     }`,
+  );
+    const tradeState = String(
+    data.trade ?? "",
+  ).toUpperCase();
+
+  let regimeDescription =
+    "Waiting for market analysis...";
+
+  if (
+    tradeState.includes("TRADE") &&
+    !tradeState.includes("NO")
+  ) {
+    regimeDescription =
+      "Premium-selling conditions are favorable.";
+  } else if (
+    tradeState.includes("WAIT") ||
+    tradeState.includes("NO TRADE")
+  ) {
+    regimeDescription =
+      "Conditions do not currently justify a new position.";
+  } else if (
+    tradeState.includes("CAUTION") ||
+    tradeState.includes("SMALL")
+  ) {
+    regimeDescription =
+      "Conditions are usable, but reduced size and tighter discipline are favored.";
+  }
+
+  setText(
+    "regimeDescription",
+    regimeDescription,
   );
 
   renderReasons(data.reasons);

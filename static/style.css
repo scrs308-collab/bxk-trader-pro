@@ -2247,3 +2247,239 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* =========================================================
+   TRADE CHECKLIST
+   ========================================================= */
+
+#tradeChecklist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.checklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.checklist-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.checklist-summary {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.checklist-status {
+  min-width: 120px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border: 1px solid currentColor;
+}
+
+.checklist-status.ready {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.checklist-status.almost {
+  color: #84cc16;
+  background: rgba(132, 204, 22, 0.12);
+}
+
+.checklist-status.warming {
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.12);
+}
+
+.checklist-status.caution {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.checklist-status.wait {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 48px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.check-item.passed {
+  border-left: 3px solid #22c55e;
+}
+
+.check-item.failed {
+  border-left: 3px solid #ef4444;
+}
+
+.check-item.empty {
+  grid-column: 1 / -1;
+  opacity: 0.7;
+}
+
+.check-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.check-icon.pass {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.check-icon.fail {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.check-label {
+  line-height: 1.35;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 760px) {
+  .checklist-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .checklist-status {
+    width: 100%;
+  }
+}
+/* ======================================================
+   BXK COACH
+====================================================== */
+
+.bxk-coach-card {
+  margin-bottom: 18px;
+}
+
+.bxk-coach-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.coach-command-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.coach-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7c8ca5;
+  margin-bottom: 8px;
+}
+
+.coach-command {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #00d26a;
+  line-height: 1.1;
+}
+
+.coach-explanation {
+  margin-top: 12px;
+  color: #c8d3e0;
+  line-height: 1.5;
+  max-width: 650px;
+}
+
+.coach-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.coach-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+}
+
+.coach-metric span {
+  color: #93a3b8;
+  font-size: .85rem;
+}
+
+.coach-metric strong {
+  font-size: 1rem;
+  color: white;
+}
+
+.coach-reasons {
+  margin-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.coach-reason {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 4px solid #00d26a;
+  background: rgba(0,210,106,.08);
+}
+
+.coach-reason.warning {
+  border-left-color: #ffb300;
+  background: rgba(255,179,0,.08);
+}
+
+.coach-reason.danger {
+  border-left-color: #ff4d4d;
+  background: rgba(255,77,77,.08);
+}
+
+.coach-reason.neutral {
+  border-left-color: #4b8dff;
+  background: rgba(75,141,255,.08);
+}
+
+@media (max-width: 900px) {
+
+  .bxk-coach-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
