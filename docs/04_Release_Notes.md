@@ -103,3 +103,15 @@ Added:
 
 Stable
 Production Ready
+
+BXK Trader Pro v7.2.0
+
+Added configurable Trade Parameters panel
+Added Strategy selector (BXK Auto, Iron Condor, Bull Put Credit Spread, Bear Call Credit Spread)
+Added DTE selector
+Added Wing Width selector
+Added Contracts selector
+BUILD TRADE now sends user-selected parameters to the backend
+/api/best-trade now supports dynamic strategy, DTE, wing width, and contracts
+Scanner service honors user-selected parameters
+Hero card updates dynamically with generated trade
