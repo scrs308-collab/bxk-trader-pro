@@ -108,14 +108,6 @@ def build_best_trade(
     strategy: str = "auto",
     contracts: int = 1,
 ):
-    print(
-        "REQUESTED WING WIDTH:",
-        wing_width,
-    )
-    print(
-        "REQUESTED DTE:",
-        days_to_expiration,
-    )
 
     """
     Build, price, analyze, and rank live SPX Iron Condors.
