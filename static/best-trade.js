@@ -6,7 +6,9 @@ import {
   formatNumber,
 } from "./utils.js";
 
-export async function loadBestTrade() {
+export async function loadBestTrade(
+  overrides = {},
+) {
   const card = el("bestTradeCard");
 
   if (!card) {
@@ -14,13 +16,52 @@ export async function loadBestTrade() {
   }
 
   try {
-    const response = await fetch(
-      `${BEST_TRADE_URL}?_=${Date.now()}`,
-      {
-        cache: "no-store",
-      },
-    );
+    const strategySelector =
+  el("strategySelector");
 
+const dteSelector =
+  el("dteSelector");
+
+const wingWidthSelector =
+  el("wingWidthSelector");
+
+const contractsSelector =
+  el("contractsSelector");
+
+const selectedStrategy =
+  overrides.strategy ??
+  strategySelector?.value ??
+  "auto";
+
+const selectedDte =
+  overrides.dte ??
+  dteSelector?.value ??
+  "1";
+
+const selectedWingWidth =
+  overrides.wingWidth ??
+  wingWidthSelector?.value ??
+  "25";
+
+const selectedContracts =
+  overrides.contracts ??
+  contractsSelector?.value ??
+  "1";
+
+const params = new URLSearchParams({
+  strategy: selectedStrategy,
+  dte: selectedDte,
+  wing_width: selectedWingWidth,
+  contracts: selectedContracts,
+  _: Date.now().toString(),
+});
+
+const response = await fetch(
+  `${BEST_TRADE_URL}?${params.toString()}`,
+  {
+    cache: "no-store",
+  },
+);
     if (!response.ok) {
       throw new Error(
         `Best-trade API error ${response.status}`,
@@ -35,13 +76,16 @@ export async function loadBestTrade() {
         <div class="hero-header">
           <div>
             <div class="eyebrow">
-              Market Decision
+              Today's Setup
             </div>
+
             <h1>Stand Aside</h1>
+
             <div class="subline">
-              Best candidate found • Not approved for entry
+              No approved setup is currently available.
             </div>
           </div>
+
           <div class="hero-badge no-trade">
             NO TRADE
           </div>
@@ -54,6 +98,7 @@ export async function loadBestTrade() {
           }
         </div>
       `;
+
       return;
     }
 
@@ -75,73 +120,172 @@ export async function loadBestTrade() {
 
     const badgeText =
       tradeApproved ? recommendation : "NO TRADE";
+    
+    const strategyName =
+      trade.strategy || "Trade Candidate";
 
-    const tradeScore = safeNumber(
-      trade.trade_quality_score ??
-      trade.trade_score,
+    const spxPrice = safeNumber(
+      trade.spx_price,
       0,
     );
 
-    const grade = trade.grade || "F";
+    const expectedMove = safeNumber(
+      trade.expected_move,
+      0,
+    );
 
-    const qualityLabel =
-      trade.quality_label ||
-      `${grade} ${trade.rating || "Poor"}`;
-
-    const pop = safeNumber(trade.pop, 0);
-
-    const touchProbability =
-      Number.isFinite(
-        Number(trade.probability_of_touch),
-      )
-        ? `${formatNumber(
-            trade.probability_of_touch,
-            1,
-          )}%`
+    const dte =
+      trade.dte != null
+        ? trade.dte
         : "--";
 
-    const tradeReasons =
-      Array.isArray(trade.reasons)
-        ? trade.reasons
-        : [];
+    const expiration =
+      trade.expiration ||
+      trade.expiration_date ||
+      trade.expires_at ||
+      null;
 
-    const reasons = tradeReasons.length
-      ? tradeReasons
-          .map((reason) => {
-            const text =
-              typeof reason === "string"
-                ? reason
-                : reason?.reason ||
-                  "Unknown trade condition";
+    const expirationText = expiration
+      ? new Date(expiration).toLocaleDateString(
+          "en-US",
+          {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          },
+        )
+      : dte === 0
+        ? "Today"
+        : "--";
 
-            return `<span>✓ ${text}</span>`;
-          })
-          .join("")
-      : `
-          <span>
-            No detailed trade reasons returned.
-          </span>
-        `;
+    const credit = safeNumber(
+      trade.credit ??
+      trade.net_credit ??
+      trade.opening_credit ??
+      trade.premium,
+      0,
+    );
+
+    const pop = safeNumber(
+      trade.pop,
+      0,
+    );
+
+    const maxRisk = safeNumber(
+      trade.max_risk ??
+      trade.max_loss,
+      0,
+    );
+
+    const contracts = safeNumber(
+      trade.quantity ??
+      trade.contracts,
+      1,
+    );
+
+    const buyingPower = safeNumber(
+      trade.buying_power_effect ??
+      trade.buying_power ??
+      trade.capital_required,
+      0,
+    );
+
+    const updatedValue =
+      trade.timestamp ||
+      trade.updated_at ||
+      data.timestamp ||
+      new Date().toISOString();
+
+    const updatedTime = new Date(
+      updatedValue,
+    ).toLocaleTimeString(
+      "en-US",
+      {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      },
+    );
+
+    let legsHtml = "";
+
+    if (
+      strategyName === "Bull Put Credit Spread"
+)
+     {
+      legsHtml = `
+        <div class="setup-leg">
+          <span>SELL PUT</span>
+          <strong>
+            ${trade.sell_put ?? "--"}
+          </strong>
+        </div>
+
+        <div class="setup-leg">
+          <span>BUY PUT</span>
+          <strong>
+            ${trade.buy_put ?? "--"}
+          </strong>
+        </div>
+      `;
+    } else if (
+      strategyName === "Bear Call Credit Spread"
+    ) {
+      legsHtml = `
+        <div class="setup-leg">
+          <span>SELL CALL</span>
+          <strong>
+            ${trade.sell_call ?? "--"}
+          </strong>
+        </div>
+
+        <div class="setup-leg">
+          <span>BUY CALL</span>
+          <strong>
+            ${trade.buy_call ?? "--"}
+          </strong>
+        </div>
+      `;
+    } else {
+      legsHtml = `
+        <div class="setup-leg">
+          <span>SELL CALL</span>
+          <strong>
+            ${trade.sell_call ?? "--"}
+          </strong>
+        </div>
+
+        <div class="setup-leg">
+          <span>BUY CALL</span>
+          <strong>
+            ${trade.buy_call ?? "--"}
+          </strong>
+        </div>
+
+        <div class="setup-leg">
+          <span>SELL PUT</span>
+          <strong>
+            ${trade.sell_put ?? "--"}
+          </strong>
+        </div>
+
+        <div class="setup-leg">
+          <span>BUY PUT</span>
+          <strong>
+            ${trade.buy_put ?? "--"}
+          </strong>
+        </div>
+      `;
+    }
 
     card.innerHTML = `
       <div class="hero-header">
         <div>
           <div class="eyebrow">
-            Today's Best Trade
+            Today's Setup
           </div>
 
-          <h1>${trade.strategy || "Trade Candidate"}</h1>
-
-          <div class="subline">
-            SPX ${formatNumber(trade.spx_price, 2)}
-            •
-            ${trade.dte != null ? trade.dte : "--"} DTE
-            •
-            Expected Move ±${formatNumber(
-              trade.expected_move,
-              2,
-            )}
-          </div>
+          <h1>${strategyName}</h1>
         </div>
 
         <div class="hero-badge ${badgeClass}">
@@ -149,143 +293,177 @@ export async function loadBestTrade() {
         </div>
       </div>
 
-      <div class="hero-main">
-        <div class="score-block">
-          <div class="grade-badge">${grade}</div>
-          <div class="score-number">
-            ${Math.round(tradeScore)}
-          </div>
-          <div class="score-label">
-            ${qualityLabel}
-          </div>
-          <div class="score-bar">
-            <div
-              class="score-fill"
-              style="width:${Math.min(
-                tradeScore,
-                100,
-              )}%"
-            ></div>
-          </div>
-        </div>
-
-    <div class="legs-grid ${
-  trade.strategy === "Iron Condor"
-    ? ""
-    : "two-leg"
-}">
-  ${
-    trade.strategy === "Bull Put Credit Spread"
-      ? `
-        <div class="option-leg sell">
-          <span>SELL</span>
+      <div class="setup-market-row">
+        <div class="setup-market-item">
+          <span>SPX</span>
           <strong>
-            ${trade.sell_put ?? "--"} PUT
+            ${formatNumber(spxPrice, 2)}
           </strong>
         </div>
 
-        <div class="option-leg buy">
-          <span>BUY</span>
+        <div class="setup-market-item">
+          <span>Expiration</span>
           <strong>
-            ${trade.buy_put ?? "--"} PUT
+            ${expirationText}
           </strong>
         </div>
-      `
-      : trade.strategy === "Bear Call Credit Spread"
-        ? `
-          <div class="option-leg sell">
-            <span>SELL</span>
-            <strong>
-              ${trade.sell_call ?? "--"} CALL
-            </strong>
-          </div>
 
-          <div class="option-leg buy">
-            <span>BUY</span>
-            <strong>
-              ${trade.buy_call ?? "--"} CALL
-            </strong>
-          </div>
-        `
-        : `
-          <div class="option-leg sell">
-            <span>SELL</span>
-            <strong>
-              ${trade.sell_call ?? "--"} CALL
-            </strong>
-          </div>
+        <div class="setup-market-item">
+          <span>DTE</span>
+          <strong>
+            ${dte}
+          </strong>
+        </div>
 
-          <div class="option-leg buy">
-            <span>BUY</span>
-            <strong>
-              ${trade.buy_call ?? "--"} CALL
-            </strong>
-          </div>
-
-          <div class="option-leg sell">
-            <span>SELL</span>
-            <strong>
-              ${trade.sell_put ?? "--"} PUT
-            </strong>
-          </div>
-
-          <div class="option-leg buy">
-            <span>BUY</span>
-            <strong>
-              ${trade.buy_put ?? "--"} PUT
-            </strong>
-          </div>
-        `
-      }
-    </div>
-
-      <div class="trade-reasons">
-        <div class="reasons-label">Trade Reasons</div>
-        <div class="reasons-list">
-          ${reasons}
+        <div class="setup-market-item">
+          <span>Expected Move</span>
+          <strong>
+            ±${formatNumber(
+              expectedMove,
+              2,
+            )}
+          </strong>
         </div>
       </div>
 
-      <div class="trade-stats">
-        <div class="stat">
-          <span class="stat-label">Quality</span>
-          <span class="stat-value">${qualityLabel}</span>
+      <div class="setup-legs-grid">
+        ${legsHtml}
+      </div>
+
+      <div class="setup-divider"></div>
+
+      <div class="setup-metrics">
+        <div class="setup-metric">
+          <span>Credit</span>
+          <strong>
+            ${formatMoney(credit, 2)}
+          </strong>
         </div>
-        <div class="stat">
-          <span class="stat-label">Probability</span>
-          <span class="stat-value">${touchProbability}</span>
+
+        <div class="setup-metric">
+          <span>POP</span>
+          <strong>
+            ${
+              pop > 0
+                ? `${formatNumber(pop, 1)}%`
+                : "--"
+            }
+          </strong>
         </div>
-        <div class="stat">
-          <span class="stat-label">Max Profit</span>
-          <span class="stat-value">${formatMoney(trade.max_profit, 0)}</span>
+
+        <div class="setup-metric">
+          <span>Max Risk</span>
+          <strong>
+            ${
+              maxRisk > 0
+                ? formatMoney(maxRisk, 0)
+                : "--"
+            }
+          </strong>
         </div>
-        <div class="stat">
-          <span class="stat-label">Max Loss</span>
-          <span class="stat-value">${formatMoney(trade.max_loss, 0)}</span>
+
+        <div class="setup-metric">
+          <span>Contracts</span>
+          <strong>
+            ${contracts}
+          </strong>
+        </div>
+
+        <div class="setup-metric">
+          <span>Buying Power</span>
+          <strong>
+            ${
+              buyingPower > 0
+                ? formatMoney(
+                    buyingPower,
+                    0,
+                  )
+                : "--"
+            }
+          </strong>
         </div>
       </div>
-    </div>
+
+      <button
+        id="enterTradeButton"
+        class="enter-trade-button ${
+          tradeApproved
+            ? "ready"
+            : "disabled"
+        }"
+        type="button"
+        disabled
+        data-trade-approved="${
+          tradeApproved
+        }"
+      >
+        ${
+          tradeApproved
+            ? "ENTER TRADE"
+            : "NO TRADE"
+        }
+      </button>
+
+      <div class="setup-updated">
+        Last Updated: ${updatedTime}
+      </div>
     `;
   } catch (error) {
-    console.error("Error loading best trade:", error);
+    console.error(
+      "Error loading best trade:",
+      error,
+    );
+
     card.innerHTML = `
       <div class="hero-header">
         <div>
           <div class="eyebrow">
-            Market Decision
+            Today's Setup
           </div>
-          <h1>Error</h1>
+
+          <h1>Unable to Load</h1>
+
           <div class="subline">
-            Failed to load trade data
+            Failed to retrieve the current setup.
           </div>
         </div>
+
         <div class="hero-badge no-trade">
           ERROR
         </div>
       </div>
+
       <div class="no-trade-message">
         ${error.message}
       </div>
     `;
   }
+}
+export function initializeTradeBuilder() {
+  const buildButton =
+    el("buildTradeButton");
+
+  if (!buildButton) {
+    return;
+  }
+
+  buildButton.addEventListener(
+    "click",
+    async () => {
+      const originalText =
+        buildButton.textContent;
+
+      buildButton.disabled = true;
+      buildButton.textContent =
+        "BUILDING...";
+
+      try {
+        await loadBestTrade();
+      } finally {
+        buildButton.disabled = false;
+        buildButton.textContent =
+          originalText;
+      }
+    },
+  );
 }

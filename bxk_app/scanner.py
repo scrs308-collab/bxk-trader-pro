@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from bxk_app.live_option_engine import (
     calculate_iron_condor_credit,
@@ -171,11 +171,39 @@ def test_candidate_grid():
     }
 
 
+from fastapi import Query
+
 @router.get("/best-trade")
-def best_trade():
+def best_trade(
+    strategy: str = Query(
+        default="auto",
+        pattern=(
+            "^(auto|iron_condor|"
+            "bull_put_credit_spread|"
+            "bear_call_credit_spread)$"
+        ),
+    ),
+    dte: int = Query(
+        default=1,
+        ge=0,
+        le=30,
+    ),
+    wing_width: int = Query(
+        default=25,
+        ge=5,
+        le=100,
+    ),
+    contracts: int = Query(
+        default=1,
+        ge=1,
+        le=50,
+    ),
+):
     return build_best_trade(
-        wing_width=25,
-        days_to_expiration=1,
+        strategy=strategy,
+        wing_width=wing_width,
+        days_to_expiration=dte,
+        contracts=contracts,
         min_credit=1.00,
     )
 

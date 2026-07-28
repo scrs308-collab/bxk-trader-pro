@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from bxk_app.services.scanner_service import (
     get_best_bear_call,
@@ -45,8 +45,37 @@ def test_candidate_grid():
 
 
 @router.get("/best-trade")
-def best_trade():
-    return get_best_trade()
+def best_trade(
+    strategy: str = Query(
+        default="auto",
+        pattern=(
+            "^(auto|iron_condor|"
+            "bull_put_credit_spread|"
+            "bear_call_credit_spread)$"
+        ),
+    ),
+    dte: int = Query(
+        default=1,
+        ge=0,
+        le=30,
+    ),
+    wing_width: int = Query(
+        default=25,
+        ge=5,
+        le=100,
+    ),
+    contracts: int = Query(
+        default=1,
+        ge=1,
+        le=50,
+    ),
+):
+    return get_best_trade(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+    )
 
 
 @router.get("/best-bull-put")

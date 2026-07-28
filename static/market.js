@@ -1037,6 +1037,10 @@ function renderSystemDashboard(data) {
 }
 
 export function updateDashboard(data, updateChecklist) {
+   const tradeState = String(
+    data.trade ?? "",
+  ).toUpperCase();
+
   setText("recommendation", data.recommendation);
   setText(
     "confidence",
@@ -1081,8 +1085,14 @@ export function updateDashboard(data, updateChecklist) {
     "recommendationAction",
     recommendationAction,
   );
-  
+
 setScore(data.score);
+
+setText(
+  "tradeState",
+  tradeState || "--",
+);
+
 updateCoach(data);
 updateThermometer(data.score, data);
    
@@ -1100,21 +1110,24 @@ updateThermometer(data.score, data);
       data.vix_state ?? "--"
     }`,
   );
-  setText(
-    "expectedMove",
-    `${getStatusIcon(data.expected_move_state)} ${
-      data.expected_move_state ?? "--"
-    }`,
-  );
+  const expectedMoveValue =
+  data.opportunity?.expected_move;
+
+setText(
+  "expectedMove",
+  expectedMoveValue != null
+    ? `±${formatNumber(expectedMoveValue)}`
+    : "--",
+);
+ 
+      
   setText(
     "ivRank",
     `${getStatusIcon(data.iv_rank_state)} ${
       data.iv_rank_state ?? "--"
     }`,
   );
-    const tradeState = String(
-    data.trade ?? "",
-  ).toUpperCase();
+   
 
   let regimeDescription =
     "Waiting for market analysis...";
@@ -1139,11 +1152,7 @@ updateThermometer(data.score, data);
       "Conditions are usable, but reduced size and tighter discipline are favored.";
   }
 
-  setText(
-    "regimeDescription",
-    regimeDescription,
-  );
-
+  
   renderReasons(data.reasons);
   setText("lastUpdate", nowTime());
   updateOpportunityCard(data);

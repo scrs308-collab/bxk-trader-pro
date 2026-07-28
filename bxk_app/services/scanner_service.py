@@ -157,64 +157,88 @@ def get_test_candidate_grid():
         "results": results,
     }
 
-def get_best_trade():
+
+def get_best_trade(
+    strategy: str = "auto",
+    dte: int = 1,
+    wing_width: int = 25,
+    contracts: int = 1,
+):
     market = run_trade_quality()
 
-    rankings = rank_strategies(
-        safe_market_value(
-            market,
-            "score",
-            0,
-        ),
-        safe_market_value(
-            market,
-            "trend",
-            "UNKNOWN",
-        ),
-        safe_market_value(
-            market,
-            "vix_state",
-            "UNKNOWN",
-        ),
-    )
+    if strategy == "auto":
+        rankings = rank_strategies(
+            safe_market_value(
+                market,
+                "score",
+                0,
+            ),
+            safe_market_value(
+                market,
+                "trend",
+                "UNKNOWN",
+            ),
+            safe_market_value(
+                market,
+                "vix_state",
+                "UNKNOWN",
+            ),
+        )
 
-    supported_strategies = {
-        "Iron Condor",
-        "Bull Put Credit Spread",
-        "Bear Call Credit Spread",
-    }
+        supported_strategies = {
+            "Iron Condor",
+            "Bull Put Credit Spread",
+            "Bear Call Credit Spread",
+        }
 
-    selected_strategy = next(
-        (
-            strategy["name"]
-            for strategy in rankings
-            if strategy.get("name")
-            in supported_strategies
-        ),
-        "Iron Condor",
-    )
+        selected_strategy = next(
+            (
+                item["name"]
+                for item in rankings
+                if item.get("name")
+                in supported_strategies
+            ),
+            "Iron Condor",
+        )
+
+    elif strategy == "bull_put_credit_spread":
+        selected_strategy = "Bull Put Credit Spread"
+
+    elif strategy == "bear_call_credit_spread":
+        selected_strategy = "Bear Call Credit Spread"
+
+    else:
+        selected_strategy = "Iron Condor"
 
     if selected_strategy == "Bull Put Credit Spread":
-        return build_best_bull_put(
-            wing_width=25,
-            days_to_expiration=1,
+        result = build_best_bull_put(
+            wing_width=wing_width,
+            days_to_expiration=dte,
             min_credit=1.00,
         )
 
-    if selected_strategy == "Bear Call Credit Spread":
-        return build_best_bear_call(
-            wing_width=25,
-            days_to_expiration=1,
+    elif selected_strategy == "Bear Call Credit Spread":
+        result = build_best_bear_call(
+            wing_width=wing_width,
+            days_to_expiration=dte,
             min_credit=1.00,
         )
 
-    return build_best_trade(
-        wing_width=25,
-        days_to_expiration=1,
-        min_credit=1.00,
-    )
+    else:
+        result = build_best_trade(
+            wing_width=wing_width,
+            days_to_expiration=dte,
+            min_credit=1.00,
+        )
 
+    if isinstance(result, dict):
+        result["requested_contracts"] = contracts
+        result["requested_strategy"] = strategy
+        result["requested_dte"] = dte
+        result["requested_wing_width"] = wing_width
 
+    return result
+    
 def get_best_bull_put():
     return build_best_bull_put(
         wing_width=25,

@@ -75,11 +75,99 @@
   class="dashboard-tab-panel active"
 >
 
-      <section id="bestTradeCard" class="trade-hero">
-    <div class="hero-loading">Loading BXK Trade Engine...</div>
+ <div class="trade-parameters">
+  <div class="trade-parameter">
+    <label for="strategySelector">
+      Strategy
+    </label>
+
+    <select id="strategySelector">
+      <option value="auto">
+        BXK Auto
+      </option>
+  
+
+      <option value="iron_condor">
+        Iron Condor
+      </option>
+
+      <option value="bull_put_credit_spread">
+        Bull Put Credit Spread
+      </option>
+
+      <option value="bear_call_credit_spread">
+        Bear Call Credit Spread
+      </option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="dteSelector">
+      Expiration
+    </label>
+
+    <select id="dteSelector">
+      <option value="0">0 DTE</option>
+      <option value="1" selected>1 DTE</option>
+      <option value="2">2 DTE</option>
+      <option value="3">3 DTE</option>
+      <option value="7">7 DTE</option>
+      <option value="10">10 DTE</option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="wingWidthSelector">
+      Wing Width
+    </label>
+
+    <select id="wingWidthSelector">
+      <option value="5">5 Points</option>
+      <option value="10">10 Points</option>
+      <option value="20">20 Points</option>
+      <option value="25" selected>
+        25 Points
+      </option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="contractsSelector">
+      Contracts
+    </label>
+
+    <select id="contractsSelector">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="10">10</option>
+    </select>
+  </div>
+
+  <div class="trade-parameter trade-parameter-action">
+    <button
+      id="buildTradeButton"
+      class="build-trade-button"
+      type="button"
+    >
+      BUILD TRADE
+    </button>
+  </div>
+</div>
+
+    <section
+  id="bestTradeCard"
+  class="trade-hero"
+>
+  <div class="hero-loading">
+    Loading BXK Trade Engine...
+  </div>
 </section>
 
-<section class="card thermo-card">
+  <section class="card thermo-card">
 
     <div class="card-label">
         BXK Market Readiness
@@ -137,10 +225,10 @@
 
 </section>
 
-<section class="card bxk-coach-card">
+<section class="card bxk-coach-card full-width">
 
   <div class="card-label">
-    BXK Coach
+    MISSION BRIEF
   </div>
 
   <div class="bxk-coach-grid">
@@ -148,7 +236,7 @@
     <div class="coach-command-block">
 
       <div class="coach-eyebrow">
-        Recommended Action
+        MISSION STATUS
       </div>
 
       <div
@@ -206,73 +294,34 @@
 </section>
 
 <main class="dashboard">
-      <section class="card hero-card recommendation-card">
+      
+      <section class="card decision-card">
 
-  <div class="card-label">
-    Recommendation
-  </div>
+    <div class="card-label">
+        Decision
+    </div>
 
-  <div
-      class="recommendation"
-      id="recommendation">
-      Loading...
-  </div>
+    <div
+        class="decision-score"
+        id="score">
+        --
+    </div>
 
-  <div
-      class="confidence"
-      id="confidence">
-      Confidence: --
-  </div>
+    <div
+        class="decision-grade"
+        id="scoreGrade">
+        Grade --
+    </div>
 
-  <div
-      class="recommendation-action"
-      id="recommendationAction">
-
-      Awaiting market data...
-
-  </div>
-
-</section>
-
-      <section class="card score-card">
-
-  <div class="card-label">
-    Market Score
-  </div>
-
-  <div class="score" id="score">
-    --
-  </div>
-
-  <div class="score-grade" id="scoreGrade">
-    Grade --
-  </div>
-
-  <div class="score-bar">
-    <div id="scoreFill"></div>
-  </div>
+    <div
+        class="decision-action"
+        id="tradeState">
+        --
+    </div>
 
 </section>
-      <section class="card regime-card">
 
-  <div class="card-label">
-    Market Regime
-  </div>
-
-  <div class="metric" id="trade">
-    --
-  </div>
-
-  <div
-      class="regime-description"
-      id="regimeDescription">
-
-      Waiting for market analysis...
-
-  </div>
-
-</section>
-        
+          
       <section class="card">
         <div class="card-label">Trend</div>
         <div class="metric" id="trend">--</div>
@@ -287,72 +336,7 @@
         <div class="card-label">Expected Move</div>
         <div class="metric" id="expectedMove">--</div>
       </section>
-
-      <section class="card">
-        <div class="card-label">IV Rank</div>
-        <div class="metric" id="ivRank">--</div>
-      </section>
-
-      <section class="card wide">
-        <div class="card-label">Reasons</div>
-        <ul id="reasons">
-          <li>Waiting for scanner data...</li>
-        </ul>
-      </section>
-
-      <section class="card">
-        <div class="card-label">System</div>
-
-        <div class="small-row">
-          <span>Last Update</span>
-          <strong id="lastUpdate">--</strong>
-        </div>
-
-        <div class="small-row">
-          <span>Clock</span>
-          <strong id="clock">--</strong>
-        </div>
-      </section>
-
-
-  <section class="card opportunity-card">
-  <div class="card-label">Live Opportunity</div>
-
-  <div class="opportunity-strategy" id="strategyName">WAIT</div>
-
-  <div class="trade-grid">
-    <div><span>SPX</span><strong id="spxPrice">--</strong></div>
-    <div><span>Expected Move</span><strong id="expectedMovePoints">--</strong></div>
-
-    <div><span>Sell Put</span><strong id="sellPut">--</strong></div>
-    <div><span>Buy Put</span><strong id="buyPut">--</strong></div>
-
-    <div><span>Sell Call</span><strong id="sellCall">--</strong></div>
-    <div><span>Buy Call</span><strong id="buyCall">--</strong></div>
-
-    <div><span>Target Credit</span><strong id="targetCredit">--</strong></div>
-    <div><span>POP</span><strong id="pop">--</strong></div>
-
-    <div><span>Max Risk</span><strong id="maxRisk">--</strong></div>
-    <div><span>Expected Profit</span><strong id="expectedProfit">--</strong></div>
-
-    <div><span>Risk Level</span><strong id="riskLevel">--</strong></div>
-    <div><span>BXK Trade Quality</span><strong id="tradeScore">--</strong></div>
-
-    <div><span>Confidence</span><strong id="tradeConfidence">--</strong></div>
-    <div><span>Put Buffer</span><strong id="putBuffer">--</strong></div>
-
-    <div><span>Call Buffer</span><strong id="callBuffer">--</strong></div>
-    <div><span>Source</span><strong id="tradeSource">--</strong></div>
-    <div><span>Live Credit</span><strong id="liveCredit">--</strong></div>
-    <div><span>Put Credit</span><strong id="putCredit">--</strong></div>
-
-    <div><span>Call Credit</span><strong id="callCredit">--</strong></div>
-    <div><span>Return on Risk</span><strong id="returnOnRisk">--</strong></div>
-
-    <div><span>Candidates</span><strong id="candidatesEvaluated">--</strong></div>
-  </div>
-</section>
+         
 
     </main>
 

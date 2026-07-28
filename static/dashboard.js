@@ -24,6 +24,7 @@ import {
 
 import {
   loadBestTrade,
+  initializeTradeBuilder,
 } from "./best-trade.js";
 
 import {
@@ -235,4 +236,5 @@ function initializeDashboardTabs() {
   });
 }
 
+initializeTradeBuilder();
 initializeDashboardTabs();

@@ -201,3 +201,30 @@ WHAT CHANGED
 ROLLBACK
 --------
 Restore the old dashboard.js and remove type="module" from the script tag.
+Phase 1 - Trade Workstation
+✅ Trade Setup redesigned
+⬜ DTE selector
+⬜ Wing Width selector
+⬜ Contract selector
+⬜ Strategy selector
+⬜ ENTER TRADE (live Tastytrade)
+Phase 2 - Mission Control
+Position health score
+Profit target guidance
+Stop-loss monitoring
+Auto alerts
+Adjustment recommendations
+Exit button
+Phase 3 - Intelligence
+Backtesting
+Trade journal
+Performance analytics
+AI trade coach
+Trade replay
+Strategy comparison
+Phase 4 - Automation
+Semi-automatic execution
+Portfolio risk limits
+Daily P/L guardrails
+Broker synchronization
+One-click trade management

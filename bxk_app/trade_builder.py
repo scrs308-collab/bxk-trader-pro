@@ -1,4 +1,5 @@
 from datetime import datetime
+from fastapi import Query
 
 from bxk_app.live_option_engine import (
     calculate_bear_call_credit,
@@ -100,13 +101,22 @@ def build_demo_trade(
         ),
         "best_trade": best_trade,
     }
-
-
 def build_best_trade(
     wing_width: int = 25,
     days_to_expiration: int = 1,
     min_credit: float = 1.00,
+    strategy: str = "auto",
+    contracts: int = 1,
 ):
+    print(
+        "REQUESTED WING WIDTH:",
+        wing_width,
+    )
+    print(
+        "REQUESTED DTE:",
+        days_to_expiration,
+    )
+
     """
     Build, price, analyze, and rank live SPX Iron Condors.
     """
