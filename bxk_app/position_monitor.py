@@ -347,6 +347,16 @@ def build_iron_condor_summary(
     short_call = short_calls[0]
     long_call = long_calls[0]
 
+    valid_strike_order = (
+        long_put["strike"]
+        < short_put["strike"]
+        < short_call["strike"]
+        < long_call["strike"]
+    )
+
+    if not valid_strike_order:
+        return None
+
     quantity = min(
         leg["quantity"]
         for leg in parsed_legs
@@ -527,16 +537,17 @@ def build_iron_condor_summary(
     )
 
     return position_summary
-
-
 def build_position_summaries(
     positions: list[dict],
     spx_price: float | None = None,
 ) -> list[dict]:
     """
-    Group raw option legs by root, expiration, and quantity,
-    then build one iron-condor summary for each complete
-    four-leg group.
+    Group multiple open SPX iron condors.
+
+    Tastytrade commonly returns each iron condor as
+    four consecutive legs. Positions are first grouped
+    by root, expiration, and quantity, then evaluated
+    in four-leg blocks.
     """
 
     if not positions:
@@ -565,6 +576,7 @@ def build_position_summaries(
                     or 0
                 )
             )
+
         except (
             TypeError,
             ValueError,
@@ -596,15 +608,32 @@ def build_position_summaries(
     )
 
     for _, grouped_legs in sorted_groups:
-        if len(grouped_legs) != 4:
+
+        # A complete Iron Condor requires four legs.
+        if len(grouped_legs) < 4:
             continue
 
-        summary = build_iron_condor_summary(
-            positions=grouped_legs,
-            spx_price=spx_price,
-        )
+        # Process every consecutive four-leg position.
+        for index in range(
+            0,
+            len(grouped_legs),
+            4,
+        ):
+            position_legs = grouped_legs[
+                index:index + 4
+            ]
 
-        if summary is not None:
-            summaries.append(summary)
+            if len(position_legs) != 4:
+                continue
+
+            summary = build_iron_condor_summary(
+                positions=position_legs,
+                spx_price=spx_price,
+            )
+
+            if summary is not None:
+                summaries.append(summary)
 
     return summaries
+
+

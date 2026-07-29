@@ -171,25 +171,34 @@ const response = await fetch(
       0,
     );
 
-    const maxRisk = safeNumber(
-      trade.max_risk ??
-      trade.max_loss,
-      0,
-    );
-
     const contracts = safeNumber(
-      trade.quantity ??
-      trade.contracts,
-      1,
-    );
+  trade.quantity ??
+  trade.contracts ??
+  data.requested_contracts ??
+  selectedContracts,
+  1,
+);
 
-    const buyingPower = safeNumber(
-      trade.buying_power_effect ??
-      trade.buying_power ??
-      trade.capital_required,
-      0,
-    );
+const maxRisk = safeNumber(
+  trade.max_risk ??
+  trade.max_loss,
+  0,
+);
 
+const buyingPowerFromApi = safeNumber(
+  trade.buying_power_effect ??
+  trade.buying_power ??
+  trade.capital_required,
+  0,
+);
+
+const buyingPower =
+  buyingPowerFromApi > 0
+    ? buyingPowerFromApi
+    : maxRisk;
+    
+  
+    
     const updatedValue =
       trade.timestamp ||
       trade.updated_at ||
@@ -280,18 +289,20 @@ const response = await fetch(
 
     card.innerHTML = `
       <div class="hero-header">
-        <div>
-          <div class="eyebrow">
-            Today's Setup
-          </div>
+  <div>
+    <div class="eyebrow">
+      Today's Setup
+    </div>
 
-          <h1>${strategyName}</h1>
-        </div>
+    <h1>${strategyName}</h1>
 
-        <div class="hero-badge ${badgeClass}">
-          ${badgeText}
-        </div>
-      </div>
+    <div class="subline">
+      ${contracts} Contract${
+        contracts === 1 ? "" : "s"
+      } • ${selectedWingWidth}-Point Wings
+    </div>
+  </div>
+</div>
 
       <div class="setup-market-row">
         <div class="setup-market-item">
