@@ -666,9 +666,11 @@ function renderStrategyPlaybook(data) {
   );
 
   const premiumHealthy =
-    vixState === "IDEAL" &&
-    expectedMoveState === "HEALTHY";
-
+    expectedMoveState === "HEALTHY" &&
+  (
+    vixState === "IDEAL" ||
+    vixState === "OUTSIDE RANGE"
+  );
   const rangeBound =
     trend === "MIXED" ||
     trend === "NEUTRAL" ||
