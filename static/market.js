@@ -1,4 +1,3 @@
-
 import {
   el,
   setText,
@@ -333,7 +332,7 @@ function renderMarketSummary(data) {
 
   const score = Math.max(
     0,
-    Math.min(100, safeNumber(data.score)),
+    Math.min(100, safeNumber(data.score))
   );
 
   container.innerHTML = `
@@ -644,122 +643,139 @@ function renderStrategyPlaybook(data) {
     return;
   }
 
-  const trend = String(
-    data.trend || "UNKNOWN",
-  ).toUpperCase();
-
-  const vixState = String(
-    data.vix_state || "UNKNOWN",
-  ).toUpperCase();
-
-  const expectedMoveState = String(
-    data.expected_move_state || "UNKNOWN",
-  ).toUpperCase();
+  const backendStrategies = Array.isArray(
+    data.strategies,
+  )
+    ? data.strategies
+    : [];
 
   const finalDecision = String(
     data.final_decision || "NO TRADE",
   ).toUpperCase();
 
-  const score = Math.max(
-    0,
-    Math.min(100, safeNumber(data.score)),
-  );
-
-  const premiumHealthy =
-    expectedMoveState === "HEALTHY" &&
-  (
-    vixState === "IDEAL" ||
-    vixState === "OUTSIDE RANGE"
-  );
-  const rangeBound =
-    trend === "MIXED" ||
-    trend === "NEUTRAL" ||
-    trend === "SIDEWAYS";
-
-  const directional =
-    trend === "BULLISH" ||
-    trend === "BEARISH";
-
-  const ironCondorStatus =
-    premiumHealthy && rangeBound && score >= 75
-      ? "APPROVED"
-      : premiumHealthy && score >= 50
-        ? "CAUTION"
-        : "DENIED";
-
-  const creditSpreadStatus =
-    premiumHealthy && directional && score >= 75
-      ? "APPROVED"
-      : directional && score >= 50
-        ? "CAUTION"
-        : "DENIED";
-
-  const ironButterflyStatus =
-    premiumHealthy && rangeBound && score >= 85
-      ? "APPROVED"
-      : premiumHealthy && rangeBound
-        ? "CAUTION"
-        : "DENIED";
-
-  const brokenWingStatus =
-    premiumHealthy && directional && score >= 80
-      ? "APPROVED"
-      : directional
-        ? "CAUTION"
-        : "DENIED";
-
-  const noTradeStatus =
-    finalDecision === "NO TRADE"
-      ? "APPROVED"
-      : "DENIED";
-
-  const strategies = [
-    {
-      name: "Iron Condor",
+  const strategyDetails = {
+    "Iron Condor": {
       description:
         "Primary BXK strategy for a range-bound market with healthy premium.",
       conditions:
         "Mixed or neutral trend · Ideal VIX · Healthy expected move",
       risk: "Defined",
-      status: ironCondorStatus,
     },
-    {
-      name: "Credit Spread",
+
+    "Credit Spread": {
       description:
         "Directional premium-selling strategy for a clearly bullish or bearish market.",
       conditions:
         "Confirmed direction · Healthy premium · Strong market score",
       risk: "Defined",
-      status: creditSpreadStatus,
     },
-    {
-      name: "Iron Butterfly",
+
+    "Iron Butterfly": {
       description:
         "Higher-credit strategy when SPX is expected to remain near a central price.",
       conditions:
         "Range-bound market · High confidence · Strong premium",
       risk: "Defined / Higher",
-      status: ironButterflyStatus,
     },
-    {
-      name: "Broken-Wing Butterfly",
+
+    "Broken-Wing Butterfly": {
       description:
         "Directional structure with asymmetric wings and controlled risk.",
       conditions:
         "Directional bias · Favorable pricing · Strong setup",
       risk: "Defined",
-      status: brokenWingStatus,
     },
-    {
-      name: "No Trade",
-      description:
-        "Protect capital when BXK entry requirements are not satisfied.",
-      conditions:
-        "Weak score · Poor premium · Conflicting market conditions",
-      risk: "None",
-      status: noTradeStatus,
+  };
+  
+  const strategies = backendStrategies.map(
+    (strategy) => {
+      const name = String(
+        strategy.name || "Unknown Strategy",
+      );
+
+      const details =
+        strategyDetails[name] || {
+          description:
+            strategy.reason ||
+            "Strategy evaluated by the BXK recommendation engine.",
+          conditions:
+            strategy.reason ||
+            "See current market analysis.",
+          risk: "Defined",
+        };
+
+      const strategyScore = Math.max(
+        0,
+        Math.min(
+          100,
+          safeNumber(strategy.score),
+        ),
+      );
+
+      return {
+        name,
+        description: details.description,
+        conditions:
+          strategy.reason ||
+          details.conditions,
+        risk: details.risk,
+        score: strategyScore,
+        confidence:
+          strategy.confidence || "--",
+
+        rawScore: safeNumber(
+          strategy.raw_score,
+          strategyScore,
+        ),
+
+        scoreCapped:
+          strategy.score_capped === true,
+
+        factors: Array.isArray(
+          strategy.factors,
+        )
+          ? strategy.factors
+          : [],
+
+        status: String(
+          strategy.status || "DENIED",
+        ).toUpperCase(),
+      };
     },
-  ];
+  );    
+     strategies.push({
+  name: "No Trade",
+  description:
+    "Protect capital when BXK entry requirements are not satisfied.",
+  conditions:
+    "Weak score · Poor premium · Conflicting market conditions",
+  risk: "None",
+
+  score:
+    finalDecision === "NO TRADE"
+      ? 100
+      : 0,
+
+  rawScore:
+    finalDecision === "NO TRADE"
+      ? 100
+      : 0,
+
+  scoreCapped: false,
+
+  confidence:
+    finalDecision === "NO TRADE"
+      ? "High"
+      : "Low",
+
+  status:
+    finalDecision === "NO TRADE"
+      ? "APPROVED"
+      : "DENIED",
+
+  factors: [],
+});
+   
 
   container.innerHTML = `
     <div class="strategy-playbook-grid">
@@ -781,8 +797,51 @@ function renderStrategyPlaybook(data) {
               <p>${strategy.description}</p>
 
               <div class="strategy-detail">
-                <span>Best Conditions</span>
-                <strong>${strategy.conditions}</strong>
+  <span>Backend Score</span>
+  <strong>
+    ${strategy.score} / 100
+    ${
+      strategy.scoreCapped
+        ? ` · Raw ${strategy.rawScore}`
+        : ""
+    }
+  </strong>
+</div>
+
+<div class="strategy-factor-list">
+  ${(strategy.factors ?? [])
+    .map((factor) => {
+      const points = safeNumber(
+        factor.points
+      );
+
+      return `
+        <div class="strategy-factor">
+          <span>
+            ${factor.label || "Factor"}
+          </span>
+
+          <strong>
+            +${points}
+          </strong>
+        </div>
+      `;
+    })
+    .join("")}
+</div>
+
+              <div class="strategy-detail">
+                <span>Confidence</span>
+                <strong>
+                  ${strategy.confidence}
+                </strong>
+              </div>
+
+              <div class="strategy-detail">
+                <span>BXK Analysis</span>
+                <strong>
+                  ${strategy.conditions}
+                </strong>
               </div>
 
               <div class="strategy-detail">
@@ -794,8 +853,9 @@ function renderStrategyPlaybook(data) {
         })
         .join("")}
     </div>
-  `;
+     `;
 }
+
 
 function renderSystemDashboard(data) {
   const container = el("systemDashboard");
@@ -806,15 +866,15 @@ function renderSystemDashboard(data) {
 
   const score = Math.max(
     0,
-    Math.min(100, safeNumber(data.score)),
+    Math.min(100, safeNumber(data.score))
   );
 
   const vixState = String(
-    data.vix_state || "UNKNOWN",
+    data.vix_state || "UNKNOWN"
   ).toUpperCase();
 
   const expectedMoveState = String(
-    data.expected_move_state || "UNKNOWN",
+    data.expected_move_state || "UNKNOWN"
   ).toUpperCase();
 
   const vixHealthy =
@@ -1155,11 +1215,11 @@ setText(
   }
 
   
-  renderReasons(data.reasons);
-  setText("lastUpdate", nowTime());
-  updateOpportunityCard(data);
-  updateChecklist(data);
-  renderMarketSummary(data);
-  renderStrategyPlaybook(data);
-  renderSystemDashboard(data);
+    renderReasons(data.reasons);
+    setText("lastUpdate", nowTime());
+    updateOpportunityCard(data);
+    updateChecklist(data);
+    renderMarketSummary(data);
+    renderStrategyPlaybook(data);
+    renderSystemDashboard(data);
 }
