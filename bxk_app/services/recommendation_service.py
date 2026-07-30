@@ -5,6 +5,7 @@ from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.trade_builder import build_best_trade
+from bxk_app.services.execution_service import validate_trade
 
 def safe_market_value(
     market,
@@ -314,6 +315,75 @@ def get_recommendation():
             "reasons",
             [],
         )
+            # =====================================================
+    # EXECUTION READINESS
+    # =====================================================
+
+    execution_trade = {
+        "strategy": safe_market_value(
+            best_trade,
+            "strategy",
+            "",
+        ),
+        "expiration": safe_market_value(
+            best_trade,
+            "expiration",
+            "",
+        ),
+        "contracts": safe_market_value(
+            best_trade,
+            "contracts",
+            safe_market_value(
+                best_trade,
+                "quantity",
+                1,
+            ),
+        ),
+        "credit": safe_market_value(
+            best_trade,
+            "credit",
+            safe_market_value(
+                best_trade,
+                "net_credit",
+                safe_market_value(
+                    best_trade,
+                    "opening_credit",
+                    0,
+                ),
+            ),
+        ),
+        "buying_power": safe_market_value(
+            best_trade,
+            "buying_power_effect",
+            safe_market_value(
+                best_trade,
+                "buying_power",
+                safe_market_value(
+                    best_trade,
+                    "capital_required",
+                    safe_market_value(
+                        best_trade,
+                        "max_risk",
+                        0,
+                    ),
+                ),
+            ),
+        ),
+        "max_risk": safe_market_value(
+            best_trade,
+            "max_risk",
+            0,
+        ),
+        "pop": safe_market_value(
+            best_trade,
+            "pop",
+            0,
+        ),
+    }
+
+    execution_result = validate_trade(
+        execution_trade
+    )
 
     return {
         "app": "BXK Trader Pro",
@@ -358,4 +428,11 @@ def get_recommendation():
             # Full live result plus extracted live trade
             "best_trade_result": best_trade_result,
             "best_trade": best_trade,
+
+              # Execution readiness
+            "execution": {
+                "ready": execution_result.ready,
+                "status": execution_result.status,
+                "reason": execution_result.reason,
+            },
         }

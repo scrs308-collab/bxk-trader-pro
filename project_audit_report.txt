@@ -1,0 +1,477 @@
+============================================================
+BXK TRADER PRO PROJECT AUDIT
+============================================================
+Generated: 2026-07-29 21:15:54
+Project root: C:\Projects\bxk-trader-pro
+Project health score: 100/100
+
+NOTE: Archive candidates require human review. Dynamic imports and manually executed scripts may not appear in static dependency analysis.
+
+PYTHON SUMMARY
+--------------
+Python files: 50
+Entry points: 12
+Reachable modules: 48
+Archive candidates: 0
+
+ENTRY POINTS
+------------
+[ENTRY] bxk_app/main.py
+[ENTRY] bxk_app/sdk_dxlink_test.py
+[ENTRY] bxk_app/sdk_test.py
+[ENTRY] server.py
+[ENTRY] tools/api_client.py
+[ENTRY] tools/backup.py
+[ENTRY] tools/bxk.py
+[ENTRY] tools/new_doc.py
+[ENTRY] tools/new_engine.py
+[ENTRY] tools/project_audit.py
+[ENTRY] tools/release.py
+[ENTRY] tools/version.py
+
+ARCHIVE CANDIDATES
+------------------
+None found.
+
+PYTHON DEPENDENCY MAP
+---------------------
+bxk_app/broker_tastytrade.py
+  Imported by:
+    - bxk_app/option_scanner.py
+    - bxk_app/routes/options.py
+    - bxk_app/services/broker_service.py
+    - bxk_app/services/position_service.py
+  Imports:
+    - bxk_app/config.py
+
+bxk_app/brokers/__init__.py
+  Imported by: none
+  Local imports: none
+
+bxk_app/brokers/base.py
+  Imported by:
+    - bxk_app/brokers/tastytrade.py
+  Local imports: none
+
+bxk_app/brokers/tastytrade.py
+  Imported by:
+    - bxk_app/market_engine.py
+    - bxk_app/services/broker_service.py
+  Imports:
+    - bxk_app/brokers/base.py
+    - bxk_app/config.py
+
+bxk_app/config.py
+  Imported by:
+    - bxk_app/broker_tastytrade.py
+    - bxk_app/brokers/tastytrade.py
+    - bxk_app/live_option_engine.py
+    - bxk_app/sdk_dxlink_test.py
+    - bxk_app/sdk_test.py
+    - bxk_app/tastytrade_client.py
+  Local imports: none
+
+bxk_app/live_option_engine.py
+  Imported by:
+    - bxk_app/option_scanner.py
+    - bxk_app/scanner_engine.py
+    - bxk_app/services/scanner_service.py
+    - bxk_app/trade_builder.py
+  Imports:
+    - bxk_app/config.py
+
+bxk_app/main.py
+  Imported by:
+    - server.py
+  Imports:
+    - bxk_app/routes/__init__.py
+
+bxk_app/market_data.py
+  Imported by:
+    - bxk_app/market_engine.py
+    - bxk_app/opportunity_engine.py
+    - bxk_app/routes/debug.py
+    - bxk_app/scoring.py
+    - bxk_app/services/market_service.py
+    - bxk_app/services/position_service.py
+    - bxk_app/trade_builder.py
+  Local imports: none
+
+bxk_app/market_engine.py
+  Imported by:
+    - bxk_app/routes/debug.py
+    - bxk_app/services/market_service.py
+    - bxk_app/services/position_service.py
+    - bxk_app/services/recommendation_service.py
+  Imports:
+    - bxk_app/brokers/tastytrade.py
+    - bxk_app/market_data.py
+
+bxk_app/models.py
+  Imported by:
+    - bxk_app/opportunity_engine.py
+    - bxk_app/scoring.py
+  Local imports: none
+
+bxk_app/opportunity_engine.py
+  Imported by:
+    - bxk_app/services/recommendation_service.py
+  Imports:
+    - bxk_app/market_data.py
+    - bxk_app/models.py
+    - bxk_app/wing_optimizer.py
+
+bxk_app/option_scanner.py
+  Imported by:
+    - bxk_app/scanner_engine.py
+    - bxk_app/services/scanner_service.py
+    - bxk_app/trade_builder.py
+  Imports:
+    - bxk_app/broker_tastytrade.py
+    - bxk_app/live_option_engine.py
+    - bxk_app/scanner_settings.py
+    - bxk_app/trade_quality.py
+
+bxk_app/position_coach.py
+  Imported by:
+    - bxk_app/position_monitor.py
+  Local imports: none
+
+bxk_app/position_monitor.py
+  Imported by:
+    - bxk_app/services/position_service.py
+  Imports:
+    - bxk_app/position_coach.py
+
+bxk_app/routes/__init__.py
+  Imported by:
+    - bxk_app/main.py
+  Imports:
+    - bxk_app/routes/broker.py
+    - bxk_app/routes/debug.py
+    - bxk_app/routes/health.py
+    - bxk_app/routes/market.py
+    - bxk_app/routes/options.py
+    - bxk_app/routes/positions.py
+    - bxk_app/routes/recommendation.py
+    - bxk_app/routes/scanner.py
+
+bxk_app/routes/broker.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/services/broker_service.py
+
+bxk_app/routes/debug.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/market_data.py
+    - bxk_app/market_engine.py
+
+bxk_app/routes/health.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Local imports: none
+
+bxk_app/routes/market.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/services/market_service.py
+
+bxk_app/routes/options.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/broker_tastytrade.py
+    - bxk_app/trade_builder.py
+
+bxk_app/routes/positions.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/services/position_service.py
+
+bxk_app/routes/recommendation.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/services/recommendation_service.py
+
+bxk_app/routes/scanner.py
+  Imported by:
+    - bxk_app/routes/__init__.py
+  Imports:
+    - bxk_app/services/scanner_service.py
+
+bxk_app/scanner_engine.py
+  Imported by:
+    - bxk_app/services/scanner_service.py
+    - bxk_app/wing_optimizer.py
+  Imports:
+    - bxk_app/live_option_engine.py
+    - bxk_app/option_scanner.py
+    - bxk_app/scanner_settings.py
+    - bxk_app/trade_quality.py
+
+bxk_app/scanner_settings.py
+  Imported by:
+    - bxk_app/option_scanner.py
+    - bxk_app/scanner_engine.py
+    - bxk_app/trade_quality.py
+  Local imports: none
+
+bxk_app/scoring.py
+  Imported by:
+    - bxk_app/services/market_service.py
+    - bxk_app/services/recommendation_service.py
+    - bxk_app/services/scanner_service.py
+    - bxk_app/trade_builder.py
+  Imports:
+    - bxk_app/market_data.py
+    - bxk_app/models.py
+    - bxk_app/trade_quality_engine.py
+
+bxk_app/sdk_dxlink_test.py
+  Imported by: none
+  Imports:
+    - bxk_app/config.py
+
+bxk_app/sdk_test.py
+  Imported by: none
+  Imports:
+    - bxk_app/config.py
+
+bxk_app/services/__init__.py
+  Imported by: none
+  Local imports: none
+
+bxk_app/services/broker_service.py
+  Imported by:
+    - bxk_app/routes/broker.py
+  Imports:
+    - bxk_app/broker_tastytrade.py
+    - bxk_app/brokers/tastytrade.py
+    - bxk_app/tastytrade_client.py
+
+bxk_app/services/market_service.py
+  Imported by:
+    - bxk_app/routes/market.py
+  Imports:
+    - bxk_app/market_data.py
+    - bxk_app/market_engine.py
+    - bxk_app/scoring.py
+
+bxk_app/services/position_service.py
+  Imported by:
+    - bxk_app/routes/positions.py
+  Imports:
+    - bxk_app/broker_tastytrade.py
+    - bxk_app/market_data.py
+    - bxk_app/market_engine.py
+    - bxk_app/position_monitor.py
+
+bxk_app/services/recommendation_service.py
+  Imported by:
+    - bxk_app/routes/recommendation.py
+  Imports:
+    - bxk_app/market_engine.py
+    - bxk_app/opportunity_engine.py
+    - bxk_app/scoring.py
+    - bxk_app/strategy_ranker.py
+    - bxk_app/trade_builder.py
+
+bxk_app/services/scanner_service.py
+  Imported by:
+    - bxk_app/routes/scanner.py
+  Imports:
+    - bxk_app/live_option_engine.py
+    - bxk_app/option_scanner.py
+    - bxk_app/scanner_engine.py
+    - bxk_app/scoring.py
+    - bxk_app/strategy_ranker.py
+    - bxk_app/trade_builder.py
+    - bxk_app/wing_optimizer.py
+
+bxk_app/strategy_ranker.py
+  Imported by:
+    - bxk_app/services/recommendation_service.py
+    - bxk_app/services/scanner_service.py
+  Local imports: none
+
+bxk_app/tastytrade_client.py
+  Imported by:
+    - bxk_app/services/broker_service.py
+  Imports:
+    - bxk_app/config.py
+
+bxk_app/trade_analyzer.py
+  Imported by:
+    - bxk_app/trade_builder.py
+  Local imports: none
+
+bxk_app/trade_builder.py
+  Imported by:
+    - bxk_app/routes/options.py
+    - bxk_app/services/recommendation_service.py
+    - bxk_app/services/scanner_service.py
+  Imports:
+    - bxk_app/live_option_engine.py
+    - bxk_app/market_data.py
+    - bxk_app/option_scanner.py
+    - bxk_app/scoring.py
+    - bxk_app/trade_analyzer.py
+
+bxk_app/trade_quality.py
+  Imported by:
+    - bxk_app/option_scanner.py
+    - bxk_app/scanner_engine.py
+  Imports:
+    - bxk_app/scanner_settings.py
+
+bxk_app/trade_quality_engine.py
+  Imported by:
+    - bxk_app/scoring.py
+  Local imports: none
+
+bxk_app/wing_optimizer.py
+  Imported by:
+    - bxk_app/opportunity_engine.py
+    - bxk_app/services/scanner_service.py
+  Imports:
+    - bxk_app/scanner_engine.py
+
+server.py
+  Imported by: none
+  Imports:
+    - bxk_app/main.py
+
+tools/api_client.py
+  Imported by: none
+  Local imports: none
+
+tools/backup.py
+  Imported by: none
+  Local imports: none
+
+tools/bxk.py
+  Imported by: none
+  Local imports: none
+
+tools/new_doc.py
+  Imported by: none
+  Local imports: none
+
+tools/new_engine.py
+  Imported by: none
+  Local imports: none
+
+tools/project_audit.py
+  Imported by: none
+  Local imports: none
+
+tools/release.py
+  Imported by: none
+  Local imports: none
+
+tools/version.py
+  Imported by: none
+  Local imports: none
+
+MISSING LOCAL IMPORTS
+---------------------
+None found.
+
+CIRCULAR IMPORTS
+----------------
+None found.
+
+FRONTEND SUMMARY
+----------------
+Frontend files: 11
+Archive candidates: 0
+
+FRONTEND ARCHIVE CANDIDATES
+---------------------------
+None found.
+
+FRONTEND REFERENCE MAP
+----------------------
+static/best-trade.js
+  Referenced by:
+    - static/dashboard.js
+  Declared references:
+    - ./config.js
+    - ./utils.js
+
+static/checklist.js
+  Referenced by:
+    - static/dashboard.js
+  Declared references:
+    - ./utils.js
+
+static/coach.js
+  Referenced by:
+    - static/market.js
+  Declared references:
+    - ./utils.js
+
+static/config.js
+  Referenced by:
+    - static/best-trade.js
+    - static/dashboard.js
+    - static/position.js
+  Declared references: none
+
+static/dashboard.js
+  Referenced by:
+    - static/index.html
+  Declared references:
+    - ./best-trade.js
+    - ./checklist.js
+    - ./config.js
+    - ./market.js
+    - ./position.js
+    - ./utils.js
+
+static/index.html
+  Referenced by: none
+  Declared references:
+    - /static/dashboard.js
+    - /static/position-v10.css
+    - /static/style.css
+
+static/market.js
+  Referenced by:
+    - static/dashboard.js
+  Declared references:
+    - ./coach.js
+    - ./utils.js
+
+static/position-v10.css
+  Referenced by:
+    - static/index.html
+  Declared references: none
+
+static/position.js
+  Referenced by:
+    - static/dashboard.js
+  Declared references:
+    - ./config.js
+    - ./utils.js
+
+static/style.css
+  Referenced by:
+    - static/index.html
+  Declared references: none
+
+static/utils.js
+  Referenced by:
+    - static/best-trade.js
+    - static/checklist.js
+    - static/coach.js
+    - static/dashboard.js
+    - static/market.js
+    - static/position.js
+  Declared references: none
