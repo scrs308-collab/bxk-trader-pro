@@ -70,37 +70,39 @@ const response = await fetch(
 
     const data = await response.json();
     const trade = data.best_trade;
-
+      
     if (!trade) {
-      card.innerHTML = `
-        <div class="hero-header">
-          <div>
-            <div class="eyebrow">
-              Today's Setup
-            </div>
-
-            <h1>Stand Aside</h1>
-
-            <div class="subline">
-              No approved setup is currently available.
-            </div>
-          </div>
-
-          <div class="hero-badge no-trade">
-            NO TRADE
-          </div>
+  card.innerHTML = `
+    <div class="hero-header">
+      <div>
+        <div class="eyebrow">
+          Today's Setup
         </div>
 
-        <div class="no-trade-message">
-          ${
-            data.reason ||
-            "The trade engine did not return an approved setup."
-          }
-        </div>
-      `;
+        <h1>Stand Aside</h1>
 
-      return;
-    }
+        <div class="subline">
+          No approved setup is currently available.
+        </div>
+      </div>
+
+      <div class="hero-badge no-trade">
+        NO TRADE
+      </div>
+    </div>
+
+    <div class="no-trade-message">
+      ${
+        data.reason ||
+        "The trade engine did not return an approved setup."
+      }
+    </div>
+  `;
+
+  return;
+}
+          
+          
 
     const recommendation = String(
       trade.final_decision ||
@@ -120,6 +122,53 @@ const response = await fetch(
 
     const badgeText =
       tradeApproved ? recommendation : "NO TRADE";
+
+        const missionScore = Math.max(
+      0,
+      Math.min(
+        100,
+        safeNumber(
+          trade.trade_quality_score ??
+          trade.trade_score ??
+          trade.score ??
+          data.score,
+          0,
+        ),
+      ),
+    );
+
+    const missionConfidence = String(
+      trade.confidence ??
+      data.confidence ??
+      "--",
+    ).toUpperCase();
+
+    const executionStatus = String(
+      data.execution?.status ??
+      trade.execution?.status ??
+      (
+        tradeApproved
+          ? "READY"
+          : "NOT READY"
+      ),
+    ).toUpperCase();
+
+    const executionReady =
+      data.execution?.ready === true ||
+      trade.execution?.ready === true ||
+      executionStatus === "READY";
+
+    const missionStatusClass =
+      tradeApproved
+        ? recommendation === "TRADE SMALL"
+          ? "caution"
+          : "ready"
+        : "stand-down";
+
+    const executionClass =
+      executionReady
+        ? "ready"
+        : "blocked";
     
     const strategyName =
       trade.strategy || "Trade Candidate";
@@ -288,21 +337,66 @@ const buyingPower =
     }
 
     card.innerHTML = `
-      <div class="hero-header">
-  <div>
-    <div class="eyebrow">
-      Today's Setup
+    <div class="mission-control">
+  <div class="mission-control-heading">
+    <div>
+      <div class="eyebrow">
+        BXK Mission Control
+      </div>
+
+      <h1>${strategyName}</h1>
+
+      <div class="subline">
+        ${contracts} Contract${
+          contracts === 1 ? "" : "s"
+        } · ${selectedWingWidth}-Point Wings
+      </div>
     </div>
 
-    <h1>${strategyName}</h1>
+    <div class="mission-status ${missionStatusClass}">
+      <span>Mission Status</span>
 
-    <div class="subline">
-      ${contracts} Contract${
-        contracts === 1 ? "" : "s"
-      } • ${selectedWingWidth}-Point Wings
+      <strong>
+        ${badgeText}
+      </strong>
+    </div>
+  </div>
+
+  <div class="mission-control-grid">
+    <div class="mission-control-item primary">
+      <span>Primary Strategy</span>
+
+      <strong>
+        ${strategyName}
+      </strong>
+    </div>
+
+    <div class="mission-control-item">
+      <span>Mission Score</span>
+
+      <strong>
+        ${Math.round(missionScore)}
+      </strong>
+    </div>
+
+    <div class="mission-control-item">
+      <span>Confidence</span>
+
+      <strong>
+        ${missionConfidence}
+      </strong>
+    </div>
+
+    <div class="mission-control-item ${executionClass}">
+      <span>Execution</span>
+
+      <strong>
+        ${executionStatus}
+      </strong>
     </div>
   </div>
 </div>
+     
 
       <div class="setup-market-row">
         <div class="setup-market-item">

@@ -794,60 +794,116 @@ function renderStrategyPlaybook(data) {
                 </span>
               </div>
 
-              <p>${strategy.description}</p>
+              <p class="strategy-description">
+  ${strategy.description}
+</p>
 
-              <div class="strategy-detail">
-  <span>Backend Score</span>
-  <strong>
-    ${strategy.score} / 100
+<div class="strategy-protocol-section">
+  <div class="strategy-protocol-title">
+    Assessment
+  </div>
+
+  <div class="strategy-assessment-list">
+    ${
+      (strategy.factors ?? []).length > 0
+        ? (strategy.factors ?? [])
+            .map((factor) => {
+              const points = safeNumber(
+                factor.points,
+              );
+
+              return `
+  <div class="strategy-assessment-row">
+
+    <span class="assessment-pass">
+      ✓
+    </span>
+
+    <span class="assessment-label">
+      ${factor.label || "Factor"}
+    </span>
+
+    <span class="assessment-fill"></span>
+
+    <strong class="assessment-points">
+      +${points}
+    </strong>
+
+  </div>
+`;
+                  
+            })
+            .join("")
+        : `
+            <div class="strategy-assessment-row">
+              <span class="assessment-neutral">
+                —
+              </span>
+
+              <span class="assessment-label">
+                No qualification factors
+              </span>
+            </div>
+          `
+    }
+  </div>
+</div>
+
+<div class="strategy-protocol-section">
+  <div class="strategy-protocol-title">
+    Decision
+  </div>
+
+  <div class="strategy-decision-grid">
+    <div class="strategy-decision-item">
+      <span>Final Score</span>
+
+      <strong>
+        ${strategy.score} / 100
+      </strong>
+    </div>
+
     ${
       strategy.scoreCapped
-        ? ` · Raw ${strategy.rawScore}`
+        ? `
+            <div class="strategy-decision-item">
+              <span>Raw Score</span>
+
+              <strong>
+                ${strategy.rawScore}
+              </strong>
+            </div>
+          `
         : ""
     }
-  </strong>
+
+    <div class="strategy-decision-item">
+      <span>Confidence</span>
+
+      <strong>
+        ${strategy.confidence}
+      </strong>
+    </div>
+
+    <div class="strategy-decision-item">
+      <span>Risk</span>
+
+      <strong>
+        ${strategy.risk}
+      </strong>
+    </div>
+  </div>
 </div>
 
-<div class="strategy-factor-list">
-  ${(strategy.factors ?? [])
-    .map((factor) => {
-      const points = safeNumber(
-        factor.points
-      );
+<div class="strategy-protocol-section">
+  <div class="strategy-protocol-title">
+    BXK Analysis
+  </div>
 
-      return `
-        <div class="strategy-factor">
-          <span>
-            ${factor.label || "Factor"}
-          </span>
-
-          <strong>
-            +${points}
-          </strong>
-        </div>
-      `;
-    })
-    .join("")}
+  <div class="strategy-analysis-text">
+    ${strategy.conditions}
+  </div>
 </div>
-
-              <div class="strategy-detail">
-                <span>Confidence</span>
-                <strong>
-                  ${strategy.confidence}
-                </strong>
-              </div>
-
-              <div class="strategy-detail">
-                <span>BXK Analysis</span>
-                <strong>
-                  ${strategy.conditions}
-                </strong>
-              </div>
-
-              <div class="strategy-detail">
-                <span>Risk</span>
-                <strong>${strategy.risk}</strong>
-              </div>
             </div>
           `;
         })

@@ -2941,3 +2941,262 @@ button {
     grid-column: auto;
   }
 }
+/* =========================================================
+   BXK Strategy Protocol
+   ========================================================= */
+
+.strategy-protocol-section {
+  margin-top: 18px;
+}
+
+.strategy-protocol-title {
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  border-bottom: 1px solid
+    rgba(148, 163, 184, 0.2);
+}
+
+.strategy-assessment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.strategy-assessment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assessment-pass {
+  flex: 0 0 auto;
+
+  font-weight: 800;
+  color: #22c55e;
+}
+
+.assessment-neutral {
+  flex: 0 0 auto;
+
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.assessment-label {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+.assessment-fill {
+  flex: 1 1 auto;
+
+  height: 1px;
+  min-width: 20px;
+
+  border-bottom: 1px dotted
+    rgba(148, 163, 184, 0.35);
+}
+
+.assessment-points {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.strategy-decision-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strategy-decision-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 9px 10px;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+
+  background:
+    rgba(15, 23, 42, 0.35);
+}
+
+.strategy-decision-item span {
+  color: #94a3b8;
+}
+
+.strategy-analysis-text {
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .strategy-decision-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assessment-label {
+    white-space: normal;
+  }
+}
+/* =========================================================
+   BXK Mission Control
+   ========================================================= */
+
+.mission-control {
+  margin-bottom: 22px;
+  padding: 20px;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 23, 42, 0.95),
+      rgba(30, 41, 59, 0.72)
+    );
+}
+
+.mission-control-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.mission-control-heading h1 {
+  margin: 4px 0 6px;
+}
+
+.mission-status {
+  min-width: 170px;
+  padding: 12px 16px;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+
+  text-align: right;
+}
+
+.mission-status span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  color: #94a3b8;
+}
+
+.mission-status strong {
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.mission-status.ready {
+  border-color:
+    rgba(34, 197, 94, 0.45);
+
+  background:
+    rgba(34, 197, 94, 0.08);
+}
+
+.mission-status.caution {
+  border-color:
+    rgba(234, 179, 8, 0.45);
+
+  background:
+    rgba(234, 179, 8, 0.08);
+}
+
+.mission-status.stand-down {
+  border-color:
+    rgba(239, 68, 68, 0.4);
+
+  background:
+    rgba(239, 68, 68, 0.08);
+}
+
+.mission-control-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mission-control-item {
+  padding: 12px;
+
+  border: 1px solid
+    rgba(148, 163, 184, 0.14);
+  border-radius: 9px;
+
+  background:
+    rgba(15, 23, 42, 0.45);
+}
+
+.mission-control-item span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  color: #94a3b8;
+}
+
+.mission-control-item strong {
+  font-size: 0.95rem;
+}
+
+.mission-control-item.primary {
+  grid-column: span 1;
+}
+
+.mission-control-item.ready strong {
+  color: #22c55e;
+}
+
+.mission-control-item.blocked strong {
+  color: #ef4444;
+}
+
+@media (max-width: 900px) {
+  .mission-control-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mission-control-heading {
+    flex-direction: column;
+  }
+
+  .mission-status {
+    width: 100%;
+    text-align: left;
+  }
+
+  .mission-control-grid {
+    grid-template-columns: 1fr;
+  }
+}
