@@ -139,9 +139,13 @@ const response = await fetch(
 
     const missionConfidence = String(
       trade.confidence ??
+      trade.rating ??
+      trade.quality_label ??
+      trade.grade ??
       data.confidence ??
-      "--",
-    ).toUpperCase();
+     "--",
+  ).toUpperCase();
+    
 
     const executionStatus = String(
       data.execution?.status ??
@@ -497,7 +501,7 @@ const buyingPower =
             : "disabled"
         }"
         type="button"
-        disabled
+        ${tradeApproved ? "" : "disabled"}
         data-trade-approved="${
           tradeApproved
         }"
@@ -513,6 +517,238 @@ const buyingPower =
         Last Updated: ${updatedTime}
       </div>
     `;
+
+        const enterTradeButton = el(
+      "enterTradeButton",
+    );
+
+    if (
+      enterTradeButton &&
+      tradeApproved
+    ) {
+      enterTradeButton.addEventListener(
+        "click",
+        async () => {
+          const originalText =
+            enterTradeButton.textContent;
+
+          enterTradeButton.disabled = true;
+          enterTradeButton.textContent =
+            "BUILDING ORDER...";
+
+          try {
+            const previewParams =
+              new URLSearchParams({
+                strategy: selectedStrategy,
+                dte: selectedDte,
+                wing_width:
+                  selectedWingWidth,
+                contracts:
+                  selectedContracts,
+              });
+
+            const previewResponse =
+              await fetch(
+                `/api/order-preview?${previewParams.toString()}`,
+                {
+                  cache: "no-store",
+                },
+              );
+
+            if (!previewResponse.ok) {
+              throw new Error(
+                `Order preview error ${previewResponse.status}`,
+              );
+            }
+
+            const preview =
+              await previewResponse.json();
+
+            console.log(
+              "BXK order preview:",
+              preview,
+            );
+            const existingPreview =
+  document.getElementById(
+    "orderPreviewPanel",
+  );
+
+if (existingPreview) {
+  existingPreview.remove();
+}
+
+const order = preview.order;
+
+if (
+  preview.status !== "READY" ||
+  !order
+) {
+  throw new Error(
+    preview.message ||
+    "Order preview unavailable.",
+  );
+}
+
+const previewPanel =
+  document.createElement("div");
+
+previewPanel.id =
+  "orderPreviewPanel";
+
+previewPanel.className =
+  "order-preview-panel";
+
+previewPanel.innerHTML = `
+  <div class="order-preview-header">
+    <div>
+      <div class="eyebrow">
+        Order Review
+      </div>
+
+      <h2>
+        ${order.strategy}
+      </h2>
+    </div>
+
+    <button
+      id="closeOrderPreview"
+      class="order-preview-close"
+      type="button"
+    >
+      ×
+    </button>
+  </div>
+
+  <div class="order-preview-grid">
+    <div>
+      <span>Quantity</span>
+      <strong>${order.quantity}</strong>
+    </div>
+
+    <div>
+      <span>Limit Credit</span>
+      <strong>
+        ${formatMoney(
+          order.limit_price,
+          2,
+        )}
+      </strong>
+    </div>
+
+    <div>
+      <span>Max Profit</span>
+      <strong>
+        ${formatMoney(
+          order.max_profit,
+          0,
+        )}
+      </strong>
+    </div>
+
+    <div>
+      <span>Max Risk</span>
+      <strong>
+        ${formatMoney(
+          order.max_risk,
+          0,
+        )}
+      </strong>
+    </div>
+  </div>
+
+  <div class="order-preview-legs">
+    ${order.legs
+      .map(
+        (leg) => `
+          <div class="order-preview-leg">
+            <span>
+              ${leg.action}
+              ${leg.option_type}
+            </span>
+
+            <strong>
+              ${leg.strike}
+            </strong>
+          </div>
+        `,
+      )
+      .join("")}
+  </div>
+
+  <div class="order-preview-actions">
+    <button
+      id="cancelOrderPreview"
+      class="order-preview-secondary"
+      type="button"
+    >
+      Cancel
+    </button>
+
+    <button
+      id="confirmOrderPreview"
+      class="order-preview-primary"
+      type="button"
+      disabled
+    >
+      Confirm Trade
+    </button>
+  </div>
+`;
+
+card.insertAdjacentElement(
+  "afterend",
+  previewPanel,
+);
+
+const closePreview = () => {
+  previewPanel.remove();
+};
+
+document
+  .getElementById(
+    "closeOrderPreview",
+  )
+  ?.addEventListener(
+    "click",
+    closePreview,
+  );
+
+document
+  .getElementById(
+    "cancelOrderPreview",
+  )
+  ?.addEventListener(
+    "click",
+    closePreview,
+  );
+
+            enterTradeButton.textContent =
+              preview.status === "READY"
+                ? "ORDER READY"
+                : "NO ORDER AVAILABLE";
+
+          } catch (error) {
+            console.error(
+              "Order preview failed:",
+              error,
+            );
+
+            enterTradeButton.textContent =
+              "PREVIEW FAILED";
+
+          } finally {
+            window.setTimeout(() => {
+              enterTradeButton.disabled =
+                false;
+
+              enterTradeButton.textContent =
+                originalText;
+            }, 2000);
+          }
+        },
+      );
+    }
+
   } catch (error) {
     console.error(
       "Error loading best trade:",

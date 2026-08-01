@@ -25,6 +25,9 @@ from bxk_app.routes.scanner import (
 from bxk_app.routes.debug import (
     router as debug_router,
 )
+from bxk_app.routes.order import (
+    router as order_router,
+)
 
 router = APIRouter()
 
@@ -36,3 +39,4 @@ router.include_router(positions_router)
 router.include_router(options_router)
 router.include_router(scanner_router)
 router.include_router(debug_router)
+router.include_router(order_router)
