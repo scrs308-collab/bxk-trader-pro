@@ -568,14 +568,10 @@ const buyingPower =
               "BXK order preview:",
               preview,
             );
-            const existingPreview =
-  document.getElementById(
-    "orderPreviewPanel",
-  );
+            
+ 
 
-if (existingPreview) {
-  existingPreview.remove();
-}
+
 
 const order = preview.order;
 
@@ -779,6 +775,258 @@ document
       </div>
     `;
   }
+}
+function closeExistingOrderPreview() {
+  document
+    .getElementById("orderPreviewPanel")
+    ?.remove();
+}
+
+function renderOrderPreview({
+  card,
+  preview,
+}) {
+  closeExistingOrderPreview();
+
+  const order = preview?.order;
+
+  if (
+    preview?.status !== "READY" ||
+    !order
+  ) {
+    throw new Error(
+      preview?.message ||
+      "Order preview unavailable.",
+    );
+  }
+
+  const quantity = safeNumber(
+    order.quantity,
+    1,
+  );
+
+  const limitPrice = safeNumber(
+    order.limit_price,
+    0,
+  );
+
+  const maxProfit = safeNumber(
+    order.max_profit,
+    0,
+  );
+
+  const maxRisk = safeNumber(
+    order.max_risk,
+    0,
+  );
+
+  const buyingPower = safeNumber(
+    order.buying_power_effect ??
+    order.buying_power ??
+    maxRisk,
+    maxRisk,
+  );
+
+  const riskReward =
+    maxProfit > 0
+      ? maxRisk / maxProfit
+      : 0;
+
+  const legs = Array.isArray(order.legs)
+    ? order.legs
+    : [];
+
+  const previewPanel =
+    document.createElement("div");
+
+  previewPanel.id =
+    "orderPreviewPanel";
+
+  previewPanel.className =
+    "order-preview-panel";
+
+  previewPanel.innerHTML = `
+    <div class="order-preview-header">
+      <div>
+        <div class="eyebrow">
+          BXK Order Review
+        </div>
+
+        <h2>
+          ${order.strategy || "Trade Order"}
+        </h2>
+
+        <div class="subline">
+          Review every detail before submission.
+        </div>
+      </div>
+
+      <button
+        id="closeOrderPreview"
+        class="order-preview-close"
+        type="button"
+        aria-label="Close order preview"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="order-preview-grid">
+      <div>
+        <span>Quantity</span>
+        <strong>${quantity}</strong>
+      </div>
+
+      <div>
+        <span>Limit Credit</span>
+        <strong>
+          ${formatMoney(limitPrice, 2)}
+        </strong>
+      </div>
+
+      <div>
+        <span>Max Profit</span>
+        <strong>
+          ${formatMoney(maxProfit, 0)}
+        </strong>
+      </div>
+
+      <div>
+        <span>Max Risk</span>
+        <strong>
+          ${formatMoney(maxRisk, 0)}
+        </strong>
+      </div>
+
+      <div>
+        <span>Buying Power</span>
+        <strong>
+          ${formatMoney(buyingPower, 0)}
+        </strong>
+      </div>
+
+      <div>
+        <span>Risk / Reward</span>
+        <strong>
+          ${
+            riskReward > 0
+              ? `1 : ${formatNumber(
+                  riskReward,
+                  1,
+                )}`
+              : "--"
+          }
+        </strong>
+      </div>
+    </div>
+
+    <div class="order-preview-legs">
+      ${
+        legs.length > 0
+          ? legs
+              .map(
+                (leg) => `
+                  <div class="order-preview-leg">
+                    <span>
+                      ${leg.action || "--"}
+                      ${leg.option_type || ""}
+                    </span>
+
+                    <strong>
+                      ${leg.strike ?? "--"}
+                    </strong>
+                  </div>
+                `,
+              )
+              .join("")
+          : `
+              <div class="order-preview-empty">
+                Order legs unavailable.
+              </div>
+            `
+      }
+    </div>
+
+    <div class="order-risk-check">
+      <div class="eyebrow">
+        Risk Check
+      </div>
+
+      <div class="order-risk-row">
+        <span>Order preview created</span>
+        <strong>PASS</strong>
+      </div>
+
+      <div class="order-risk-row">
+        <span>Positive credit</span>
+        <strong>
+          ${limitPrice > 0 ? "PASS" : "FAIL"}
+        </strong>
+      </div>
+
+      <div class="order-risk-row">
+        <span>Defined maximum risk</span>
+        <strong>
+          ${maxRisk > 0 ? "PASS" : "FAIL"}
+        </strong>
+      </div>
+
+      <div class="order-risk-row">
+        <span>All option legs present</span>
+        <strong>
+          ${legs.length >= 2 ? "PASS" : "FAIL"}
+        </strong>
+      </div>
+    </div>
+
+    <div class="order-preview-warning">
+      Confirm Trade remains disabled until the
+      broker submission endpoint and final account
+      safeguards are connected.
+    </div>
+
+    <div class="order-preview-actions">
+      <button
+        id="cancelOrderPreview"
+        class="order-preview-secondary"
+        type="button"
+      >
+        Cancel
+      </button>
+
+      <button
+        id="confirmOrderPreview"
+        class="order-preview-primary"
+        type="button"
+        disabled
+      >
+        Confirm Trade
+      </button>
+    </div>
+  `;
+
+  card.insertAdjacentElement(
+    "afterend",
+    previewPanel,
+  );
+
+  const closePreview = () => {
+    previewPanel.remove();
+  };
+
+  document
+    .getElementById("closeOrderPreview")
+    ?.addEventListener(
+      "click",
+      closePreview,
+    );
+
+  document
+    .getElementById("cancelOrderPreview")
+    ?.addEventListener(
+      "click",
+      closePreview,
+    );
 }
 export function initializeTradeBuilder() {
   const buildButton =
