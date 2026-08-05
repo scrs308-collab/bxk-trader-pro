@@ -199,7 +199,9 @@ const response = await fetch(
       null;
 
     const expirationText = expiration
-      ? new Date(expiration).toLocaleDateString(
+      ? new Date(
+          `${expiration}T12:00:00`
+        ).toLocaleDateString(
           "en-US",
           {
             month: "short",
