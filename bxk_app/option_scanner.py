@@ -1,7 +1,43 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.scanner_settings import scanner_settings
 from bxk_app.trade_quality import score_candidate
 from bxk_app.live_option_engine import calculate_iron_condor_credit
+
+
+MARKET_TIMEZONE = ZoneInfo("America/New_York")
+
+
+def calculate_actual_dte(expiration_value) -> int:
+    """
+    Calculate calendar DTE using the US market date.
+    """
+
+    if not expiration_value:
+        return -1
+
+    try:
+        if isinstance(expiration_value, datetime):
+            expiration_date = expiration_value.date()
+        elif isinstance(expiration_value, date):
+            expiration_date = expiration_value
+        else:
+            expiration_date = date.fromisoformat(
+                str(expiration_value)[:10]
+            )
+    except (TypeError, ValueError):
+        return -1
+
+    market_today = datetime.now(
+        MARKET_TIMEZONE
+    ).date()
+
+    return (
+        expiration_date
+        - market_today
+    ).days
 
 
 def safe_float(value, default: float = 0.0) -> float:
@@ -43,22 +79,20 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     valid_expirations = []
 
     for expiration in expirations:
-        try:
-            dte = int(
-                expiration.get(
-                    "days-to-expiration",
-                    -1,
-                )
-            )
-        except (TypeError, ValueError):
-            continue
+        expiration_date = expiration.get(
+            "expiration-date"
+        )
 
-        if dte < 0:
+        actual_dte = calculate_actual_dte(
+            expiration_date
+        )
+
+        if actual_dte < 0:
             continue
 
         valid_expirations.append(
             {
-                "dte": dte,
+                "dte": actual_dte,
                 "data": expiration,
             }
         )
@@ -125,9 +159,7 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
                 "expiration_date": selected_expiration.get(
                     "expiration-date"
                 ),
-                "days_to_expiration": selected_expiration.get(
-                    "days-to-expiration"
-                ),
+                "days_to_expiration": selected["dte"],
                 "settlement_type": selected_expiration.get(
                     "settlement-type"
                 ),
