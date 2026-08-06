@@ -780,11 +780,14 @@ function renderOrderPreview({
           </div>
 
           <h2 id="orderReviewTitle">
-            ${order.strategy || "Trade Order"}
+            BXK Trade Review
           </h2>
 
           <div class="order-review-subtitle">
-            Review the complete order before submission.
+            ${order.strategy || "Trade Order"}
+            &nbsp;?&nbsp;
+            ${quantity}
+            ${quantity === 1 ? "Contract" : "Contracts"}
           </div>
         </div>
 
@@ -815,7 +818,17 @@ function renderOrderPreview({
 
         <div>
           <span>Execution</span>
-          <strong>${executionStatus}</strong>
+          <strong class="order-review-execution ${
+            String(executionStatus).toUpperCase() === "READY"
+              ? "ready"
+              : "blocked"
+          }">
+            ${
+              String(executionStatus).toUpperCase() === "READY"
+                ? "? READY"
+                : "? BLOCKED"
+            }
+          </strong>
         </div>
 
         <div>
@@ -950,7 +963,7 @@ function renderOrderPreview({
                       : "failed"
                   }">
                     <span class="order-review-check-icon">
-                      ${check.passed ? "?" : "!"}
+                      ${check.passed ? "?" : "?"}
                     </span>
 
                     <span>${check.label}</span>
@@ -982,11 +995,45 @@ function renderOrderPreview({
         </aside>
       </div>
 
-      <div class="order-review-notice">
-        Confirm Trade remains disabled until broker
-        submission, account verification, duplicate-order
-        protection, and final loss controls are connected.
-      </div>
+      <section class="order-review-readiness">
+        <div class="order-review-section-heading">
+          Broker Readiness
+        </div>
+
+        <div class="order-review-readiness-grid">
+          <div class="ready">
+            <span>?</span>
+            <div>
+              <strong>Order Preview</strong>
+              <small>Complete</small>
+            </div>
+          </div>
+
+          <div class="ready">
+            <span>?</span>
+            <div>
+              <strong>Risk Controls</strong>
+              <small>Passed</small>
+            </div>
+          </div>
+
+          <div class="pending">
+            <span>?</span>
+            <div>
+              <strong>Account Verification</strong>
+              <small>Not connected</small>
+            </div>
+          </div>
+
+          <div class="pending">
+            <span>?</span>
+            <div>
+              <strong>Live Submission</strong>
+              <small>Phase 2</small>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <footer class="order-review-actions">
         <button
@@ -1003,7 +1050,7 @@ function renderOrderPreview({
           type="button"
           disabled
         >
-          Confirm Trade
+          BXK AUTO
         </button>
       </footer>
     </section>
