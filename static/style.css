@@ -3926,3 +3926,691 @@ body.order-review-open {
       1fr;
   }
 }
+
+/* BXK LIGHT/DARK THEME */
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+.card,
+.trade-hero,
+.score-block,
+.dashboard-tabs,
+.dashboard-tab,
+.order-review-modal,
+.order-review-section,
+.order-review-checks,
+.order-review-readiness-grid > div,
+button,
+select,
+input {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.theme-toggle {
+  min-height: 42px;
+  padding: 10px 17px;
+  border: 1px solid rgba(100, 116, 139, 0.38);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.12);
+}
+
+.theme-toggle:hover {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  transform: translateY(-1px);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid rgba(34, 197, 94, 0.28);
+  outline-offset: 2px;
+}
+
+/* Light is the default BXK theme. */
+
+html[data-theme="light"],
+body[data-theme="light"] {
+  background: #edf2f7;
+  color: #172033;
+}
+
+body[data-theme="light"] .topbar h1,
+body[data-theme="light"] h1,
+body[data-theme="light"] h2,
+body[data-theme="light"] h3,
+body[data-theme="light"] h4,
+body[data-theme="light"] strong {
+  color: #172033;
+}
+
+body[data-theme="light"] .topbar p,
+body[data-theme="light"] p,
+body[data-theme="light"] small,
+body[data-theme="light"] .subline,
+body[data-theme="light"] .score-label,
+body[data-theme="light"] .card-label,
+body[data-theme="light"] .muted {
+  color: #52647a;
+}
+
+body[data-theme="light"] .trade-hero {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(34, 197, 94, 0.14),
+      transparent 36%
+    ),
+    linear-gradient(135deg, #ffffff, #f4f8fb);
+  border-color: #cbd5e1;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.13);
+}
+
+body[data-theme="light"] .trade-hero h1 {
+  color: #172033;
+}
+
+body[data-theme="light"] .score-block,
+body[data-theme="light"] .card,
+body[data-theme="light"] .panel,
+body[data-theme="light"] section {
+  background-color: #ffffff;
+  color: #172033;
+  border-color: #d7e0e9;
+  box-shadow: 0 9px 25px rgba(15, 23, 42, 0.09);
+}
+
+body[data-theme="light"] .card {
+  background: linear-gradient(145deg, #ffffff, #f7fafc);
+}
+
+body[data-theme="light"] .dashboard-tabs {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.07);
+}
+
+body[data-theme="light"] .dashboard-tab {
+  color: #52647a;
+}
+
+body[data-theme="light"] .dashboard-tab:hover {
+  color: #172033;
+  background: #edf2f7;
+}
+
+body[data-theme="light"] .dashboard-tab.active {
+  color: #14532d;
+  border-color: rgba(22, 163, 74, 0.5);
+  background: #dcfce7;
+}
+
+body[data-theme="light"] select,
+body[data-theme="light"] input,
+body[data-theme="light"] textarea {
+  background: #ffffff;
+  color: #172033;
+  border-color: #94a3b8;
+}
+
+body[data-theme="light"] option {
+  background: #ffffff;
+  color: #172033;
+}
+
+body[data-theme="light"] .score-block .score-bar,
+body[data-theme="light"] .card .score-bar {
+  background: #dbe4ec;
+}
+
+body[data-theme="light"] table,
+body[data-theme="light"] th,
+body[data-theme="light"] td {
+  color: #172033;
+  border-color: #d7e0e9;
+}
+
+body[data-theme="light"] .order-review-overlay {
+  background: rgba(15, 23, 42, 0.58);
+}
+
+body[data-theme="light"] .order-review-modal {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(20, 184, 166, 0.12),
+      transparent 35%
+    ),
+    linear-gradient(145deg, #ffffff, #f2f7fa);
+  color: #172033;
+  border-color: rgba(13, 148, 136, 0.55);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+}
+
+body[data-theme="light"] .order-review-section,
+body[data-theme="light"] .order-review-checks,
+body[data-theme="light"] .order-review-readiness-grid > div {
+  background: rgba(255, 255, 255, 0.88);
+  color: #172033;
+  border-color: #cbd5e1;
+}
+
+body[data-theme="light"] .order-review-section-heading,
+body[data-theme="light"] .eyebrow {
+  color: #1d4f91;
+}
+
+body[data-theme="light"] .order-review-readiness-grid small {
+  color: #52647a;
+}
+
+body[data-theme="light"] .order-review-close {
+  color: #334155;
+  background: #e8eef4;
+  border-color: #cbd5e1;
+}
+
+/* Preserve the original polished dark appearance. */
+
+html[data-theme="dark"],
+body[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body[data-theme="dark"] .theme-toggle {
+  background: #172231;
+  color: #f3f7fa;
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.3);
+}
+
+body[data-theme="dark"] .theme-toggle:hover {
+  background: #213044;
+  border-color: #22c55e;
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .topbar-controls {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .theme-toggle {
+    min-height: 38px;
+    padding: 8px 13px;
+  }
+}
+
+/* BXK LIGHT THEME CONTRAST FIX */
+
+/* Market Readiness */
+
+body[data-theme="light"] .thermo-condition {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #172033;
+}
+
+body[data-theme="light"] .thermo-condition.passed {
+  border-color: #86cfa0;
+  background: #e8f7ed;
+  color: #14532d;
+}
+
+body[data-theme="light"] .thermo-condition.passed strong,
+body[data-theme="light"] .thermo-condition.passed span:not(.condition-icon) {
+  color: #14532d;
+}
+
+body[data-theme="light"] .thermo-condition.passed .condition-icon {
+  background: #15803d;
+  color: #ffffff;
+}
+
+body[data-theme="light"] .thermo-condition.denied {
+  border-color: #f3a6a6;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+body[data-theme="light"] .thermo-condition.denied strong,
+body[data-theme="light"] .thermo-condition.denied span:not(.condition-icon) {
+  color: #991b1b;
+}
+
+body[data-theme="light"] .thermo-condition.denied .condition-icon {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Strategy Playbook cards */
+
+body[data-theme="light"] .strategy-playbook-card {
+  border-color: #cbd5e1;
+  background: linear-gradient(
+    145deg,
+    #ffffff,
+    #f5f8fb
+  );
+  color: #172033;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+body[data-theme="light"] .strategy-playbook-header strong {
+  color: #172033;
+}
+
+body[data-theme="light"] .strategy-playbook-card p,
+body[data-theme="light"] .strategy-description,
+body[data-theme="light"] .strategy-analysis-text {
+  color: #475569;
+}
+
+body[data-theme="light"] .strategy-protocol-title {
+  color: #1d4f91;
+  border-color: #cbd5e1;
+}
+
+body[data-theme="light"] .strategy-assessment-row {
+  color: #334155;
+}
+
+body[data-theme="light"] .assessment-label {
+  color: #334155;
+}
+
+body[data-theme="light"] .assessment-points {
+  color: #15803d;
+}
+
+body[data-theme="light"] .assessment-pass {
+  color: #15803d;
+}
+
+body[data-theme="light"] .assessment-fill {
+  background: #d7e0e9;
+}
+
+/* Score and confidence boxes */
+
+body[data-theme="light"] .strategy-decision-item {
+  border: 1px solid #cbd5e1;
+  background: #eaf1f7;
+  color: #172033;
+}
+
+body[data-theme="light"] .strategy-decision-item span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .strategy-decision-item strong {
+  color: #172033;
+}
+
+/* Strategy status badges */
+
+body[data-theme="light"] .strategy-status.approved {
+  border-color: #78c792;
+  background: #dcfce7;
+  color: #166534;
+}
+
+body[data-theme="light"] .strategy-status.caution {
+  border-color: #e7bd47;
+  background: #fef3c7;
+  color: #854d0e;
+}
+
+body[data-theme="light"] .strategy-status.denied {
+  border-color: #efa0a0;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* BXK LIGHT THEME TRADE AND SUMMARY FIX */
+
+/* Trade Setup ? Mission Control */
+
+body[data-theme="light"] .mission-control {
+  background: linear-gradient(145deg, #ffffff, #f4f8fb);
+  border-color: #cbd5e1;
+  color: #172033;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+body[data-theme="light"] .mission-control-heading h1,
+body[data-theme="light"] .mission-control-heading h2,
+body[data-theme="light"] .mission-control-heading strong {
+  color: #172033;
+}
+
+body[data-theme="light"] .mission-control-heading p,
+body[data-theme="light"] .mission-control-heading span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .mission-control-item {
+  background: #edf3f8;
+  border-color: #cbd5e1;
+  color: #172033;
+}
+
+body[data-theme="light"] .mission-control-item.primary {
+  background: #e8f1f8;
+  border-color: #aebfce;
+}
+
+body[data-theme="light"] .mission-control-item span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .mission-control-item strong {
+  color: #172033;
+}
+
+body[data-theme="light"] .mission-control-item.ready {
+  background: #e8f7ed;
+  border-color: #86cfa0;
+}
+
+body[data-theme="light"] .mission-control-item.ready strong {
+  color: #166534;
+}
+
+body[data-theme="light"] .mission-control-item.blocked {
+  background: #fff1f2;
+  border-color: #f3a6a6;
+}
+
+body[data-theme="light"] .mission-control-item.blocked strong {
+  color: #991b1b;
+}
+
+/* Mission status */
+
+body[data-theme="light"] .mission-status {
+  background: #edf3f8;
+  border-color: #cbd5e1;
+  color: #172033;
+}
+
+body[data-theme="light"] .mission-status span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .mission-status strong {
+  color: #172033;
+}
+
+body[data-theme="light"] .mission-status.ready {
+  background: #dcfce7;
+  border-color: #78c792;
+}
+
+body[data-theme="light"] .mission-status.ready strong {
+  color: #166534;
+}
+
+body[data-theme="light"] .mission-status.caution {
+  background: #fef3c7;
+  border-color: #e7bd47;
+}
+
+body[data-theme="light"] .mission-status.caution strong {
+  color: #854d0e;
+}
+
+body[data-theme="light"] .mission-status.stand-down {
+  background: #fee2e2;
+  border-color: #efa0a0;
+}
+
+body[data-theme="light"] .mission-status.stand-down strong {
+  color: #991b1b;
+}
+
+/* Trade Setup ? market, strike, and metric tiles */
+
+body[data-theme="light"] .setup-market-item,
+body[data-theme="light"] .setup-leg,
+body[data-theme="light"] .setup-metric,
+body[data-theme="light"] .metric-card,
+body[data-theme="light"] .strike-card {
+  background: #f3f7fa;
+  border-color: #cbd5e1;
+  color: #172033;
+  box-shadow: none;
+}
+
+body[data-theme="light"] .setup-market-item span,
+body[data-theme="light"] .setup-leg span,
+body[data-theme="light"] .setup-metric span,
+body[data-theme="light"] .metric-card span,
+body[data-theme="light"] .strike-card span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .setup-market-item strong,
+body[data-theme="light"] .setup-leg strong,
+body[data-theme="light"] .setup-metric strong,
+body[data-theme="light"] .metric-card strong,
+body[data-theme="light"] .strike-card strong {
+  color: #172033;
+}
+
+/* Preserve useful leg color meaning */
+
+body[data-theme="light"] .setup-leg.short,
+body[data-theme="light"] .setup-leg.sell {
+  background: #fff1f2;
+  border-color: #f3a6a6;
+}
+
+body[data-theme="light"] .setup-leg.long,
+body[data-theme="light"] .setup-leg.buy {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+/* Top metric strip, if displayed */
+
+body[data-theme="light"] .metric-strip > div {
+  background: #f3f7fa;
+  border-color: #cbd5e1;
+}
+
+body[data-theme="light"] .metric-strip span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .metric-strip strong {
+  color: #172033;
+}
+
+/* Market Summary tiles */
+
+body[data-theme="light"] .market-summary-metric {
+  background: linear-gradient(145deg, #ffffff, #f1f6fa);
+  border-color: #cbd5e1;
+  color: #172033;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+body[data-theme="light"] .market-summary-metric span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .market-summary-metric strong {
+  color: #172033;
+}
+
+/* Market Summary outlook */
+
+body[data-theme="light"] .market-summary-outlook {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(56, 189, 248, 0.12),
+      transparent 42%
+    ),
+    linear-gradient(145deg, #ffffff, #eaf3f9);
+  border-color: #93c5d8;
+  color: #172033;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+body[data-theme="light"] .market-summary-outlook span,
+body[data-theme="light"] .market-summary-outlook p {
+  color: #52647a;
+}
+
+body[data-theme="light"] .market-summary-permission {
+  color: #172033;
+}
+
+body[data-theme="light"] .market-summary-recommendation {
+  color: #40546a;
+}
+
+/* BXK LIGHT THEME COACH CONTRAST FIX */
+
+/* Large score above Grade A */
+
+body[data-theme="light"] .score-number {
+  color: #172033;
+  text-shadow: none;
+}
+
+body[data-theme="light"] .grade-badge {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #78c792;
+}
+
+/* BXK Coach panel */
+
+body[data-theme="light"] .bxk-coach-card {
+  color: #172033;
+}
+
+body[data-theme="light"] .coach-command-block {
+  background: linear-gradient(
+    145deg,
+    #f0fdf4,
+    #e3f5e9
+  );
+  border-color: #78c792;
+}
+
+body[data-theme="light"] .coach-eyebrow {
+  color: #1d4f91;
+}
+
+body[data-theme="light"] .coach-command {
+  color: #14532d;
+  text-shadow: none;
+}
+
+body[data-theme="light"] .coach-explanation {
+  color: #40546a;
+}
+
+/* Coach metric boxes */
+
+body[data-theme="light"] .coach-metric {
+  background: #edf3f8;
+  border-color: #cbd5e1;
+}
+
+body[data-theme="light"] .coach-metric span {
+  color: #52647a;
+}
+
+body[data-theme="light"] .coach-metric strong {
+  color: #172033;
+}
+
+/* Three confirmation statements */
+
+body[data-theme="light"] .coach-reason {
+  background: #f1f6fa;
+  border-color: #cbd5e1;
+  border-left-color: #15803d;
+  color: #26384d;
+}
+
+body[data-theme="light"] .coach-reason::before {
+  color: #15803d;
+}
+
+body[data-theme="light"] .coach-reason.warning {
+  background: #fef3c7;
+  border-left-color: #b7791f;
+  color: #713f12;
+}
+
+body[data-theme="light"] .coach-reason.warning::before {
+  color: #b7791f;
+}
+
+body[data-theme="light"] .coach-reason.danger {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+  color: #7f1d1d;
+}
+
+body[data-theme="light"] .coach-reason.danger::before {
+  color: #dc2626;
+}
+
+body[data-theme="light"] .coach-reason.neutral {
+  background: #eff6ff;
+  border-left-color: #2563eb;
+  color: #1e3a5f;
+}
+
+body[data-theme="light"] .coach-reason.neutral::before {
+  color: #2563eb;
+}
+
+
+/* BXK SCORE NUMBER FINAL OVERRIDE */
+body[data-theme="light"] .decision-card .score-number,
+body[data-theme="light"] .score-number {
+  color: #172033 !important;
+  -webkit-text-fill-color: #172033 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
+
+
+/* BXK MARKET SCORE FINAL FIX */
+body[data-theme="light"] #score {
+  color: #172033 !important;
+  -webkit-text-fill-color: #172033 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+}
