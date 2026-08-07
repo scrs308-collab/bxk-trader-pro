@@ -667,6 +667,7 @@ function renderOrderPreview({
   closeExistingOrderPreview();
 
   const order = preview?.order;
+  const displayedTrade = preview?.trade || {};
 
   if (
     preview?.status !== "READY" ||
@@ -679,26 +680,36 @@ function renderOrderPreview({
   }
 
   const quantity = safeNumber(
+    displayedTrade.quantity ??
     order.quantity,
     1,
   );
 
   const limitPrice = safeNumber(
+    displayedTrade.credit ??
+    displayedTrade.net_credit ??
+    displayedTrade.opening_credit ??
     order.limit_price,
     0,
   );
 
   const maxProfit = safeNumber(
+    displayedTrade.max_profit ??
     order.max_profit,
     0,
   );
 
   const maxRisk = safeNumber(
+    displayedTrade.max_risk ??
+    displayedTrade.max_loss ??
     order.max_risk,
     0,
   );
 
   const orderBuyingPower = safeNumber(
+    displayedTrade.buying_power_effect ??
+    displayedTrade.buying_power ??
+    displayedTrade.capital_required ??
     order.buying_power_effect ??
     order.buying_power ??
     buyingPower ??
@@ -707,9 +718,37 @@ function renderOrderPreview({
   );
 
   const orderPop = safeNumber(
-    order.pop ?? pop,
+    displayedTrade.pop ??
+    order.pop ??
+    pop,
     pop,
   );
+
+  const orderExpiration =
+    order.expiration ||
+    displayedTrade.expiration ||
+    displayedTrade.expiration_date ||
+    null;
+
+  const orderDte =
+    order.dte ??
+    displayedTrade.dte ??
+    "--";
+
+  const orderExpirationText = orderExpiration
+    ? new Date(
+        `${String(orderExpiration).slice(0, 10)}T12:00:00`,
+      ).toLocaleDateString(
+        "en-US",
+        {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        },
+      )
+    : Number(orderDte) === 0
+      ? "Today"
+      : "--";
 
   const riskReward =
     maxProfit > 0
@@ -785,7 +824,7 @@ function renderOrderPreview({
 
           <div class="order-review-subtitle">
             ${order.strategy || "Trade Order"}
-            &nbsp;?&nbsp;
+            &nbsp;&bull;&nbsp;
             ${quantity}
             ${quantity === 1 ? "Contract" : "Contracts"}
           </div>
@@ -797,7 +836,7 @@ function renderOrderPreview({
           type="button"
           aria-label="Close order review"
         >
-          ?
+          &times;
         </button>
       </header>
 
@@ -825,8 +864,8 @@ function renderOrderPreview({
           }">
             ${
               String(executionStatus).toUpperCase() === "READY"
-                ? "? READY"
-                : "? BLOCKED"
+                ? "READY"
+                : "BLOCKED"
             }
           </strong>
         </div>
@@ -886,6 +925,20 @@ function renderOrderPreview({
             </div>
 
             <div class="order-review-metrics">
+              <div>
+                <span>Expiration</span>
+                <strong>
+                  ${orderExpirationText}
+                </strong>
+              </div>
+
+              <div>
+                <span>DTE</span>
+                <strong>
+                  ${orderDte}
+                </strong>
+              </div>
+
               <div>
                 <span>Limit Credit</span>
                 <strong>
@@ -963,7 +1016,7 @@ function renderOrderPreview({
                       : "failed"
                   }">
                     <span class="order-review-check-icon">
-                      ${check.passed ? "?" : "?"}
+                      ${check.passed ? "OK" : "X"}
                     </span>
 
                     <span>${check.label}</span>
@@ -1002,7 +1055,7 @@ function renderOrderPreview({
 
         <div class="order-review-readiness-grid">
           <div class="ready">
-            <span>?</span>
+            <span>OK</span>
             <div>
               <strong>Order Preview</strong>
               <small>Complete</small>
@@ -1010,7 +1063,7 @@ function renderOrderPreview({
           </div>
 
           <div class="ready">
-            <span>?</span>
+            <span>OK</span>
             <div>
               <strong>Risk Controls</strong>
               <small>Passed</small>
@@ -1018,7 +1071,7 @@ function renderOrderPreview({
           </div>
 
           <div class="pending">
-            <span>?</span>
+            <span>--</span>
             <div>
               <strong>Account Verification</strong>
               <small>Not connected</small>
@@ -1026,7 +1079,7 @@ function renderOrderPreview({
           </div>
 
           <div class="pending">
-            <span>?</span>
+            <span>--</span>
             <div>
               <strong>Live Submission</strong>
               <small>Phase 2</small>
