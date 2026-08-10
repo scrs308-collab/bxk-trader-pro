@@ -4614,3 +4614,386 @@ body[data-theme="light"] #score {
   text-shadow: none !important;
   opacity: 1 !important;
 }
+
+/* =========================================================
+   BXK ORDER REVIEW - LIGHT THEME CONTRAST FIX
+   ========================================================= */
+
+/* Header */
+body[data-theme="light"] .order-review-header h2 {
+  color: #172033;
+}
+
+body[data-theme="light"] .order-review-subtitle {
+  color: #475569;
+  font-weight: 650;
+}
+
+/* Top status cards */
+body[data-theme="light"] .order-review-status-row > div {
+  background: #e8eef4;
+  border-color: #c3cfdb;
+  color: #172033;
+}
+
+body[data-theme="light"] .order-review-status-row span {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 850;
+  opacity: 1;
+}
+
+body[data-theme="light"] .order-review-status-row strong {
+  color: #172033;
+  font-weight: 800;
+}
+
+/* Execution READY badge */
+body[data-theme="light"] .order-review-execution.ready {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+/* Execution BLOCKED badge */
+body[data-theme="light"] .order-review-execution.blocked {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Option leg cards */
+body[data-theme="light"] .order-review-leg {
+  background: #e8eef4;
+  border-color: #c3cfdb;
+}
+
+body[data-theme="light"] .order-review-leg span {
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 850;
+  opacity: 1;
+}
+
+body[data-theme="light"] .order-review-leg strong {
+  color: #172033;
+  font-weight: 800;
+}
+
+/* Trade economics cards */
+body[data-theme="light"] .order-review-metrics > div {
+  background: #e8eef4;
+  border-color: #c3cfdb;
+}
+
+body[data-theme="light"] .order-review-metrics span {
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 850;
+  opacity: 1;
+}
+
+body[data-theme="light"] .order-review-metrics strong {
+  color: #172033;
+  font-weight: 800;
+}
+
+/* Risk check wording */
+body[data-theme="light"] .order-review-check > span:nth-child(2) {
+  color: #334155;
+  font-weight: 650;
+}
+
+/* PASS */
+body[data-theme="light"] .order-review-check.passed strong {
+  color: #15803d;
+  font-weight: 850;
+}
+
+body[data-theme="light"] .order-review-check.passed .order-review-check-icon {
+  color: #166534;
+  background: #dcfce7;
+}
+
+/* FAIL */
+body[data-theme="light"] .order-review-check.failed strong {
+  color: #b91c1c;
+  font-weight: 850;
+}
+
+body[data-theme="light"] .order-review-check.failed .order-review-check-icon {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+/* Order status box */
+body[data-theme="light"] .order-review-decision span {
+  color: #334155;
+  font-weight: 700;
+}
+
+body[data-theme="light"] .order-review-decision.approved {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+body[data-theme="light"] .order-review-decision.approved strong {
+  color: #15803d;
+  font-weight: 850;
+}
+
+body[data-theme="light"] .order-review-decision.blocked {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+body[data-theme="light"] .order-review-decision.blocked strong {
+  color: #b91c1c;
+  font-weight: 850;
+}
+
+/* Broker readiness */
+body[data-theme="light"] .order-review-readiness-grid strong {
+  color: #172033;
+  font-weight: 800;
+}
+
+body[data-theme="light"] .order-review-readiness-grid small {
+  color: #475569;
+  font-weight: 650;
+}
+
+/* Section titles */
+body[data-theme="light"] .order-review-section-heading {
+  color: #1d4f91;
+  font-weight: 850;
+}
+
+/* Empty/error wording */
+body[data-theme="light"] .order-review-empty {
+  color: #475569;
+}
+
+
+/* =========================================================
+   BXK TOP BAR / FILTER LABEL LIGHT THEME FIX
+   ========================================================= */
+
+/* Top tab strip */
+body[data-theme="light"] .dashboard-tabs {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #cbd5e1;
+}
+
+body[data-theme="light"] .dashboard-tab {
+  color: #334155;
+  font-weight: 700;
+}
+
+body[data-theme="light"] .dashboard-tab:hover {
+  color: #172033;
+}
+
+body[data-theme="light"] .dashboard-tab.active,
+body[data-theme="light"] .dashboard-tab[aria-selected="true"] {
+  color: #166534;
+  font-weight: 800;
+}
+
+/* Top trade control/filter row container */
+body[data-theme="light"] .trade-controls,
+body[data-theme="light"] .trade-setup-controls,
+body[data-theme="light"] .control-strip,
+body[data-theme="light"] .trade-toolbar,
+body[data-theme="light"] .setup-toolbar,
+body[data-theme="light"] .trade-setup-toolbar {
+  color: #172033;
+}
+
+/* Small labels above BXK Auto / 1 DTE / 25 Points / 1 */
+body[data-theme="light"] .trade-controls label,
+body[data-theme="light"] .trade-setup-controls label,
+body[data-theme="light"] .control-strip label,
+body[data-theme="light"] .trade-toolbar label,
+body[data-theme="light"] .setup-toolbar label,
+body[data-theme="light"] .trade-setup-toolbar label,
+body[data-theme="light"] .trade-controls .control-label,
+body[data-theme="light"] .trade-setup-controls .control-label,
+body[data-theme="light"] .control-strip .control-label,
+body[data-theme="light"] .trade-toolbar .control-label,
+body[data-theme="light"] .setup-toolbar .control-label,
+body[data-theme="light"] .trade-setup-toolbar .control-label,
+body[data-theme="light"] .trade-controls small,
+body[data-theme="light"] .trade-setup-controls small,
+body[data-theme="light"] .control-strip small,
+body[data-theme="light"] .trade-toolbar small,
+body[data-theme="light"] .setup-toolbar small,
+body[data-theme="light"] .trade-setup-toolbar small {
+  color: #334155;
+  font-weight: 850;
+  opacity: 1;
+  letter-spacing: 0.08em;
+}
+
+/* Dropdowns and inputs in the top row */
+body[data-theme="light"] .trade-controls select,
+body[data-theme="light"] .trade-setup-controls select,
+body[data-theme="light"] .control-strip select,
+body[data-theme="light"] .trade-toolbar select,
+body[data-theme="light"] .setup-toolbar select,
+body[data-theme="light"] .trade-setup-toolbar select,
+body[data-theme="light"] .trade-controls input,
+body[data-theme="light"] .trade-setup-controls input,
+body[data-theme="light"] .control-strip input,
+body[data-theme="light"] .trade-toolbar input,
+body[data-theme="light"] .setup-toolbar input,
+body[data-theme="light"] .trade-setup-toolbar input {
+  background: #ffffff;
+  color: #172033;
+  border: 1px solid #cbd5e1;
+  font-weight: 700;
+}
+
+/* Placeholder / default faded text cleanup */
+body[data-theme="light"] .trade-controls select option,
+body[data-theme="light"] .trade-setup-controls select option,
+body[data-theme="light"] .control-strip select option,
+body[data-theme="light"] .trade-toolbar select option,
+body[data-theme="light"] .setup-toolbar select option,
+body[data-theme="light"] .trade-setup-toolbar select option {
+  color: #172033;
+}
+
+/* Build Trade button */
+body[data-theme="light"] .trade-controls button,
+body[data-theme="light"] .trade-setup-controls button,
+body[data-theme="light"] .control-strip button,
+body[data-theme="light"] .trade-toolbar button,
+body[data-theme="light"] .setup-toolbar button,
+body[data-theme="light"] .trade-setup-toolbar button {
+  font-weight: 800;
+}
+
+body[data-theme="light"] .trade-controls .primary,
+body[data-theme="light"] .trade-setup-controls .primary,
+body[data-theme="light"] .control-strip .primary,
+body[data-theme="light"] .trade-toolbar .primary,
+body[data-theme="light"] .setup-toolbar .primary,
+body[data-theme="light"] .trade-setup-toolbar .primary {
+  color: #166534;
+}
+
+/* If the top filter card itself is too dark/washed */
+body[data-theme="light"] .trade-controls,
+body[data-theme="light"] .trade-setup-controls,
+body[data-theme="light"] .control-strip,
+body[data-theme="light"] .trade-toolbar,
+body[data-theme="light"] .setup-toolbar,
+body[data-theme="light"] .trade-setup-toolbar,
+body[data-theme="light"] .trade-filter-bar,
+body[data-theme="light"] .setup-filter-bar {
+  border-color: #cbd5e1;
+}
+
+
+/* =========================================================
+   BXK TRADE PARAMETER LIGHT THEME CONTRAST FIX
+   ========================================================= */
+
+/* Strategy / Expiration / Wing Width / Contracts labels */
+body[data-theme="light"] .trade-parameter label {
+  color: #24364b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  opacity: 1;
+  text-transform: uppercase;
+}
+
+/* Selected values: BXK Auto / 1 DTE / 25 Points / 1 */
+body[data-theme="light"] .trade-parameter select {
+  background: #ffffff;
+  color: #172033;
+  border-color: #cbd5e1;
+  font-weight: 750;
+  opacity: 1;
+}
+
+body[data-theme="light"] .trade-parameter select option {
+  color: #172033;
+  background: #ffffff;
+}
+
+/* Make the whole control strip a little cleaner */
+body[data-theme="light"] .trade-parameters {
+  border-color: #cbd5e1;
+}
+
+/* Build Trade button text */
+body[data-theme="light"] .trade-parameters button {
+  font-weight: 900;
+  opacity: 1;
+}
+
+
+/* =========================================================
+   BXK TOP CONTROL STRIP - FINAL CONTRAST FIX
+   ========================================================= */
+
+/* Small labels above the selectors */
+body[data-theme="light"] .trade-parameter label {
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  opacity: 1;
+  text-transform: uppercase;
+}
+
+/* Keep the dropdown values crisp */
+body[data-theme="light"] .trade-parameter select {
+  background: #ffffff;
+  color: #172033;
+  border: 1px solid #cbd5e1;
+  font-weight: 750;
+  opacity: 1;
+}
+
+/* Make the whole strip feel intentional */
+body[data-theme="light"] .trade-parameters {
+  background: #7f8b99;
+  border-color: #94a3b8;
+}
+
+/* BUILD TRADE button - always visible */
+body[data-theme="light"] .trade-parameters button {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid #15803d;
+  font-weight: 900;
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.22);
+}
+
+/* BUILD TRADE hover */
+body[data-theme="light"] .trade-parameters button:hover {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #166534;
+}
+
+/* If button is focused */
+body[data-theme="light"] .trade-parameters button:focus,
+body[data-theme="light"] .trade-parameters button:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.35);
+  outline-offset: 2px;
+}
+
+/* If the button is disabled, still keep it readable */
+body[data-theme="light"] .trade-parameters button:disabled {
+  background: #86efac;
+  color: #14532d;
+  border-color: #4ade80;
+  opacity: 1;
+}
+
