@@ -5,8 +5,10 @@ from bxk_app.live_option_engine import (
     calculate_bear_call_credit,
     calculate_bull_put_credit,
     calculate_iron_condor_credit,
+    get_live_market_data,
 )
 from bxk_app.market_data import market_data
+from bxk_app.market_engine import market_engine
 from bxk_app.option_scanner import (
     generate_bear_call_candidates,
     generate_bull_put_candidates,
@@ -17,6 +19,53 @@ from bxk_app.option_scanner import (
 )
 from bxk_app.scoring import run_trade_quality
 from bxk_app.trade_analyzer import analyze_trade
+
+
+def refresh_live_trade_context():
+    """
+    Refresh and validate the live market snapshot before
+    any executable trade candidate is constructed.
+    """
+    try:
+        market_engine.update()
+        snapshot = market_data.get_snapshot()
+    except Exception:
+        return None, None, {
+            "status": "NO MARKET DATA",
+            "best_trade": None,
+            "message": (
+                "Unable to refresh live market data."
+            ),
+        }
+
+    spx_price = (
+        snapshot.get("spx")
+        or snapshot.get("price")
+    )
+    expected_move = snapshot.get(
+        "expected_move"
+    )
+
+    try:
+        spx_price = float(spx_price)
+        expected_move = float(expected_move)
+    except (TypeError, ValueError):
+        spx_price = 0.0
+        expected_move = 0.0
+
+    if spx_price <= 0 or expected_move <= 0:
+        return None, snapshot, {
+            "status": "NO MARKET DATA",
+            "best_trade": None,
+            "message": (
+                "Live SPX price or expected move "
+                "is unavailable after refresh."
+            ),
+        }
+
+    market = run_trade_quality()
+
+    return market, snapshot, None
 
 
 def build_demo_trade(
@@ -113,8 +162,12 @@ def build_best_trade(
     Build, price, analyze, and rank live SPX Iron Condors.
     """
 
-    market = run_trade_quality()
-    snapshot = market_data.get_snapshot()
+    market, snapshot, refresh_error = (
+        refresh_live_trade_context()
+    )
+
+    if refresh_error:
+        return refresh_error
 
     spx_price = (
         snapshot.get("spx")
@@ -130,20 +183,24 @@ def build_best_trade(
             spx_price
         )
     except (TypeError, ValueError):
-        spx_price = 7535.54
-
-    if spx_price <= 0:
-        spx_price = 7535.54
+        spx_price = 0.0
 
     try:
         expected_move = float(
             expected_move
         )
     except (TypeError, ValueError):
-        expected_move = 62.5
+        expected_move = 0.0
 
-    if expected_move <= 0:
-        expected_move = 62.5
+    if spx_price <= 0 or expected_move <= 0:
+        return {
+            "status": "NO MARKET DATA",
+            "best_trade": None,
+            "message": (
+                "Live SPX price or expected move "
+                "is unavailable."
+            ),
+        }
 
     raw_candidates = generate_candidate_condors(
         spx_price=spx_price,
@@ -153,11 +210,14 @@ def build_best_trade(
     )
 
     if not raw_candidates:
-        return build_demo_trade(
-            spx_price=spx_price,
-            expected_move=expected_move,
-            wing_width=wing_width,
-        )
+        return {
+            "status": "NO CANDIDATES",
+            "best_trade": None,
+            "message": (
+                "No live Iron Condor candidates "
+                "were available."
+            ),
+        }
 
     ranked = []
 
@@ -376,11 +436,14 @@ def build_best_trade(
         )
 
     if not ranked:
-        return build_demo_trade(
-            spx_price=spx_price,
-            expected_move=expected_move,
-            wing_width=wing_width,
-        )
+        return {
+            "status": "NO QUALIFYING TRADES",
+            "best_trade": None,
+            "message": (
+                "No live Iron Condor candidates "
+                "passed the trade filters."
+            ),
+        }
 
     ranked.sort(
         key=lambda item: item["trade_score"],
@@ -408,18 +471,20 @@ def build_best_bull_put(
     Build, price, filter, analyze, and rank live Bull Put spreads.
     """
 
-    market = run_trade_quality()
-    snapshot = market_data.get_snapshot()
+    market, snapshot, refresh_error = (
+        refresh_live_trade_context()
+    )
+
+    if refresh_error:
+        return refresh_error
 
     spx_price = (
         snapshot.get("spx")
         or snapshot.get("price")
-        or 7535.54
     )
 
-    expected_move = (
-        snapshot.get("expected_move")
-        or 62.5
+    expected_move = snapshot.get(
+        "expected_move"
     )
 
     try:
@@ -427,20 +492,24 @@ def build_best_bull_put(
             spx_price
         )
     except (TypeError, ValueError):
-        spx_price = 7535.54
-
-    if spx_price <= 0:
-        spx_price = 7535.54
+        spx_price = 0.0
 
     try:
         expected_move = float(
             expected_move
         )
     except (TypeError, ValueError):
-        expected_move = 62.5
+        expected_move = 0.0
 
-    if expected_move <= 0:
-        expected_move = 62.5
+    if spx_price <= 0 or expected_move <= 0:
+        return {
+            "status": "NO MARKET DATA",
+            "best_trade": None,
+            "message": (
+                "Live SPX price or expected move "
+                "is unavailable."
+            ),
+        }
 
     raw_candidates = generate_bull_put_candidates(
         wing_width=wing_width,
@@ -451,6 +520,9 @@ def build_best_bull_put(
         "candidates_generated": len(
             raw_candidates
         ),
+        "invalid_sell_put": 0,
+        "sell_put_not_below_spx": 0,
+        "analysis_rejected": 0,
         "missing_delta": 0,
         "invalid_delta": 0,
         "delta_too_low": 0,
@@ -488,6 +560,20 @@ def build_best_bull_put(
             spx_price=spx_price,
             expected_move=expected_move,
         )
+
+        sell_put = trade.get("sell_put")
+
+        try:
+            sell_put = float(sell_put)
+        except (TypeError, ValueError):
+            diagnostics["invalid_sell_put"] += 1
+            continue
+
+        if sell_put >= spx_price:
+            diagnostics[
+                "sell_put_not_below_spx"
+            ] += 1
+            continue
 
         credit_data = calculate_bull_put_credit(
             trade
@@ -681,6 +767,27 @@ def build_best_bull_put(
             analysis
         )
 
+        final_decision = str(
+            candidate_trade.get(
+                "final_decision",
+                "",
+            )
+        ).upper()
+
+        market_permission = str(
+            candidate_trade.get(
+                "market_permission",
+                "",
+            )
+        ).upper()
+
+        if (
+            final_decision == "NO TRADE"
+            or market_permission == "WAIT"
+        ):
+            diagnostics["analysis_rejected"] += 1
+            continue
+
         diagnostics["qualified"] += 1
 
         ranked.append(
@@ -738,35 +845,41 @@ def build_best_bear_call(
     Build, price, filter, analyze, and rank live Bear Call spreads.
     """
 
-    market = run_trade_quality()
-    snapshot = market_data.get_snapshot()
+    market, snapshot, refresh_error = (
+        refresh_live_trade_context()
+    )
+
+    if refresh_error:
+        return refresh_error
 
     spx_price = (
         snapshot.get("spx")
         or snapshot.get("price")
-        or 7535.54
     )
 
-    expected_move = (
-        snapshot.get("expected_move")
-        or 62.5
+    expected_move = snapshot.get(
+        "expected_move"
     )
 
     try:
         spx_price = float(spx_price)
     except (TypeError, ValueError):
-        spx_price = 7535.54
-
-    if spx_price <= 0:
-        spx_price = 7535.54
+        spx_price = 0.0
 
     try:
         expected_move = float(expected_move)
     except (TypeError, ValueError):
-        expected_move = 62.5
+        expected_move = 0.0
 
-    if expected_move <= 0:
-        expected_move = 62.5
+    if spx_price <= 0 or expected_move <= 0:
+        return {
+            "status": "NO MARKET DATA",
+            "best_trade": None,
+            "message": (
+                "Live SPX price or expected move "
+                "is unavailable."
+            ),
+        }
 
     raw_candidates = generate_bear_call_candidates(
         wing_width=wing_width,
@@ -802,14 +915,36 @@ def build_best_bear_call(
 
     ranked = []
 
-    for candidate in raw_candidates:
-        trade = normalize_bear_call_candidate(
+    normalized_candidates = [
+        normalize_bear_call_candidate(
             candidate,
             spx_price=spx_price,
             expected_move=expected_move,
         )
+        for candidate in raw_candidates
+    ]
 
-        credit_data = calculate_bear_call_credit(trade)
+    quote_symbols = sorted(
+        {
+            symbol
+            for trade in normalized_candidates
+            for symbol in (
+                trade.get("sell_call_streamer"),
+                trade.get("buy_call_streamer"),
+            )
+            if symbol
+        }
+    )
+
+    shared_quotes = get_live_market_data(
+        quote_symbols
+    )
+
+    for trade in normalized_candidates:
+        credit_data = calculate_bear_call_credit(
+            trade,
+            quotes=shared_quotes,
+        )
 
         short_call_delta = credit_data.get(
             "short_call_delta"

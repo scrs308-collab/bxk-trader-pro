@@ -540,6 +540,7 @@ def calculate_bull_put_credit(
 
 def calculate_bear_call_credit(
     trade: dict,
+    quotes: dict | None = None,
 ) -> dict:
     """
     Calculate live pricing and probability metrics for a
@@ -551,9 +552,10 @@ def calculate_bear_call_credit(
         trade["buy_call_streamer"],
     ]
 
-    quotes = get_live_market_data(
-        symbols
-    )
+    if quotes is None:
+        quotes = get_live_market_data(
+            symbols
+        )
 
     sell_call = quotes.get(
         trade["sell_call_streamer"],

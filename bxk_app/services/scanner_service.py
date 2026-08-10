@@ -191,14 +191,29 @@ def get_best_trade(
             "Bear Call Credit Spread",
         }
 
-        selected_strategy = next(
-            (
-                item["name"]
-                for item in rankings
-                if item.get("name")
+        approved_strategies = [
+            item
+            for item in rankings
+            if (
+                item.get("name")
                 in supported_strategies
-            ),
-            "Iron Condor",
+                and item.get("status")
+                == "APPROVED"
+            )
+        ]
+
+        if not approved_strategies:
+            return {
+                "status": "NO APPROVED STRATEGY",
+                "best_trade": None,
+                "requested_contracts": contracts,
+                "requested_strategy": strategy,
+                "requested_dte": dte,
+                "requested_wing_width": wing_width,
+            }
+
+        selected_strategy = (
+            approved_strategies[0]["name"]
         )
 
     elif strategy == "bull_put_credit_spread":
@@ -236,6 +251,34 @@ def get_best_trade(
         result["requested_strategy"] = strategy
         result["requested_dte"] = dte
         result["requested_wing_width"] = wing_width
+
+        best_trade = result.get("best_trade")
+
+        if best_trade:
+            final_decision = str(
+                best_trade.get(
+                    "final_decision",
+                    "",
+                )
+            ).upper()
+
+            market_permission = str(
+                best_trade.get(
+                    "market_permission",
+                    "",
+                )
+            ).upper()
+
+            if (
+                final_decision == "NO TRADE"
+                or market_permission == "WAIT"
+            ):
+                result["status"] = "NO TRADE"
+                result["best_trade"] = None
+                result["blocked_trade"] = best_trade
+                result["message"] = (
+                    "Trade blocked by market analysis."
+                )
 
     return result
     

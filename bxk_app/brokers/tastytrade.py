@@ -125,6 +125,7 @@ class TastytradeBroker(BrokerBase):
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
     ) -> requests.Response | None:
         """
         Send an authenticated API request.
@@ -146,6 +147,7 @@ class TastytradeBroker(BrokerBase):
                 url=url,
                 headers=headers,
                 params=params,
+                json=json_body,
                 timeout=15,
             )
 
@@ -163,6 +165,7 @@ class TastytradeBroker(BrokerBase):
                     url=url,
                     headers=refreshed_headers,
                     params=params,
+                    json=json_body,
                     timeout=15,
                 )
 
@@ -500,6 +503,161 @@ class TastytradeBroker(BrokerBase):
                     ] = item
 
         return result
+
+
+    # ---------------------------------------------------------
+    # BXK / Tastytrade Order Preflight
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _tasty_open_action(action: str) -> str:
+        action = str(action or "").strip().upper()
+
+        mapping = {
+            "BUY": "Buy to Open",
+            "SELL": "Sell to Open",
+        }
+
+        if action not in mapping:
+            raise ValueError(
+                f"Unsupported BXK order action: {action}"
+            )
+
+        return mapping[action]
+
+    def build_dry_run_payload(
+        self,
+        order: dict,
+    ) -> dict:
+        """
+        Translate a validated BXK opening order into
+        a Tastytrade dry-run order payload.
+
+        This method cannot submit a live order.
+        """
+
+        if not order:
+            raise ValueError(
+                "No BXK order supplied."
+            )
+
+        quantity = int(
+            order.get("quantity") or 0
+        )
+
+        if quantity <= 0:
+            raise ValueError(
+                "Order quantity must be greater than zero."
+            )
+
+        try:
+            price = float(
+                order.get("limit_price")
+            )
+        except (TypeError, ValueError):
+            price = 0.0
+
+        if price <= 0:
+            raise ValueError(
+                "Limit credit must be greater than zero."
+            )
+
+        bxk_legs = order.get("legs") or []
+
+        if not bxk_legs:
+            raise ValueError(
+                "Order does not contain option legs."
+            )
+
+        tasty_legs = []
+
+        for leg in bxk_legs:
+            symbol = str(
+                leg.get("symbol") or ""
+            ).strip()
+
+            if not symbol:
+                raise ValueError(
+                    "Option leg is missing its symbol."
+                )
+
+            tasty_legs.append({
+                "instrument-type": "Equity Option",
+                "symbol": symbol,
+                "quantity": quantity,
+                "action": self._tasty_open_action(
+                    leg.get("action")
+                ),
+            })
+
+        return {
+            "time-in-force": "Day",
+            "order-type": "Limit",
+            "price": f"{price:.2f}",
+            "price-effect": "Credit",
+            "legs": tasty_legs,
+        }
+
+    def dry_run_order(
+        self,
+        order: dict,
+        account_number=None,
+    ):
+        """
+        Send a BXK order to Tastytrade's dry-run endpoint.
+
+        SAFETY:
+        This cannot submit a live order.
+        """
+
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No Tastytrade account available."
+            )
+            return None
+
+        try:
+            payload = self.build_dry_run_payload(
+                order
+            )
+        except (TypeError, ValueError) as exc:
+            self.last_error = str(exc)
+            return None
+
+        response = self._request(
+            "POST",
+            (
+                f"/accounts/{account_number}"
+                "/orders/dry-run"
+            ),
+            json_body=payload,
+        )
+
+        if response is None:
+            return None
+
+        try:
+            broker_response = response.json()
+        except (TypeError, ValueError) as exc:
+            self.last_error = (
+                "Invalid Tastytrade dry-run response: "
+                f"{exc}"
+            )
+            return None
+
+        self.last_error = None
+
+        return {
+            "payload": payload,
+            "broker_response": broker_response,
+        }
+
 
     def get_quote(self, symbol: str):
         clean_symbol = (
