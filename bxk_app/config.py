@@ -35,3 +35,18 @@ CAUTION_SCORE = 55
 
 STOP_MULTIPLIER = 2.0
 TARGET_PERCENT = 70
+
+
+# ===============================
+# Live Trading Safety
+# ===============================
+
+BXK_LIVE_TRADING_ENABLED = (
+    os.getenv(
+        "BXK_LIVE_TRADING_ENABLED",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)

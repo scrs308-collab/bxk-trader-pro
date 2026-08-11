@@ -5,6 +5,7 @@ import requests
 
 from bxk_app.brokers.base import BrokerBase
 from bxk_app.config import (
+    BXK_LIVE_TRADING_ENABLED,
     TASTYTRADE_CLIENT_SECRET,
     TASTYTRADE_REFRESH_TOKEN,
 )
@@ -658,6 +659,72 @@ class TastytradeBroker(BrokerBase):
             "broker_response": broker_response,
         }
 
+    def submit_live_order(
+        self,
+        order: dict,
+        account_number=None,
+    ):
+        """
+        Submit a validated BXK opening order to Tastytrade.
+
+        SAFETY:
+        Live submission is blocked unless
+        BXK_LIVE_TRADING_ENABLED is explicitly enabled.
+        """
+
+        if not BXK_LIVE_TRADING_ENABLED:
+            self.last_error = (
+                "BXK live trading is disabled."
+            )
+            return None
+
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No Tastytrade account available."
+            )
+            return None
+
+        try:
+            payload = self.build_dry_run_payload(
+                order
+            )
+        except (TypeError, ValueError) as exc:
+            self.last_error = str(exc)
+            return None
+
+        response = self._request(
+            "POST",
+            (
+                f"/accounts/{account_number}"
+                "/orders"
+            ),
+            json_body=payload,
+        )
+
+        if response is None:
+            return None
+
+        try:
+            broker_response = response.json()
+        except (TypeError, ValueError) as exc:
+            self.last_error = (
+                "Invalid Tastytrade live-order response: "
+                f"{exc}"
+            )
+            return None
+
+        self.last_error = None
+
+        return {
+            "payload": payload,
+            "broker_response": broker_response,
+        }
 
     def get_quote(self, symbol: str):
         clean_symbol = (

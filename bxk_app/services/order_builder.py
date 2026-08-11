@@ -1,4 +1,6 @@
-﻿def _strategy_key(value):
+from decimal import Decimal, ROUND_FLOOR
+
+def _strategy_key(value):
     return (
         str(value or "")
         .strip()
@@ -17,6 +19,43 @@ def _leg(best_trade, action, option_type, strike_key):
         "strike": best_trade.get(strike_key),
         "symbol": best_trade.get(symbol_key),
     }
+
+
+CREDIT_INCREMENT = Decimal("0.05")
+
+
+def _normalize_credit_to_increment(value):
+    # Normalize a positive credit down to the nearest
+    # broker-valid $0.05 increment.
+    try:
+        raw_credit = Decimal(str(value))
+    except Exception as exc:
+        raise ValueError(
+            f"Invalid order credit: {value}"
+        ) from exc
+
+    if raw_credit <= 0:
+        raise ValueError(
+            "Order credit must be greater than zero."
+        )
+
+    steps = (
+        raw_credit / CREDIT_INCREMENT
+    ).to_integral_value(
+        rounding=ROUND_FLOOR
+    )
+
+    normalized = (
+        steps * CREDIT_INCREMENT
+    ).quantize(Decimal("0.01"))
+
+    if normalized <= 0:
+        raise ValueError(
+            "Normalized order credit must be "
+            "greater than zero."
+        )
+
+    return float(normalized)
 
 
 def build_order(best_trade, quantity=1):
@@ -119,6 +158,54 @@ def build_order(best_trade, quantity=1):
             "a strike or option symbol."
         )
 
+
+    raw_credit = float(
+        best_trade.get("credit") or 0
+    )
+
+    limit_price = (
+        _normalize_credit_to_increment(
+            raw_credit
+        )
+    )
+
+    raw_max_profit = float(
+        best_trade.get("max_profit") or 0
+    )
+    raw_max_risk = float(
+        best_trade.get("max_risk") or 0
+    )
+    raw_buying_power = float(
+        best_trade.get(
+            "buying_power",
+            raw_max_risk,
+        )
+        or 0
+    )
+
+    credit_adjustment_dollars = round(
+        (raw_credit - limit_price) * 100,
+        2,
+    )
+
+    max_profit = round(
+        raw_max_profit
+        - credit_adjustment_dollars,
+        2,
+    )
+
+    max_risk = round(
+        raw_max_risk
+        + credit_adjustment_dollars,
+        2,
+    )
+
+    buying_power = round(
+        raw_buying_power
+        + credit_adjustment_dollars,
+        2,
+    )
+
     return {
         "strategy": strategy,
         "symbol": best_trade.get(
@@ -132,22 +219,15 @@ def build_order(best_trade, quantity=1):
         "quantity": int(quantity),
         "order_type": "LIMIT",
         "time_in_force": "DAY",
-        "limit_price": best_trade.get(
-            "credit",
-            0,
+        "limit_price": limit_price,
+        "scanner_credit": raw_credit,
+        "credit_increment": 0.05,
+        "credit_adjustment_dollars": (
+            credit_adjustment_dollars
         ),
-        "buying_power": best_trade.get(
-            "buying_power",
-            best_trade.get("max_risk", 0),
-        ),
-        "max_risk": best_trade.get(
-            "max_risk",
-            0,
-        ),
-        "max_profit": best_trade.get(
-            "max_profit",
-            0,
-        ),
+        "buying_power": buying_power,
+        "max_risk": max_risk,
+        "max_profit": max_profit,
         "pop": best_trade.get(
             "pop",
             0,

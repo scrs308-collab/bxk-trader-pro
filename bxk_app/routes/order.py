@@ -3,9 +3,9 @@ from datetime import date, datetime
 from fastapi import APIRouter, Query
 
 from bxk_app.brokers.tastytrade import broker
+from bxk_app.config import BXK_LIVE_TRADING_ENABLED
 from bxk_app.routes.scanner import get_best_trade
 from bxk_app.services.order_builder import build_order
-
 
 router = APIRouter(
     prefix="/api",
@@ -891,4 +891,177 @@ def order_dry_run(
         "trade": trade,
         "order": order,
         "dry_run": dry_run,
+    }
+
+@router.post("/order-submit")
+def order_submit(
+    strategy: str = Query("auto"),
+    dte: int = Query(1, ge=0, le=3),
+    wing_width: int = Query(25),
+    contracts: int = Query(1, ge=1, le=10),
+    confirm_live: bool = Query(False),
+):
+    """
+    Submit the current approved BXK order to Tastytrade.
+
+    SAFETY:
+    Requires explicit confirmation and the BXK
+    live-trading master switch to be enabled.
+    """
+
+    if not confirm_live:
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": BXK_LIVE_TRADING_ENABLED,
+            "message": (
+                "Explicit live-trade confirmation "
+                "is required."
+            ),
+            "errors": [
+                "confirm_live must be true."
+            ],
+        }
+
+    preflight = order_dry_run(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+    )
+
+    if preflight.get("status") != "BROKER_PREFLIGHT_PASSED":
+        return preflight
+
+    if not BXK_LIVE_TRADING_ENABLED:
+        return {
+            "status": "LIVE_TRADING_DISABLED",
+            "live_submission_enabled": False,
+            "message": (
+                "BXK validation and Tastytrade "
+                "broker preflight passed, but "
+                "live trading is disabled."
+            ),
+            "errors": [
+                "BXK live trading is disabled."
+            ],
+            "checks": preflight.get("checks", []),
+            "broker_checks": preflight.get(
+                "broker_checks", []
+            ),
+            "broker_preflight": preflight.get(
+                "broker_preflight"
+            ),
+            "trade": preflight.get("trade"),
+            "order": preflight.get("order"),
+        }
+
+    account_number = broker.get_first_account_number()
+
+    if not account_number:
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": True,
+            "message": (
+                "Tastytrade account verification "
+                "failed before submission."
+            ),
+            "errors": [
+                broker.last_error
+                or "No Tastytrade account available."
+            ],
+        }
+
+    positions = broker.get_positions(
+        account_number=account_number,
+    )
+
+    if broker.last_error:
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": True,
+            "message": (
+                "BXK could not verify existing "
+                "positions immediately before "
+                "submission."
+            ),
+            "errors": [
+                broker.last_error
+                or "Position verification failed."
+            ],
+        }
+
+    order = preflight.get("order") or {}
+
+    position_overlap = _check_existing_position_overlap(
+        order,
+        positions,
+    )
+
+    if not position_overlap["passed"]:
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": True,
+            "message": (
+                "Proposed BXK order now overlaps "
+                "an existing Tastytrade position."
+            ),
+            "errors": [
+                (
+                    "Account positions changed "
+                    "after broker preflight."
+                )
+            ],
+            "position_overlap": position_overlap,
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
+    live_order = broker.submit_live_order(
+        order,
+        account_number=account_number,
+    )
+
+    if live_order is None:
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": True,
+            "message": (
+                "Tastytrade live submission failed."
+            ),
+            "errors": [
+                broker.last_error
+                or "Live order submission failed."
+            ],
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
+    broker_response = (
+        live_order.get("broker_response") or {}
+    )
+    data = broker_response.get("data") or {}
+    submitted_order = data.get("order") or {}
+
+    account_text = str(account_number)
+    masked_account = (
+        f"***{account_text[-4:]}"
+        if len(account_text) >= 4
+        else "***"
+    )
+
+    return {
+        "status": "SUBMITTED",
+        "live_submission_enabled": True,
+        "message": (
+            "BXK live order was submitted "
+            "to Tastytrade."
+        ),
+        "account": masked_account,
+        "order_id": submitted_order.get("id"),
+        "broker_status": submitted_order.get(
+            "status"
+        ),
+        "trade": preflight.get("trade"),
+        "order": order,
+        "broker_order": submitted_order,
     }
