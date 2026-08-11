@@ -582,6 +582,10 @@ const buyingPower =
               executionStatus,
               pop,
               buyingPower,
+              strategy: selectedStrategy,
+              dte: selectedDte,
+              wingWidth: selectedWingWidth,
+              contracts: selectedContracts,
             });
 
             enterTradeButton.textContent =
@@ -663,6 +667,10 @@ function renderOrderPreview({
   executionStatus = "--",
   pop = 0,
   buyingPower = 0,
+  strategy = "auto",
+  dte = 1,
+  wingWidth = 25,
+  contracts = 1,
 }) {
   closeExistingOrderPreview();
 
@@ -1070,21 +1078,34 @@ function renderOrderPreview({
             </div>
           </div>
 
-          <div class="pending">
+          <div
+            id="brokerAccountReadiness"
+            class="pending"
+          >
             <span>--</span>
             <div>
               <strong>Account Verification</strong>
-              <small>Not connected</small>
+              <small>Checking broker...</small>
             </div>
           </div>
 
-          <div class="pending">
+          <div
+            id="brokerSubmissionReadiness"
+            class="pending"
+          >
             <span>--</span>
             <div>
               <strong>Live Submission</strong>
-              <small>Phase 2</small>
+              <small>Protected by BXK master switch</small>
             </div>
           </div>
+        </div>
+
+        <div
+          id="orderBrokerMessage"
+          class="order-review-empty"
+        >
+          Running Tastytrade broker preflight...
         </div>
       </section>
 
@@ -1103,7 +1124,7 @@ function renderOrderPreview({
           type="button"
           disabled
         >
-          BXK AUTO
+          CHECKING BROKER...
         </button>
       </footer>
     </section>
@@ -1157,6 +1178,373 @@ function renderOrderPreview({
     "keydown",
     escapeHandler,
   );
+
+  const confirmButton = overlay.querySelector(
+    "#confirmOrderPreview",
+  );
+
+  const accountReadiness = overlay.querySelector(
+    "#brokerAccountReadiness",
+  );
+
+  const submissionReadiness = overlay.querySelector(
+    "#brokerSubmissionReadiness",
+  );
+
+  const brokerMessage = overlay.querySelector(
+    "#orderBrokerMessage",
+  );
+
+  const executionParams = new URLSearchParams({
+    strategy,
+    dte,
+    wing_width: wingWidth,
+    contracts,
+  });
+
+  const updateReadinessCard = (
+    element,
+    {
+      state = "pending",
+      icon = "--",
+      detail = "",
+    } = {},
+  ) => {
+    if (!element) {
+      return;
+    }
+
+    element.classList.remove(
+      "ready",
+      "pending",
+    );
+
+    element.classList.add(state);
+
+    const iconElement =
+      element.querySelector("span");
+
+    const detailElement =
+      element.querySelector("small");
+
+    if (iconElement) {
+      iconElement.textContent = icon;
+    }
+
+    if (detailElement) {
+      detailElement.textContent = detail;
+    }
+  };
+
+  const setBrokerMessage = (message) => {
+    if (brokerMessage) {
+      brokerMessage.textContent = message;
+    }
+  };
+
+  const runBrokerPreflight = async () => {
+    if (!allChecksPassed) {
+      updateReadinessCard(
+        accountReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Local risk check failed",
+        },
+      );
+
+      updateReadinessCard(
+        submissionReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Submission blocked",
+        },
+      );
+
+      setBrokerMessage(
+        "BXK local risk checks must pass before broker preflight.",
+      );
+
+      if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.textContent =
+          "ORDER BLOCKED";
+      }
+
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/order-dry-run?${executionParams.toString()}`,
+        {
+          method: "POST",
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Broker preflight error ${response.status}`,
+        );
+      }
+
+      const result = await response.json();
+
+      console.log(
+        "BXK broker preflight:",
+        result,
+      );
+
+      if (
+        result?.status ===
+        "BROKER_PREFLIGHT_PASSED"
+      ) {
+        updateReadinessCard(
+          accountReadiness,
+          {
+            state: "ready",
+            icon: "OK",
+            detail:
+              result.account
+                ? `Verified ${result.account}`
+                : "Verified",
+          },
+        );
+
+        updateReadinessCard(
+          submissionReadiness,
+          {
+            state: "pending",
+            icon: "--",
+            detail:
+              "Ready for explicit confirmation",
+          },
+        );
+
+        const fees = safeNumber(
+          result?.broker_preflight?.fees,
+          0,
+        );
+
+        setBrokerMessage(
+          fees > 0
+            ? `Broker preflight passed. Estimated fees: ${formatMoney(
+                fees,
+                2,
+              )}.`
+            : "Broker preflight passed.",
+        );
+
+        if (confirmButton) {
+          confirmButton.disabled = false;
+          confirmButton.textContent =
+            "BXK AUTO";
+        }
+
+        return;
+      }
+
+      const errorMessage =
+        result?.message ||
+        result?.errors?.[0] ||
+        "Tastytrade broker preflight did not pass.";
+
+      updateReadinessCard(
+        accountReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Broker preflight blocked",
+        },
+      );
+
+      updateReadinessCard(
+        submissionReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Submission blocked",
+        },
+      );
+
+      setBrokerMessage(errorMessage);
+
+      if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.textContent =
+          "BROKER BLOCKED";
+      }
+    } catch (error) {
+      console.error(
+        "BXK broker preflight failed:",
+        error,
+      );
+
+      updateReadinessCard(
+        accountReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Broker check failed",
+        },
+      );
+
+      updateReadinessCard(
+        submissionReadiness,
+        {
+          state: "pending",
+          icon: "X",
+          detail: "Submission blocked",
+        },
+      );
+
+      setBrokerMessage(
+        "Unable to complete Tastytrade broker preflight.",
+      );
+
+      if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.textContent =
+          "PREFLIGHT FAILED";
+      }
+    }
+  };
+
+  confirmButton?.addEventListener(
+    "click",
+    async () => {
+      confirmButton.disabled = true;
+      confirmButton.textContent =
+        "SUBMITTING...";
+
+      setBrokerMessage(
+        "Revalidating BXK order before submission...",
+      );
+
+      const submitParams = new URLSearchParams(
+        executionParams,
+      );
+
+      submitParams.set(
+        "confirm_live",
+        "true",
+      );
+
+      try {
+        const response = await fetch(
+          `/api/order-submit?${submitParams.toString()}`,
+          {
+            method: "POST",
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Order submission error ${response.status}`,
+          );
+        }
+
+        const result = await response.json();
+
+        console.log(
+          "BXK order submission:",
+          result,
+        );
+
+        if (
+          result?.status ===
+          "LIVE_TRADING_DISABLED"
+        ) {
+          updateReadinessCard(
+            submissionReadiness,
+            {
+              state: "pending",
+              icon: "LOCK",
+              detail: "BXK master switch is OFF",
+            },
+          );
+
+          setBrokerMessage(
+            "Broker preflight passed, but BXK live trading is disabled.",
+          );
+
+          confirmButton.textContent =
+            "LIVE TRADING OFF";
+
+          return;
+        }
+
+        if (result?.status === "SUBMITTED") {
+          updateReadinessCard(
+            submissionReadiness,
+            {
+              state: "ready",
+              icon: "OK",
+              detail:
+                result.order_id
+                  ? `Order ${result.order_id}`
+                  : "Submitted",
+            },
+          );
+
+          setBrokerMessage(
+            result.message ||
+            "BXK order submitted to Tastytrade.",
+          );
+
+          confirmButton.textContent =
+            "ORDER SUBMITTED";
+
+          return;
+        }
+
+        const errorMessage =
+          result?.message ||
+          result?.errors?.[0] ||
+          "Order submission was blocked.";
+
+        updateReadinessCard(
+          submissionReadiness,
+          {
+            state: "pending",
+            icon: "X",
+            detail: "Submission blocked",
+          },
+        );
+
+        setBrokerMessage(errorMessage);
+
+        confirmButton.textContent =
+          "ORDER BLOCKED";
+      } catch (error) {
+        console.error(
+          "BXK order submission failed:",
+          error,
+        );
+
+        updateReadinessCard(
+          submissionReadiness,
+          {
+            state: "pending",
+            icon: "X",
+            detail: "Submission failed",
+          },
+        );
+
+        setBrokerMessage(
+          "Unable to complete BXK order submission.",
+        );
+
+        confirmButton.textContent =
+          "SUBMISSION FAILED";
+      }
+    },
+  );
+
+  runBrokerPreflight();
 
   overlay
     .querySelector("#closeOrderPreview")
