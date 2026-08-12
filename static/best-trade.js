@@ -677,6 +677,15 @@ function renderOrderPreview({
   const order = preview?.order;
   const displayedTrade = preview?.trade || {};
 
+  const liveSubmissionEnabled = Boolean(
+    preview?.live_submission_enabled,
+  );
+
+  const tradingMode = String(
+    preview?.trading_mode ||
+      (liveSubmissionEnabled ? "LIVE" : "TEST"),
+  ).toUpperCase();
+
   if (
     preview?.status !== "READY" ||
     !order
@@ -847,6 +856,37 @@ function renderOrderPreview({
           &times;
         </button>
       </header>
+
+      <div
+        class="order-review-mode-banner ${
+          liveSubmissionEnabled
+            ? "live"
+            : "test"
+        }"
+        role="status"
+        aria-live="polite"
+      >
+        <div>
+          <strong>
+            BXK ${tradingMode} MODE
+          </strong>
+          <span>
+            ${
+              liveSubmissionEnabled
+                ? "REAL TASTYTRADE ORDERS ENABLED"
+                : "LIVE ORDER SUBMISSION DISABLED"
+            }
+          </span>
+        </div>
+
+        <div class="order-review-mode-state">
+          ${
+            liveSubmissionEnabled
+              ? "LIVE"
+              : "SAFE"
+          }
+        </div>
+      </div>
 
       <div class="order-review-status-row">
         <div>
@@ -1096,7 +1136,13 @@ function renderOrderPreview({
             <span>--</span>
             <div>
               <strong>Live Submission</strong>
-              <small>Protected by BXK master switch</small>
+              <small>
+                ${
+                  liveSubmissionEnabled
+                    ? "REAL ORDERS ENABLED"
+                    : "Protected by BXK master switch"
+                }
+              </small>
             </div>
           </div>
         </div>

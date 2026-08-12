@@ -55,13 +55,11 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     """
     Return SPX strikes for the requested DTE.
 
-    Selection order:
-    1. Exact requested DTE
-    2. Nearest later expiration
-    3. Nearest available expiration
+    Use the exact requested calendar DTE only.
 
-    This handles weekends and market holidays when an exact
-    calendar-day DTE may not exist.
+    If that exact expiration is unavailable because of a weekend,
+    market holiday, or missing chain data, return no strikes rather
+    than silently substituting a different expiration.
     """
 
     chain = tastytrade_api.get_spx_option_chain()
@@ -100,7 +98,8 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     if not valid_expirations:
         return []
 
-    # First preference: exact requested DTE
+    # Exact DTE only.
+    # Never silently substitute another expiration.
     selected = next(
         (
             item
@@ -110,28 +109,8 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
         None,
     )
 
-    # Second preference: nearest later expiration
     if selected is None:
-        later_expirations = [
-            item
-            for item in valid_expirations
-            if item["dte"] > days_to_expiration
-        ]
-
-        if later_expirations:
-            selected = min(
-                later_expirations,
-                key=lambda item: item["dte"],
-            )
-
-    # Final fallback: nearest available expiration
-    if selected is None:
-        selected = min(
-            valid_expirations,
-            key=lambda item: abs(
-                item["dte"] - days_to_expiration
-            ),
-        )
+        return []
 
     selected_expiration = selected["data"]
 

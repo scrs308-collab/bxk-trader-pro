@@ -4997,3 +4997,97 @@ body[data-theme="light"] .trade-parameters button:disabled {
   opacity: 1;
 }
 
+/* BXK LIVE/TEST MODE BANNER */
+
+.order-review-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 28px 0;
+  padding: 14px 18px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.order-review-mode-banner > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.order-review-mode-banner strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+
+.order-review-mode-banner span {
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+}
+
+.order-review-mode-banner.test {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.75);
+  background: rgba(30, 64, 175, 0.22);
+}
+
+.order-review-mode-banner.live {
+  color: #fee2e2;
+  border-color: rgba(248, 113, 113, 0.95);
+  background: rgba(127, 29, 29, 0.55);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.18);
+}
+
+.order-review-mode-state {
+  min-width: 62px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.order-review-mode-banner.test .order-review-mode-state {
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.34);
+}
+
+.order-review-mode-banner.live .order-review-mode-state {
+  color: #fff1f2;
+  background: rgba(220, 38, 38, 0.55);
+}
+
+body[data-theme="light"] .order-review-mode-banner.test {
+  color: #1e3a8a;
+  border-color: #60a5fa;
+  background: #dbeafe;
+}
+
+body[data-theme="light"] .order-review-mode-banner.live {
+  color: #7f1d1d;
+  border-color: #ef4444;
+  background: #fee2e2;
+}
+
+body[data-theme="light"] .order-review-mode-banner.test .order-review-mode-state {
+  color: #1e3a8a;
+  background: #bfdbfe;
+}
+
+body[data-theme="light"] .order-review-mode-banner.live .order-review-mode-state {
+  color: #7f1d1d;
+  background: #fecaca;
+}
+
+@media (max-width: 620px) {
+  .order-review-mode-banner {
+    align-items: flex-start;
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+}

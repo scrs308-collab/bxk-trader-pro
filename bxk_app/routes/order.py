@@ -43,6 +43,11 @@ def _validate_order(
     legs = order.get("legs") or []
     quantity = order.get("quantity")
     expiration = order.get("expiration")
+
+    try:
+        actual_dte = int(order.get("dte"))
+    except (TypeError, ValueError):
+        actual_dte = -1
     credit = _number(order.get("limit_price"))
     max_risk = _number(order.get("max_risk"))
 
@@ -175,6 +180,15 @@ def _validate_order(
     )
 
     check(
+        "dte_match",
+        actual_dte == requested_dte,
+        (
+            "Actual order DTE does not match "
+            "the requested DTE."
+        ),
+    )
+
+    check(
         "limit_credit",
         credit > 0,
         "Limit credit must be greater than zero.",
@@ -254,6 +268,14 @@ def order_preview(
 
     return {
         "status": "READY",
+        "live_submission_enabled": (
+            BXK_LIVE_TRADING_ENABLED
+        ),
+        "trading_mode": (
+            "LIVE"
+            if BXK_LIVE_TRADING_ENABLED
+            else "TEST"
+        ),
         "trade": trade,
         "order": order,
     }
