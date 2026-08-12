@@ -254,6 +254,67 @@ def get_best_trade(
 
         best_trade = result.get("best_trade")
 
+        if not best_trade:
+            from bxk_app.option_scanner import (
+                get_spx_expiration_status,
+            )
+
+            expiration_status = (
+                get_spx_expiration_status(dte)
+            )
+
+            if (
+                expiration_status.get(
+                    "chain_available"
+                )
+                and not expiration_status.get(
+                    "exact_available"
+                )
+            ):
+                next_dte = expiration_status.get(
+                    "next_available_dte"
+                )
+
+                next_expiration = (
+                    expiration_status.get(
+                        "next_expiration"
+                    )
+                )
+
+                if (
+                    next_dte is not None
+                    and next_expiration
+                ):
+                    message = (
+                        f"{dte} DTE expiration unavailable. "
+                        "Next listed expiration: "
+                        f"{next_expiration} · "
+                        f"{next_dte} DTE. "
+                        "No substitution was made."
+                    )
+                else:
+                    message = (
+                        f"{dte} DTE expiration unavailable. "
+                        "No later listed expiration is "
+                        "currently available. "
+                        "No substitution was made."
+                    )
+
+                result["status"] = "NO TRADE"
+                result["reason_code"] = (
+                    "EXACT_DTE_UNAVAILABLE"
+                )
+                result["reason"] = message
+                result["message"] = message
+                result["next_available_dte"] = (
+                    next_dte
+                )
+                result["next_expiration"] = (
+                    next_expiration
+                )
+                result["substitution_made"] = False
+
+
         if best_trade:
             final_decision = str(
                 best_trade.get(

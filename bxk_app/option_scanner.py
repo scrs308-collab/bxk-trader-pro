@@ -51,6 +51,105 @@ def safe_float(value, default: float = 0.0) -> float:
         return default
 
 
+
+def get_spx_expiration_status(
+    days_to_expiration: int = 0,
+):
+    """
+    Report whether the exact requested SPX calendar DTE exists
+    and identify the next later listed expiration without
+    substituting it.
+    """
+
+    status = {
+        "requested_dte": int(days_to_expiration),
+        "chain_available": False,
+        "exact_available": False,
+        "exact_expiration": None,
+        "next_available_dte": None,
+        "next_expiration": None,
+        "substitution_made": False,
+    }
+
+    chain = tastytrade_api.get_spx_option_chain()
+
+    if not chain:
+        return status
+
+    items = chain.get("items", [])
+
+    if not items:
+        return status
+
+    expirations = items[0].get(
+        "expirations",
+        [],
+    )
+
+    valid_expirations = []
+
+    for expiration in expirations:
+        expiration_date = expiration.get(
+            "expiration-date"
+        )
+
+        actual_dte = calculate_actual_dte(
+            expiration_date
+        )
+
+        if actual_dte < 0:
+            continue
+
+        valid_expirations.append(
+            {
+                "dte": actual_dte,
+                "expiration": expiration_date,
+            }
+        )
+
+    if not valid_expirations:
+        return status
+
+    status["chain_available"] = True
+
+    exact = next(
+        (
+            item
+            for item in valid_expirations
+            if item["dte"] == days_to_expiration
+        ),
+        None,
+    )
+
+    if exact is not None:
+        status["exact_available"] = True
+        status["exact_expiration"] = (
+            exact["expiration"]
+        )
+        return status
+
+    later_expirations = [
+        item
+        for item in valid_expirations
+        if item["dte"] > days_to_expiration
+    ]
+
+    if later_expirations:
+        next_expiration = min(
+            later_expirations,
+            key=lambda item: item["dte"],
+        )
+
+        status["next_available_dte"] = (
+            next_expiration["dte"]
+        )
+        status["next_expiration"] = (
+            next_expiration["expiration"]
+        )
+
+    return status
+
+
 def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     """
     Return SPX strikes for the requested DTE.

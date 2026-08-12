@@ -35,10 +35,53 @@ function getReadinessStatus(score) {
   };
 }
 
+function renderNoTradeChecklist() {
+  const container = el("tradeChecklist");
+
+  if (!container) {
+    return;
+  }
+
+
+  container.innerHTML = `
+    <div class="checklist-header">
+      <div>
+        <div class="checklist-title">
+          TRADE EVALUATION
+        </div>
+
+        <div class="checklist-summary">
+          0 strengths &middot; 0 concerns
+        </div>
+      </div>
+
+      <div class="checklist-status wait">
+        WAIT
+      </div>
+    </div>
+
+    <div class="checklist-grid">
+      <div class="check-item empty">
+        No approved trade to score.
+        Waiting for a valid setup.
+      </div>
+    </div>
+  `;
+}
+
+
 export function updateChecklist(data) {
   const container = el("tradeChecklist");
 
   if (!container) {
+    return;
+  }
+
+
+  if (
+    document.body.dataset.bxkTradeCandidate === "none"
+  ) {
+    renderNoTradeChecklist();
     return;
   }
 
@@ -147,3 +190,22 @@ export function updateChecklist(data) {
 
   container.innerHTML = html;
 }
+
+document.addEventListener(
+  "bxk:trade-candidate",
+  (event) => {
+    const detail = event.detail || {};
+
+    if (detail.status === "none") {
+      renderNoTradeChecklist();
+      return;
+    }
+
+    if (
+      detail.status === "ready" &&
+      detail.trade
+    ) {
+      updateChecklist(detail.trade);
+    }
+  },
+);

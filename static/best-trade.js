@@ -72,6 +72,14 @@ const response = await fetch(
     const trade = data.best_trade;
       
     if (!trade) {
+    document.body.dataset.bxkTradeCandidate = "none";
+
+    document.dispatchEvent(
+      new CustomEvent("bxk:trade-candidate", {
+        detail: { status: "none" },
+      }),
+    );
+
   card.innerHTML = `
     <div class="hero-header">
       <div>
@@ -103,6 +111,17 @@ const response = await fetch(
 }
           
           
+
+    document.body.dataset.bxkTradeCandidate = "ready";
+
+    document.dispatchEvent(
+      new CustomEvent("bxk:trade-candidate", {
+        detail: {
+          status: "ready",
+          trade,
+        },
+      }),
+    );
 
     const recommendation = String(
       trade.final_decision ||
