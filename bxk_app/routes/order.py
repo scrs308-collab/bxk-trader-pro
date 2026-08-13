@@ -30,15 +30,28 @@ def _validate_order(
     errors = []
     checks = []
 
-    def check(name, passed, message):
+    def check(
+        name,
+        passed,
+        success_message,
+        failure_message,
+    ):
+        passed = bool(passed)
+
+        message = (
+            success_message
+            if passed
+            else failure_message
+        )
+
         checks.append({
             "name": name,
-            "passed": bool(passed),
+            "passed": passed,
             "message": message,
         })
 
         if not passed:
-            errors.append(message)
+            errors.append(failure_message)
 
     legs = order.get("legs") or []
     quantity = order.get("quantity")
@@ -48,6 +61,7 @@ def _validate_order(
         actual_dte = int(order.get("dte"))
     except (TypeError, ValueError):
         actual_dte = -1
+
     credit = _number(order.get("limit_price"))
     max_risk = _number(order.get("max_risk"))
 
@@ -62,6 +76,7 @@ def _validate_order(
     check(
         "strategy",
         "iron_condor" in strategy_key,
+        "Strategy verified as iron condor.",
         "Strategy must be an iron condor.",
     )
 
@@ -69,6 +84,7 @@ def _validate_order(
         "underlying",
         str(order.get("symbol", "")).upper()
         in {"SPX", "SPXW"},
+        "Underlying verified as SPX/SPXW.",
         "Underlying must be SPX or SPXW.",
     )
 
@@ -76,12 +92,14 @@ def _validate_order(
         "quantity",
         quantity == requested_contracts
         and 1 <= requested_contracts <= 10,
+        "Contract quantity verified.",
         "Contract quantity is invalid or changed.",
     )
 
     check(
         "leg_count",
         len(legs) == 4,
+        "Four-leg iron condor structure verified.",
         "Iron condor must contain exactly four legs.",
     )
 
@@ -95,8 +113,9 @@ def _validate_order(
     if len(legs) == 4:
         directions_valid = all(
             str(leg.get("action", "")).upper() == action
-            and str(leg.get("option_type", "")).upper()
-            == option_type
+            and str(
+                leg.get("option_type", "")
+            ).upper() == option_type
             for leg, (action, option_type)
             in zip(legs, expected_legs)
         )
@@ -133,24 +152,28 @@ def _validate_order(
     check(
         "leg_directions",
         directions_valid,
+        "Option leg directions and types verified.",
         "Option leg directions or types are invalid.",
     )
 
     check(
         "option_symbols",
         symbols_present,
+        "All option symbols are present.",
         "One or more option symbols are missing.",
     )
 
     check(
         "strike_order",
         strike_order_valid,
+        "Iron-condor strike order verified.",
         "Iron-condor strikes are not ordered correctly.",
     )
 
     check(
         "wing_width",
         width_valid,
+        "Wing widths match the request.",
         "Actual wing widths do not match the request.",
     )
 
@@ -163,25 +186,33 @@ def _validate_order(
                 "%Y-%m-%d",
             ).date()
 
-            expiration_valid = expiration_date >= date.today()
+            expiration_valid = (
+                expiration_date >= date.today()
+            )
         except ValueError:
             expiration_valid = False
 
     check(
         "expiration",
         expiration_valid,
+        "Expiration is valid and not expired.",
         "Expiration is missing, invalid, or already passed.",
     )
 
     check(
         "dte",
         requested_dte in {0, 1, 2, 3},
+        "Requested DTE is within the approved range.",
         "Requested DTE is outside the approved range.",
     )
 
     check(
         "dte_match",
         actual_dte == requested_dte,
+        (
+            "Actual order DTE matches "
+            "the requested DTE."
+        ),
         (
             "Actual order DTE does not match "
             "the requested DTE."
@@ -191,24 +222,28 @@ def _validate_order(
     check(
         "limit_credit",
         credit > 0,
+        "Limit credit is greater than zero.",
         "Limit credit must be greater than zero.",
     )
 
     check(
         "maximum_risk",
         max_risk > 0,
+        "Maximum risk is greater than zero.",
         "Maximum risk must be greater than zero.",
     )
 
     check(
         "order_type",
         order.get("order_type") == "LIMIT",
+        "Limit order type verified.",
         "Only limit orders are permitted.",
     )
 
     check(
         "time_in_force",
         order.get("time_in_force") == "DAY",
+        "DAY time-in-force verified.",
         "Only DAY orders are permitted.",
     )
 
