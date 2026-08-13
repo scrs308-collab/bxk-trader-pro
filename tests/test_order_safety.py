@@ -457,3 +457,154 @@ def test_overlap_allows_different_symbol():
 
     assert result["passed"] is True
     assert result["overlaps"] == []
+
+def _valid_broker_dry_run():
+    leg = {
+        "symbol": "SPXW TEST OPTION",
+        "action": "Sell to Open",
+        "quantity": 1,
+        "instrument-type": "Equity Option",
+    }
+
+    return {
+        "payload": {
+            "price": "1.75",
+            "legs": [dict(leg)],
+        },
+        "broker_response": {
+            "data": {
+                "order": {
+                    "status": "Received",
+                    "price": "1.75",
+                    "order-type": "Limit",
+                    "time-in-force": "Day",
+                    "price-effect": "Credit",
+                    "legs": [dict(leg)],
+                },
+                "warnings": [],
+                "buying-power-effect": {
+                    "current-buying-power": "10000.00",
+                    "change-in-buying-power": "831.88",
+                    "new-buying-power": "9168.12",
+                },
+                "fee-calculation": {
+                    "total-fees": "6.88",
+                },
+            }
+        },
+    }
+
+
+def _broker_checks(result):
+    return {
+        item["name"]: item
+        for item in result["checks"]
+    }
+
+
+def test_broker_preflight_accepts_valid_response():
+    result = (
+        order_route._evaluate_broker_dry_run(
+            _valid_broker_dry_run(),
+            {},
+        )
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is True
+    assert result["fees"] == 6.88
+
+    assert (
+        checks[
+            "broker_buying_power_reconciled"
+        ]["passed"]
+        is True
+    )
+
+    assert (
+        checks["broker_fees"]["passed"]
+        is True
+    )
+
+
+def test_broker_warning_fails_preflight():
+    dry_run = _valid_broker_dry_run()
+
+    dry_run["broker_response"]["data"][
+        "warnings"
+    ] = [
+        {
+            "code": "tif.next_valid_session",
+            "message": (
+                "Your order will begin working "
+                "during next valid session."
+            ),
+        }
+    ]
+
+    result = (
+        order_route._evaluate_broker_dry_run(
+            dry_run,
+            {},
+        )
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is False
+
+    assert (
+        checks["broker_warning_free"]["passed"]
+        is False
+    )
+
+
+def test_buying_power_mismatch_fails_preflight():
+    dry_run = _valid_broker_dry_run()
+
+    dry_run["broker_response"]["data"][
+        "buying-power-effect"
+    ]["new-buying-power"] = "9000.00"
+
+    result = (
+        order_route._evaluate_broker_dry_run(
+            dry_run,
+            {},
+        )
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is False
+
+    assert (
+        checks[
+            "broker_buying_power_reconciled"
+        ]["passed"]
+        is False
+    )
+
+
+def test_invalid_fee_data_fails_preflight():
+    dry_run = _valid_broker_dry_run()
+
+    dry_run["broker_response"]["data"][
+        "fee-calculation"
+    ] = {}
+
+    result = (
+        order_route._evaluate_broker_dry_run(
+            dry_run,
+            {},
+        )
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is False
+
+    assert (
+        checks["broker_fees"]["passed"]
+        is False
+    )

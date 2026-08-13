@@ -517,11 +517,49 @@ def _evaluate_broker_dry_run(
     checks = []
     errors = []
 
+    success_messages = {
+        "broker_response":
+            "Tastytrade broker response received.",
+        "broker_order_status":
+            "Tastytrade dry-run status verified as Received.",
+        "broker_warning_free":
+            "Tastytrade returned no broker warnings.",
+        "broker_leg_count":
+            "Broker leg count matches the BXK order.",
+        "broker_legs_match":
+            "All broker legs exactly match the BXK order.",
+        "broker_limit_price":
+            "Broker limit price matches the BXK order.",
+        "broker_order_type":
+            "Broker order type verified as Limit.",
+        "broker_time_in_force":
+            "Broker time in force verified as Day.",
+        "broker_price_effect":
+            "Broker price effect verified as Credit.",
+        "broker_buying_power":
+            "Broker buying-power information is valid.",
+        "broker_buying_power_reconciled":
+            "Broker buying-power impact reconciles exactly.",
+        "broker_fees":
+            "Broker fee calculation is valid.",
+    }
+
     def check(name, passed, message):
+        passed = bool(passed)
+
+        display_message = (
+            success_messages.get(
+                name,
+                "Broker check passed.",
+            )
+            if passed
+            else message
+        )
+
         checks.append({
             "name": name,
-            "passed": bool(passed),
-            "message": message,
+            "passed": passed,
+            "message": display_message,
         })
 
         if not passed:
@@ -708,12 +746,47 @@ def _evaluate_broker_dry_run(
         ),
     )
 
+    buying_power_reconciled = (
+        buying_power_valid
+        and abs(
+            (current_bp - new_bp)
+            - bp_impact
+        ) <= 0.01
+    )
+
+    check(
+        "broker_buying_power_reconciled",
+        buying_power_reconciled,
+        (
+            "Tastytrade buying-power impact "
+            "does not reconcile with current "
+            "and new buying power."
+        ),
+    )
+
+    fee_value = fees.get("total-fees")
+
     try:
-        total_fees = float(
-            fees.get("total-fees") or 0
+        total_fees = float(fee_value)
+
+        fees_valid = (
+            bool(fees)
+            and fee_value is not None
+            and total_fees >= 0
         )
+
     except (TypeError, ValueError):
         total_fees = 0.0
+        fees_valid = False
+
+    check(
+        "broker_fees",
+        fees_valid,
+        (
+            "Tastytrade returned invalid "
+            "fee-calculation information."
+        ),
+    )
 
     return {
         "passed": not errors,
