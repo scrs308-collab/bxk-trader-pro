@@ -21,13 +21,17 @@ def ready_preflight():
     }
 
 
-def call_submit(confirm_live=True):
+def call_submit(
+    confirm_live=True,
+    review_id=None,
+):
     return order_route.order_submit(
         strategy="iron_condor",
         dte=1,
         wing_width=25,
         contracts=1,
         confirm_live=confirm_live,
+        review_id=review_id,
     )
 
 
@@ -321,10 +325,23 @@ def test_success_path_uses_mocked_submission(
         True,
     )
 
+    preflight = ready_preflight()
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade=preflight["trade"],
+            order=preflight["order"],
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
     monkeypatch.setattr(
         order_route,
         "order_dry_run",
-        lambda **kwargs: ready_preflight(),
+        lambda **kwargs: preflight,
     )
 
     monkeypatch.setattr(
@@ -382,7 +399,9 @@ def test_success_path_uses_mocked_submission(
         fake_submit,
     )
 
-    result = call_submit()
+    result = call_submit(
+        review_id=review_id,
+    )
 
     assert submitted["called"] is True
     assert result["status"] == "SUBMITTED"
@@ -938,4 +957,271 @@ def test_broker_buying_power_difference_fails_preflight():
             "broker_buying_power_matches_bxk"
         ]["passed"]
         is False
+    )
+
+
+def test_review_lock_preserves_exact_order_snapshot():
+    trade = {
+        "strategy": "SPX Iron Condor",
+    }
+
+    order = {
+        "strategy": "SPX Iron Condor",
+        "symbol": "SPX",
+        "quantity": 1,
+        "limit_price": 3.32,
+        "max_risk": 2168.00,
+        "buying_power": 2168.00,
+        "legs": [
+            {
+                "action": "SELL_TO_OPEN",
+                "symbol": "LOCKED-LEG-1",
+            },
+        ],
+    }
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade=trade,
+            order=order,
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    # Deliberately mutate the originals after locking.
+    # The server-side snapshot must not change.
+    order["limit_price"] = 1.00
+    order["legs"][0]["symbol"] = "MUTATED"
+    trade["strategy"] = "MUTATED"
+
+    review, error = (
+        order_route._get_order_review_lock(
+            review_id,
+        )
+    )
+
+    assert error is None
+    assert review is not None
+
+    assert (
+        review["order"]["limit_price"]
+        == 3.32
+    )
+
+    assert (
+        review["order"]["legs"][0]["symbol"]
+        == "LOCKED-LEG-1"
+    )
+
+    assert (
+        review["trade"]["strategy"]
+        == "SPX Iron Condor"
+    )
+
+
+def test_order_dry_run_uses_frozen_review_order(
+    monkeypatch,
+):
+    frozen_order = {
+        "strategy": "SPX Iron Condor",
+        "symbol": "SPX",
+        "quantity": 1,
+        "limit_price": 3.32,
+        "max_risk": 2168.00,
+        "buying_power": 2168.00,
+        "legs": [
+            {
+                "action": "SELL_TO_OPEN",
+                "symbol": "FROZEN-SPX-OPTION",
+            },
+        ],
+    }
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade={
+                "strategy": "SPX Iron Condor",
+            },
+            order=frozen_order,
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    def scanner_must_not_run(*args, **kwargs):
+        raise AssertionError(
+            "Scanner rebuilt a reviewed order."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "_build_current_order",
+        scanner_must_not_run,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": None,
+            "message": "RTH execution permitted.",
+            "policy": {
+                "session": "RTH",
+                "market_time":
+                    "2026-08-13T10:30:00-04:00",
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_validate_order",
+        lambda *args, **kwargs: (
+            [],
+            [],
+        ),
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "authenticate",
+        lambda: True,
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_first_account_number",
+        lambda: "TEST7178",
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_positions",
+        lambda account_number=None: [],
+    )
+
+    order_route.broker.last_error = None
+
+    monkeypatch.setattr(
+        order_route,
+        "_check_existing_position_overlap",
+        lambda order, positions: {
+            "passed": True,
+            "message":
+                "No existing position overlap.",
+            "overlaps": [],
+        },
+    )
+
+    captured = {}
+
+    def fake_dry_run_order(
+        order,
+        account_number=None,
+    ):
+        captured["order"] = order
+        captured["account"] = account_number
+
+        return {
+            "payload": {},
+            "broker_response": {},
+        }
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "dry_run_order",
+        fake_dry_run_order,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_evaluate_broker_dry_run",
+        lambda dry_run, order: {
+            "passed": True,
+            "checks": [],
+            "errors": [],
+            "buying_power": {},
+            "fees": 0.0,
+        },
+    )
+
+    result = order_route.order_dry_run(
+        review_id=review_id,
+    )
+
+    assert (
+        result["status"]
+        == "BROKER_PREFLIGHT_PASSED"
+    )
+
+    assert (
+        captured["order"]["limit_price"]
+        == 3.32
+    )
+
+    assert (
+        captured["order"]["legs"][0]["symbol"]
+        == "FROZEN-SPX-OPTION"
+    )
+
+
+def test_order_dry_run_requires_review_lock():
+    result = order_route.order_dry_run(
+        review_id=None,
+    )
+
+    assert result["status"] == "BLOCKED"
+
+    assert (
+        result["reason_code"]
+        == "REVIEW_LOCK_REQUIRED"
+    )
+
+
+def test_consumed_review_lock_cannot_be_reused():
+    review_id = (
+        order_route._create_order_review_lock(
+            trade={
+                "strategy": "SPX Iron Condor",
+            },
+            order={
+                "strategy": "SPX Iron Condor",
+                "symbol": "SPX",
+                "quantity": 1,
+                "limit_price": 3.32,
+                "legs": [],
+            },
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    review, error = (
+        order_route._consume_order_review_lock(
+            review_id,
+        )
+    )
+
+    assert error is None
+    assert review is not None
+
+    second_review, second_error = (
+        order_route._get_order_review_lock(
+            review_id,
+        )
+    )
+
+    assert second_review is None
+
+    assert (
+        second_error["reason_code"]
+        == "REVIEW_LOCK_CONSUMED"
     )

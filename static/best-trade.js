@@ -1167,6 +1167,40 @@ function renderOrderPreview({
         </div>
 
         <div
+          id="brokerRiskAudit"
+          class="order-review-risk-audit pending"
+          aria-live="polite"
+        >
+          <div>
+            <span>BXK Risk</span>
+            <strong id="brokerAuditBxkRisk">
+              --
+            </strong>
+          </div>
+
+          <div>
+            <span>Broker Impact</span>
+            <strong id="brokerAuditImpact">
+              --
+            </strong>
+          </div>
+
+          <div>
+            <span>Fees</span>
+            <strong id="brokerAuditFees">
+              --
+            </strong>
+          </div>
+
+          <div>
+            <span>Variance</span>
+            <strong id="brokerAuditVariance">
+              --
+            </strong>
+          </div>
+        </div>
+
+        <div
           id="orderBrokerMessage"
           class="order-review-empty"
         >
@@ -1260,12 +1294,43 @@ function renderOrderPreview({
     "#orderBrokerMessage",
   );
 
+  const brokerRiskAudit = overlay.querySelector(
+    "#brokerRiskAudit",
+  );
+
+  const brokerAuditBxkRisk = overlay.querySelector(
+    "#brokerAuditBxkRisk",
+  );
+
+  const brokerAuditImpact = overlay.querySelector(
+    "#brokerAuditImpact",
+  );
+
+  const brokerAuditFees = overlay.querySelector(
+    "#brokerAuditFees",
+  );
+
+  const brokerAuditVariance = overlay.querySelector(
+    "#brokerAuditVariance",
+  );
+
+  const reviewId = String(
+    preview?.review_id || "",
+  ).trim();
+
   const executionParams = new URLSearchParams({
     strategy,
     dte,
     wing_width: wingWidth,
     contracts,
   });
+
+  if (reviewId) {
+    executionParams.set(
+      "review_id",
+      reviewId,
+    );
+  }
 
   const updateReadinessCard = (
     element,
@@ -1307,6 +1372,60 @@ function renderOrderPreview({
     }
   };
 
+  const setBrokerRiskAudit = ({
+    state = "pending",
+    bxkRisk = null,
+    brokerImpact = null,
+    fees = null,
+    variance = null,
+  } = {}) => {
+    if (brokerRiskAudit) {
+      brokerRiskAudit.classList.remove(
+        "ready",
+        "pending",
+        "failed",
+      );
+
+      brokerRiskAudit.classList.add(state);
+    }
+
+    const formatAuditMoney = (value) => {
+      if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        !Number.isFinite(Number(value))
+      ) {
+        return "--";
+      }
+
+      return formatMoney(
+        Number(value),
+        2,
+      );
+    };
+
+    if (brokerAuditBxkRisk) {
+      brokerAuditBxkRisk.textContent =
+        formatAuditMoney(bxkRisk);
+    }
+
+    if (brokerAuditImpact) {
+      brokerAuditImpact.textContent =
+        formatAuditMoney(brokerImpact);
+    }
+
+    if (brokerAuditFees) {
+      brokerAuditFees.textContent =
+        formatAuditMoney(fees);
+    }
+
+    if (brokerAuditVariance) {
+      brokerAuditVariance.textContent =
+        formatAuditMoney(variance);
+    }
+  };
+
   const runBrokerPreflight = async () => {
     if (!allChecksPassed) {
       updateReadinessCard(
@@ -1326,6 +1445,10 @@ function renderOrderPreview({
           detail: "Submission blocked",
         },
       );
+
+      setBrokerRiskAudit({
+        state: "failed",
+      });
 
       setBrokerMessage(
         "BXK local risk checks must pass before broker preflight.",
@@ -1382,6 +1505,30 @@ function renderOrderPreview({
           result?.broker_preflight?.fees,
           0,
         );
+
+        const brokerBuyingPower =
+          result?.broker_preflight?.buying_power || {};
+
+        const reconciliationCheck =
+          (result?.broker_checks || []).find(
+            (check) =>
+              check?.name ===
+              "broker_buying_power_matches_bxk",
+          );
+
+        setBrokerRiskAudit({
+          state:
+            reconciliationCheck?.passed
+              ? "ready"
+              : "failed",
+          bxkRisk:
+            brokerBuyingPower.bxk_expected,
+          brokerImpact:
+            brokerBuyingPower.impact,
+          fees,
+          variance:
+            brokerBuyingPower.variance,
+        });
 
         if (!liveSubmissionEnabled) {
           updateReadinessCard(

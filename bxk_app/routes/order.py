@@ -1,3 +1,7 @@
+import copy
+import secrets
+import threading
+import time
 from datetime import date, datetime
 
 from fastapi import APIRouter, Query
@@ -11,6 +15,262 @@ router = APIRouter(
     prefix="/api",
     tags=["Orders"],
 )
+
+
+_ORDER_REVIEW_TTL_SECONDS = 180
+_ORDER_REVIEW_LOCKS = {}
+_ORDER_REVIEW_LOCKS_GUARD = threading.Lock()
+
+
+def _review_lock_error(
+    reason_code: str,
+    message: str,
+):
+    return {
+        "status": "BLOCKED",
+        "reason_code": reason_code,
+        "live_submission_enabled": False,
+        "message": message,
+        "errors": [message],
+        "checks": [],
+    }
+
+
+def _prune_order_review_locks_locked(
+    now: float,
+):
+    expired = [
+        review_id
+        for review_id, review
+        in _ORDER_REVIEW_LOCKS.items()
+        if (
+            now
+            >= review.get(
+                "expires_at_monotonic",
+                0.0,
+            )
+        )
+    ]
+
+    for review_id in expired:
+        _ORDER_REVIEW_LOCKS.pop(
+            review_id,
+            None,
+        )
+
+
+def _create_order_review_lock(
+    *,
+    trade: dict,
+    order: dict,
+    strategy: str,
+    dte: int,
+    wing_width: int,
+    contracts: int,
+):
+    review_id = secrets.token_urlsafe(24)
+    now = time.monotonic()
+
+    review = {
+        "review_id": review_id,
+        "created_at": datetime.now().isoformat(),
+        "expires_at_monotonic": (
+            now
+            + _ORDER_REVIEW_TTL_SECONDS
+        ),
+        "consumed": False,
+        "request": {
+            "strategy": strategy,
+            "dte": int(dte),
+            "wing_width": int(wing_width),
+            "contracts": int(contracts),
+        },
+        "trade": copy.deepcopy(trade),
+        "order": copy.deepcopy(order),
+    }
+
+    with _ORDER_REVIEW_LOCKS_GUARD:
+        _prune_order_review_locks_locked(
+            now,
+        )
+
+        _ORDER_REVIEW_LOCKS[
+            review_id
+        ] = review
+
+    return review_id
+
+
+def _get_order_review_lock(
+    review_id,
+):
+    if not review_id:
+        return (
+            None,
+            _review_lock_error(
+                "REVIEW_LOCK_REQUIRED",
+                (
+                    "A BXK order review lock "
+                    "is required."
+                ),
+            ),
+        )
+
+    key = str(review_id).strip()
+
+    if not key:
+        return (
+            None,
+            _review_lock_error(
+                "REVIEW_LOCK_REQUIRED",
+                (
+                    "A BXK order review lock "
+                    "is required."
+                ),
+            ),
+        )
+
+    now = time.monotonic()
+
+    with _ORDER_REVIEW_LOCKS_GUARD:
+        review = _ORDER_REVIEW_LOCKS.get(
+            key,
+        )
+
+        if review is None:
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_NOT_FOUND",
+                    (
+                        "BXK order review lock "
+                        "was not found."
+                    ),
+                ),
+            )
+
+        if review.get("consumed"):
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_CONSUMED",
+                    (
+                        "BXK order review lock "
+                        "has already been consumed."
+                    ),
+                ),
+            )
+
+        if (
+            now
+            >= review.get(
+                "expires_at_monotonic",
+                0.0,
+            )
+        ):
+            _ORDER_REVIEW_LOCKS.pop(
+                key,
+                None,
+            )
+
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_EXPIRED",
+                    (
+                        "BXK order review lock "
+                        "expired. Build a fresh "
+                        "trade review."
+                    ),
+                ),
+            )
+
+        return (
+            copy.deepcopy(review),
+            None,
+        )
+
+
+def _consume_order_review_lock(
+    review_id,
+):
+    if not review_id:
+        return (
+            None,
+            _review_lock_error(
+                "REVIEW_LOCK_REQUIRED",
+                (
+                    "A BXK order review lock "
+                    "is required."
+                ),
+            ),
+        )
+
+    key = str(review_id).strip()
+    now = time.monotonic()
+
+    with _ORDER_REVIEW_LOCKS_GUARD:
+        review = _ORDER_REVIEW_LOCKS.get(
+            key,
+        )
+
+        if review is None:
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_NOT_FOUND",
+                    (
+                        "BXK order review lock "
+                        "was not found."
+                    ),
+                ),
+            )
+
+        if review.get("consumed"):
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_CONSUMED",
+                    (
+                        "BXK order review lock "
+                        "has already been consumed."
+                    ),
+                ),
+            )
+
+        if (
+            now
+            >= review.get(
+                "expires_at_monotonic",
+                0.0,
+            )
+        ):
+            _ORDER_REVIEW_LOCKS.pop(
+                key,
+                None,
+            )
+
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_EXPIRED",
+                    (
+                        "BXK order review lock "
+                        "expired. Build a fresh "
+                        "trade review."
+                    ),
+                ),
+            )
+
+        review["consumed"] = True
+        review["consumed_at"] = (
+            datetime.now().isoformat()
+        )
+
+        return (
+            copy.deepcopy(review),
+            None,
+        )
 
 
 def _number(value, default=0.0):
@@ -301,8 +561,21 @@ def order_preview(
             "message": "No approved trade available.",
         }
 
+    review_id = _create_order_review_lock(
+        trade=trade,
+        order=order,
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+    )
+
     return {
         "status": "READY",
+        "review_id": review_id,
+        "review_expires_in_seconds": (
+            _ORDER_REVIEW_TTL_SECONDS
+        ),
         "live_submission_enabled": (
             BXK_LIVE_TRADING_ENABLED
         ),
@@ -925,6 +1198,7 @@ def order_dry_run(
     dte: int = Query(1, ge=0, le=3),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
+    review_id: str | None = Query(None),
 ):
     """
     Run the current BXK order through Tastytrade broker preflight.
@@ -966,31 +1240,39 @@ def order_dry_run(
             ],
         }
 
-    trade, order = _build_current_order(
-        strategy,
-        dte,
-        wing_width,
-        contracts,
+    review, review_error = (
+        _get_order_review_lock(
+            review_id,
+        )
     )
 
-    if not trade:
-        return {
-            "status": "BLOCKED",
-            "live_submission_enabled": False,
-            "message": (
-                "No approved BXK trade "
-                "is currently available."
-            ),
-            "errors": [
-                "No approved trade available."
-            ],
-        }
+    if review_error:
+        return review_error
+
+    trade = review["trade"]
+    order = review["order"]
+
+    review_request = (
+        review.get("request") or {}
+    )
 
     checks, errors = _validate_order(
         order,
-        requested_dte=dte,
-        requested_wing_width=wing_width,
-        requested_contracts=contracts,
+        requested_dte=int(
+            review_request.get("dte", -1)
+        ),
+        requested_wing_width=int(
+            review_request.get(
+                "wing_width",
+                -1,
+            )
+        ),
+        requested_contracts=int(
+            review_request.get(
+                "contracts",
+                -1,
+            )
+        ),
     )
 
     checks.insert(
@@ -1166,6 +1448,7 @@ def order_dry_run(
 
     return {
         "status": "BROKER_PREFLIGHT_PASSED",
+        "review_id": review["review_id"],
         "live_submission_enabled": False,
         "message": (
             "BXK validation and Tastytrade "
@@ -1191,6 +1474,7 @@ def order_submit(
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     confirm_live: bool = Query(False),
+    review_id: str | None = Query(None),
 ):
     """
     Submit the current approved BXK order to Tastytrade.
@@ -1218,6 +1502,7 @@ def order_submit(
         dte=dte,
         wing_width=wing_width,
         contracts=contracts,
+        review_id=review_id,
     )
 
     if preflight.get("status") != "BROKER_PREFLIGHT_PASSED":
@@ -1346,6 +1631,48 @@ def order_submit(
             "trade": preflight.get("trade"),
             "order": order,
         }
+
+    consumed_review, consume_error = (
+        _consume_order_review_lock(
+            review_id,
+        )
+    )
+
+    if consume_error:
+        consume_error[
+            "live_submission_enabled"
+        ] = BXK_LIVE_TRADING_ENABLED
+
+        return consume_error
+
+    locked_order = (
+        consumed_review.get("order") or {}
+    )
+
+    if locked_order != order:
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "REVIEW_LOCK_ORDER_MISMATCH",
+            "live_submission_enabled":
+                BXK_LIVE_TRADING_ENABLED,
+            "message": (
+                "BXK review-lock order no longer "
+                "matches the broker-preflight order."
+            ),
+            "errors": [
+                (
+                    "Frozen order changed between "
+                    "preflight and submission."
+                )
+            ],
+            "trade": (
+                consumed_review.get("trade")
+            ),
+            "order": locked_order,
+        }
+
+    order = locked_order
 
     live_order = broker.submit_live_order(
         order,

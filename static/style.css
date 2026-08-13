@@ -5209,3 +5209,97 @@ body[data-theme="light"] .order-review-mode-banner.live .order-review-mode-state
     min-height: 40px;
   }
 }
+
+
+/* BXK BROKER RISK AUDIT */
+.order-review-risk-audit {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.order-review-risk-audit > div {
+  min-height: 54px;
+  padding: 9px 12px;
+  border:
+    1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 11px;
+  background:
+    rgba(15, 23, 42, 0.42);
+}
+
+.order-review-risk-audit span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.order-review-risk-audit strong {
+  display: block;
+  margin-top: 5px;
+  color: #f8fafc;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.order-review-risk-audit.ready > div {
+  border-color:
+    rgba(34, 197, 94, 0.24);
+}
+
+.order-review-risk-audit.ready strong {
+  color: #86efac;
+}
+
+.order-review-risk-audit.failed > div {
+  border-color:
+    rgba(239, 68, 68, 0.24);
+}
+
+.order-review-risk-audit.failed strong {
+  color: #fca5a5;
+}
+
+@media (max-width: 900px) {
+  .order-review-risk-audit {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .order-review-risk-audit {
+    grid-template-columns: 1fr;
+  }
+}
+
+body[data-theme="light"]
+.order-review-risk-audit > div {
+  background: #e8eef4;
+  border-color: #c3cfdb;
+}
+
+body[data-theme="light"]
+.order-review-risk-audit span {
+  color: #475569;
+}
+
+body[data-theme="light"]
+.order-review-risk-audit strong {
+  color: #172033;
+}
+
+body[data-theme="light"]
+.order-review-risk-audit.ready strong {
+  color: #166534;
+}
+
+body[data-theme="light"]
+.order-review-risk-audit.failed strong {
+  color: #991b1b;
+}
