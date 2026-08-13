@@ -540,6 +540,8 @@ def _evaluate_broker_dry_run(
             "Broker buying-power information is valid.",
         "broker_buying_power_reconciled":
             "Broker buying-power impact reconciles exactly.",
+        "broker_buying_power_matches_bxk":
+            "Broker buying-power impact matches BXK risk plus fees.",
         "broker_fees":
             "Broker fee calculation is valid.",
     }
@@ -788,6 +790,43 @@ def _evaluate_broker_dry_run(
         ),
     )
 
+    try:
+        bxk_buying_power = float(
+            order.get("buying_power")
+        )
+    except (TypeError, ValueError):
+        bxk_buying_power = 0.0
+
+    expected_broker_impact = round(
+        bxk_buying_power
+        + total_fees,
+        2,
+    )
+
+    broker_bp_variance = round(
+        bp_impact
+        - expected_broker_impact,
+        2,
+    )
+
+    buying_power_matches_bxk = (
+        buying_power_valid
+        and fees_valid
+        and bxk_buying_power > 0
+        and abs(broker_bp_variance) <= 0.05
+    )
+
+    check(
+        "broker_buying_power_matches_bxk",
+        buying_power_matches_bxk,
+        (
+            "Tastytrade buying-power impact does not "
+            "match BXK expected risk plus broker fees. "
+            f"BXK expected ${expected_broker_impact:.2f}; "
+            f"Tastytrade returned ${bp_impact:.2f}."
+        ),
+    )
+
     return {
         "passed": not errors,
         "checks": checks,
@@ -796,6 +835,18 @@ def _evaluate_broker_dry_run(
             "current": round(current_bp, 2),
             "impact": round(bp_impact, 2),
             "remaining": round(new_bp, 2),
+            "bxk_expected": round(
+                bxk_buying_power,
+                2,
+            ),
+            "expected_with_fees": round(
+                expected_broker_impact,
+                2,
+            ),
+            "variance": round(
+                broker_bp_variance,
+                2,
+            ),
         },
         "fees": round(total_fees, 2),
         "warnings": warnings,

@@ -1107,7 +1107,7 @@ function renderOrderPreview({
             <strong>
               ${
                 allChecksPassed
-                  ? "APPROVED"
+                  ? "BXK CHECKS PASSED"
                   : "BLOCKED"
               }
             </strong>
@@ -1143,7 +1143,7 @@ function renderOrderPreview({
           >
             <span>--</span>
             <div>
-              <strong>Account Verification</strong>
+              <strong>Broker Preflight</strong>
               <small>Checking broker...</small>
             </div>
           </div>
@@ -1395,11 +1395,11 @@ function renderOrderPreview({
 
           setBrokerMessage(
             fees > 0
-              ? `Broker preflight passed. Estimated fees: ${formatMoney(
+              ? `BROKER VERIFIED. Estimated fees: ${formatMoney(
                   fees,
                   2,
                 )}. Live trading is disabled.`
-              : "Broker preflight passed. Live trading is disabled.",
+              : "BROKER VERIFIED. Live trading is disabled.",
           );
 
           if (confirmButton) {
@@ -1414,20 +1414,20 @@ function renderOrderPreview({
         updateReadinessCard(
           submissionReadiness,
           {
-            state: "pending",
-            icon: "--",
+            state: "ready",
+            icon: "OK",
             detail:
-              "Ready for explicit confirmation",
+              "REVIEW READY - confirm to submit",
           },
         );
 
         setBrokerMessage(
           fees > 0
-            ? `Broker preflight passed. Estimated fees: ${formatMoney(
+            ? `REVIEW READY. Tastytrade preflight passed. Estimated fees: ${formatMoney(
                 fees,
                 2,
               )}.`
-            : "Broker preflight passed.",
+            : "REVIEW READY. Tastytrade preflight passed.",
         );
 
         if (confirmButton) {

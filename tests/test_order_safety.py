@@ -521,10 +521,30 @@ def _broker_checks(result):
 
 
 def test_broker_preflight_accepts_valid_response():
+    dry_run = _valid_broker_dry_run()
+
+    data = dry_run["broker_response"]["data"]
+
+    broker_impact = float(
+        data["buying-power-effect"][
+            "change-in-buying-power"
+        ]
+    )
+
+    broker_fees = float(
+        data["fee-calculation"]["total-fees"]
+    )
+
     result = (
         order_route._evaluate_broker_dry_run(
-            _valid_broker_dry_run(),
-            {},
+            dry_run,
+            {
+                "buying_power": round(
+                    broker_impact
+                    - broker_fees,
+                    2,
+                ),
+            },
         )
     )
 
@@ -842,3 +862,80 @@ def test_submit_blocks_if_session_changes_after_preflight(
     )
 
     assert submitted["called"] is False
+
+
+def test_broker_buying_power_matches_bxk_risk_and_fees():
+    dry_run = _valid_broker_dry_run()
+
+    data = dry_run["broker_response"]["data"]
+
+    broker_impact = float(
+        data["buying-power-effect"][
+            "change-in-buying-power"
+        ]
+    )
+
+    broker_fees = float(
+        data["fee-calculation"]["total-fees"]
+    )
+
+    bxk_buying_power = round(
+        broker_impact - broker_fees,
+        2,
+    )
+
+    result = order_route._evaluate_broker_dry_run(
+        dry_run,
+        {
+            "buying_power": bxk_buying_power,
+        },
+    )
+
+    checks = _broker_checks(result)
+
+    assert (
+        checks[
+            "broker_buying_power_matches_bxk"
+        ]["passed"]
+        is True
+    )
+
+
+def test_broker_buying_power_difference_fails_preflight():
+    dry_run = _valid_broker_dry_run()
+
+    data = dry_run["broker_response"]["data"]
+
+    broker_impact = float(
+        data["buying-power-effect"][
+            "change-in-buying-power"
+        ]
+    )
+
+    broker_fees = float(
+        data["fee-calculation"]["total-fees"]
+    )
+
+    bxk_buying_power = round(
+        broker_impact - broker_fees,
+        2,
+    )
+
+    result = order_route._evaluate_broker_dry_run(
+        dry_run,
+        {
+            "buying_power":
+                bxk_buying_power - 100.00,
+        },
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is False
+
+    assert (
+        checks[
+            "broker_buying_power_matches_bxk"
+        ]["passed"]
+        is False
+    )

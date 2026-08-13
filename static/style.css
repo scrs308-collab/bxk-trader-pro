@@ -5091,3 +5091,121 @@ body[data-theme="light"] .order-review-mode-banner.live .order-review-mode-state
     margin-right: 16px;
   }
 }
+
+
+/* BXK ORDER REVIEW COMPACT DESKTOP */
+@media (min-width: 901px) {
+  .order-review-modal {
+    max-height: calc(100vh - 32px);
+  }
+
+  .order-review-header {
+    padding: 16px 20px;
+  }
+
+  .order-review-header h2 {
+    margin-top: 3px;
+    margin-bottom: 3px;
+  }
+
+  .order-review-mode-banner {
+    margin: 0 20px;
+    padding: 11px 14px;
+  }
+
+  .order-review-status-row {
+    gap: 9px;
+    padding: 11px 20px;
+  }
+
+  .order-review-status-row > div {
+    padding: 10px 12px;
+  }
+
+  .order-review-status-row span {
+    margin-bottom: 3px;
+  }
+
+  .order-review-content {
+    gap: 14px;
+    padding: 14px 20px;
+  }
+
+  .order-review-main {
+    gap: 12px;
+  }
+
+  .order-review-section,
+  .order-review-checks {
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .order-review-section-heading {
+    margin-bottom: 9px;
+  }
+
+  .order-review-legs {
+    gap: 8px;
+  }
+
+  .order-review-leg {
+    padding: 9px 11px;
+  }
+
+  .order-review-metrics {
+    gap: 8px;
+  }
+
+  .order-review-metrics > div {
+    min-height: 64px;
+    padding: 9px 11px;
+  }
+
+  .order-review-metrics span {
+    margin-bottom: 0;
+  }
+
+  .order-review-metrics strong {
+    margin-top: 5px;
+    font-size: 1.08rem;
+  }
+
+  .order-review-check {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .order-review-readiness {
+    margin-top: 0;
+    padding: 11px 20px 12px;
+  }
+
+  .order-review-readiness-grid {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .order-review-readiness-grid > div {
+    min-height: 54px;
+    padding: 8px 10px;
+  }
+
+  .order-review-readiness-grid > div > span {
+    width: 24px;
+    height: 24px;
+  }
+
+  .order-review-readiness-grid small {
+    margin-top: 1px;
+  }
+
+  .order-review-actions {
+    gap: 10px;
+    padding: 11px 20px 14px;
+  }
+
+  .order-review-button {
+    min-height: 40px;
+  }
+}

@@ -8,7 +8,7 @@ from bxk_app.config import (
 )
 
 
-async def test_dxlink():
+async def probe_dxlink():
 
     session = Session(
         TASTYTRADE_USERNAME,
@@ -27,4 +27,4 @@ async def test_dxlink():
 
 
 if __name__ == "__main__":
-    asyncio.run(test_dxlink())
+    asyncio.run(probe_dxlink())

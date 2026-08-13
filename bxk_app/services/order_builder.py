@@ -183,25 +183,46 @@ def build_order(best_trade, quantity=1):
         or 0
     )
 
+    order_quantity = int(quantity)
+
+    if order_quantity < 1:
+        raise ValueError(
+            "Order quantity must be greater than zero."
+        )
+
     credit_adjustment_dollars = round(
-        (raw_credit - limit_price) * 100,
+        (
+            raw_credit
+            - limit_price
+        )
+        * 100
+        * order_quantity,
         2,
     )
 
     max_profit = round(
-        raw_max_profit
+        (
+            raw_max_profit
+            * order_quantity
+        )
         - credit_adjustment_dollars,
         2,
     )
 
     max_risk = round(
-        raw_max_risk
+        (
+            raw_max_risk
+            * order_quantity
+        )
         + credit_adjustment_dollars,
         2,
     )
 
     buying_power = round(
-        raw_buying_power
+        (
+            raw_buying_power
+            * order_quantity
+        )
         + credit_adjustment_dollars,
         2,
     )
@@ -216,7 +237,7 @@ def build_order(best_trade, quantity=1):
             "expiration",
         ),
         "dte": best_trade.get("dte"),
-        "quantity": int(quantity),
+        "quantity": order_quantity,
         "order_type": "LIMIT",
         "time_in_force": "DAY",
         "limit_price": limit_price,

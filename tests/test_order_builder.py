@@ -93,3 +93,42 @@ def test_build_order_requires_trade():
         raise AssertionError(
             "Expected ValueError"
         )
+
+
+def test_build_order_scales_multi_contract_economics():
+    trade = {
+        "strategy": "SPX Iron Condor",
+        "symbol": "SPX",
+        "expiration": "2026-08-14",
+        "dte": 1,
+        "credit": 3.05,
+        "max_profit": 305,
+        "max_risk": 2195,
+        "sell_put": 7415,
+        "buy_put": 7390,
+        "sell_call": 7565,
+        "buy_call": 7590,
+        "sell_put_symbol":
+            "SPXW  260814P07415000",
+        "buy_put_symbol":
+            "SPXW  260814P07390000",
+        "sell_call_symbol":
+            "SPXW  260814C07565000",
+        "buy_call_symbol":
+            "SPXW  260814C07590000",
+    }
+
+    order = build_order(
+        trade,
+        quantity=2,
+    )
+
+    assert order["quantity"] == 2
+
+    # Limit price remains per spread.
+    assert order["limit_price"] == 3.05
+
+    # Dollar economics must scale with quantity.
+    assert order["max_profit"] == 610
+    assert order["max_risk"] == 4390
+    assert order["buying_power"] == 4390
