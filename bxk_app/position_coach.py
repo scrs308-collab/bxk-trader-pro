@@ -443,9 +443,23 @@ def evaluate_position(
     elif profit_progress >= 50:
         score = max(score, 80)
 
+    # A profitable position that still has time and
+    # meaningful distance from both short strikes should
+    # not be labeled Danger simply because profit capture
+    # is still developing.
+    structurally_healthy = (
+        profit_progress >= 0
+        and minimum_distance is not None
+        and minimum_distance >= 20
+        and dte >= 1
+    )
+
+    if structurally_healthy:
+        score = max(score, 70)
+
     rating, stars = get_health_rating(
         score
-)
+    )
     # ==================================================
     # RECOMMENDATION
     # Risk rules override profit-taking rules.
@@ -498,9 +512,20 @@ def evaluate_position(
         risk_level = "MODERATE"
 
     else:
-        recommendation = ACTION_STAY
-        headline = "Position remains healthy"
-        risk_level = "LOW"
+        if rating == "Danger":
+            recommendation = ACTION_REVIEW
+            headline = "Position health needs review"
+            risk_level = "HIGH"
+
+        elif rating == "Caution":
+            recommendation = ACTION_REVIEW
+            headline = "Position health warrants caution"
+            risk_level = "MODERATE"
+
+        else:
+            recommendation = ACTION_STAY
+            headline = "Position remains healthy"
+            risk_level = "LOW"
 
     if decayed_side == "put":
         messages.append(

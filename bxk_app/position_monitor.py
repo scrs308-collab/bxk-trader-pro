@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from bxk_app.position_coach import evaluate_position
+from zoneinfo import ZoneInfo
 
 
 OPTION_PATTERN = re.compile(
@@ -14,6 +15,8 @@ OPTION_PATTERN = re.compile(
     r"(?P<strike>\d{8})$"
 )
 
+
+MARKET_TIMEZONE = ZoneInfo("America/New_York")
 
 def safe_float(
     value: Any,
@@ -104,6 +107,14 @@ def calculate_leg_pnl(
 def days_until_expiration(
     expires_at: str,
 ) -> int | None:
+    """
+    Calculate calendar DTE using the US market date.
+
+    This intentionally matches the scanner's DTE behavior
+    so UTC rollover after 8 PM Eastern cannot make an
+    expiration appear one day closer than it really is.
+    """
+
     if not expires_at:
         return None
 
@@ -115,20 +126,20 @@ def days_until_expiration(
             )
         )
 
-        now = datetime.now(
-            timezone.utc
-        )
+        expiration_date = expiration.astimezone(
+            MARKET_TIMEZONE
+        ).date()
 
-        seconds_remaining = (
-            expiration - now
-        ).total_seconds()
+        market_today = datetime.now(
+            MARKET_TIMEZONE
+        ).date()
 
         return max(
             0,
-            int(
-                seconds_remaining
-                // 86400
-            ),
+            (
+                expiration_date
+                - market_today
+            ).days,
         )
 
     except (TypeError, ValueError):
