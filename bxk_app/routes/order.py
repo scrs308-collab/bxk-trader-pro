@@ -802,6 +802,72 @@ def _evaluate_broker_dry_run(
     }
 
 
+def _execution_session_gate() -> dict:
+    """
+    Fail closed unless the current BXK DAY-order path
+    is valid for the active SPX trading session.
+
+    GTH and CURB are recognized as open sessions, but
+    BXK does not yet build the extended-session order
+    type required for those sessions.
+    """
+
+    from bxk_app.trading_session import (
+        get_spx_execution_policy,
+    )
+
+    policy = get_spx_execution_policy()
+
+    session = str(
+        policy.get("session") or "CLOSED"
+    ).upper()
+
+    if policy.get("day_order_allowed"):
+        return {
+            "passed": True,
+            "reason_code": None,
+            "message": (
+                "SPX Regular Trading Hours verified. "
+                "BXK DAY-order execution is allowed."
+            ),
+            "policy": policy,
+        }
+
+    if session == "GTH":
+        reason_code = (
+            "EXTENDED_SESSION_REQUIRES_GTH_ORDER"
+        )
+        message = (
+            "SPX is in Global Trading Hours. "
+            "BXK DAY-order execution is disabled "
+            "during this session."
+        )
+
+    elif session == "CURB":
+        reason_code = (
+            "EXTENDED_SESSION_REQUIRES_CURB_ORDER"
+        )
+        message = (
+            "SPX is in Curb Trading Hours. "
+            "BXK DAY-order execution is disabled "
+            "during this session."
+        )
+
+    else:
+        reason_code = "MARKET_SESSION_CLOSED"
+        message = (
+            "SPX is outside an executable BXK "
+            "trading session."
+        )
+
+    return {
+        "passed": False,
+        "reason_code": reason_code,
+        "message": message,
+        "policy": policy,
+    }
+
+
 @router.post("/order-dry-run")
 def order_dry_run(
     strategy: str = Query("auto"),
@@ -815,6 +881,39 @@ def order_dry_run(
     SAFETY:
     This endpoint cannot submit a live order.
     """
+
+    session_gate = _execution_session_gate()
+
+    if not session_gate["passed"]:
+        policy = session_gate["policy"]
+
+        return {
+            "status": "BLOCKED",
+            "reason_code": (
+                session_gate["reason_code"]
+            ),
+            "live_submission_enabled": False,
+            "session": policy.get("session"),
+            "market_time": (
+                policy.get("market_time")
+            ),
+            "session_policy": policy,
+            "message": (
+                session_gate["message"]
+            ),
+            "errors": [
+                session_gate["message"]
+            ],
+            "checks": [
+                {
+                    "name": "execution_session",
+                    "passed": False,
+                    "message": (
+                        session_gate["message"]
+                    ),
+                }
+            ],
+        }
 
     trade, order = _build_current_order(
         strategy,
@@ -841,6 +940,17 @@ def order_dry_run(
         requested_dte=dte,
         requested_wing_width=wing_width,
         requested_contracts=contracts,
+    )
+
+    checks.insert(
+        0,
+        {
+            "name": "execution_session",
+            "passed": True,
+            "message": (
+                session_gate["message"]
+            ),
+        },
     )
 
     if errors:
@@ -1142,6 +1252,46 @@ def order_submit(
                 )
             ],
             "position_overlap": position_overlap,
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
+    submission_session_gate = (
+        _execution_session_gate()
+    )
+
+    if not submission_session_gate["passed"]:
+        policy = submission_session_gate[
+            "policy"
+        ]
+
+        return {
+            "status": "BLOCKED",
+            "reason_code": (
+                submission_session_gate[
+                    "reason_code"
+                ]
+            ),
+            "live_submission_enabled": (
+                BXK_LIVE_TRADING_ENABLED
+            ),
+            "session": policy.get("session"),
+            "market_time": (
+                policy.get("market_time")
+            ),
+            "session_policy": policy,
+            "message": (
+                "Trading session changed before "
+                "live submission. "
+                + submission_session_gate[
+                    "message"
+                ]
+            ),
+            "errors": [
+                submission_session_gate[
+                    "message"
+                ]
+            ],
             "trade": preflight.get("trade"),
             "order": order,
         }

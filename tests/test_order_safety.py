@@ -299,6 +299,24 @@ def test_success_path_uses_mocked_submission(
 ):
     monkeypatch.setattr(
         order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": None,
+            "message": "RTH test session verified.",
+            "policy": {
+                "session": "RTH",
+                "market_time":
+                    "2026-08-12T10:00:00-04:00",
+                "session_open": True,
+                "day_order_allowed": True,
+                "extended_order_required": False,
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
         "BXK_LIVE_TRADING_ENABLED",
         True,
     )
@@ -608,3 +626,219 @@ def test_invalid_fee_data_fails_preflight():
         checks["broker_fees"]["passed"]
         is False
     )
+
+def test_execution_session_gate_allows_rth(
+    monkeypatch,
+):
+    from bxk_app import trading_session
+
+    monkeypatch.setattr(
+        trading_session,
+        "get_spx_execution_policy",
+        lambda: {
+            "session": "RTH",
+            "market_time":
+                "2026-08-12T10:00:00-04:00",
+            "session_open": True,
+            "day_order_allowed": True,
+            "extended_order_required": False,
+        },
+    )
+
+    result = (
+        order_route._execution_session_gate()
+    )
+
+    assert result["passed"] is True
+    assert result["reason_code"] is None
+
+
+def test_order_dry_run_blocks_gth_before_scan(
+    monkeypatch,
+):
+    from bxk_app import trading_session
+
+    monkeypatch.setattr(
+        trading_session,
+        "get_spx_execution_policy",
+        lambda: {
+            "session": "GTH",
+            "market_time":
+                "2026-08-12T22:00:00-04:00",
+            "session_open": True,
+            "day_order_allowed": False,
+            "extended_order_required": True,
+        },
+    )
+
+    def scanner_must_not_run(*args, **kwargs):
+        raise AssertionError(
+            "Scanner must not run when "
+            "DAY execution is session-blocked."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "_build_current_order",
+        scanner_must_not_run,
+    )
+
+    result = order_route.order_dry_run(
+        strategy="iron_condor",
+        dte=1,
+        wing_width=25,
+        contracts=1,
+    )
+
+    assert result["status"] == "BLOCKED"
+
+    assert (
+        result["reason_code"]
+        == "EXTENDED_SESSION_REQUIRES_GTH_ORDER"
+    )
+
+    assert result["session"] == "GTH"
+
+    assert (
+        result["checks"][0]["name"]
+        == "execution_session"
+    )
+
+    assert (
+        result["checks"][0]["passed"]
+        is False
+    )
+
+def test_submit_blocks_if_session_changes_after_preflight(
+    monkeypatch,
+):
+    """
+    A successful RTH broker preflight must not authorize
+    submission if the SPX session changes before the
+    actual live-order call.
+    """
+
+    order = {
+        "strategy": "SPX Iron Condor",
+        "legs": [],
+    }
+
+    monkeypatch.setattr(
+        order_route,
+        "order_dry_run",
+        lambda **kwargs: {
+            "status": "BROKER_PREFLIGHT_PASSED",
+            "trade": {
+                "strategy": "SPX Iron Condor",
+            },
+            "order": order,
+            "checks": [],
+            "broker_checks": [],
+            "broker_preflight": {
+                "passed": True,
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "BXK_LIVE_TRADING_ENABLED",
+        True,
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_first_account_number",
+        lambda: "TEST1234",
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_positions",
+        lambda account_number=None: [],
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "last_error",
+        None,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_check_existing_position_overlap",
+        lambda order, positions: {
+            "passed": True,
+            "message": (
+                "No existing position overlap."
+            ),
+            "overlaps": [],
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": False,
+            "reason_code":
+                "EXTENDED_SESSION_REQUIRES_GTH_ORDER",
+            "message": (
+                "SPX is in Global Trading Hours. "
+                "BXK DAY-order execution is disabled "
+                "during this session."
+            ),
+            "policy": {
+                "session": "GTH",
+                "market_time":
+                    "2026-08-12T20:15:01-04:00",
+                "session_open": True,
+                "day_order_allowed": False,
+                "extended_order_required": True,
+            },
+        },
+    )
+
+    submitted = {
+        "called": False,
+    }
+
+    def must_not_submit(
+        order,
+        account_number=None,
+    ):
+        submitted["called"] = True
+        raise AssertionError(
+            "Live broker submission must not occur "
+            "after the session changes."
+        )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        must_not_submit,
+    )
+
+    result = order_route.order_submit(
+        strategy="iron_condor",
+        dte=1,
+        wing_width=25,
+        contracts=1,
+        confirm_live=True,
+    )
+
+    assert result["status"] == "BLOCKED"
+
+    assert (
+        result["reason_code"]
+        == "EXTENDED_SESSION_REQUIRES_GTH_ORDER"
+    )
+
+    assert result["session"] == "GTH"
+
+    assert (
+        "Trading session changed"
+        in result["message"]
+    )
+
+    assert submitted["called"] is False
