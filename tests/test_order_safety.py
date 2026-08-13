@@ -370,3 +370,90 @@ def test_success_path_uses_mocked_submission(
     assert result["status"] == "SUBMITTED"
     assert result["order_id"] == "MOCK-ORDER-1"
     assert result["account"] == "***1234"
+
+def _sample_overlap_order(action="BUY"):
+    return {
+        "legs": [
+            {
+                "symbol": "SPXW TEST OPTION",
+                "action": action,
+                "option_type": "CALL",
+                "strike": 7825,
+            }
+        ]
+    }
+
+
+def _sample_position(direction):
+    return {
+        "symbol": "SPXW TEST OPTION",
+        "quantity": "1",
+        "quantity-direction": direction,
+        "expires-at": "2026-08-13T20:00:00.000Z",
+    }
+
+
+def test_overlap_blocks_short_to_buy():
+    result = (
+        order_route._check_existing_position_overlap(
+            _sample_overlap_order("BUY"),
+            [_sample_position("Short")],
+        )
+    )
+
+    assert result["passed"] is False
+    assert len(result["overlaps"]) == 1
+
+
+def test_overlap_blocks_long_to_sell():
+    result = (
+        order_route._check_existing_position_overlap(
+            _sample_overlap_order("SELL"),
+            [_sample_position("Long")],
+        )
+    )
+
+    assert result["passed"] is False
+    assert len(result["overlaps"]) == 1
+
+
+def test_overlap_blocks_short_to_sell():
+    result = (
+        order_route._check_existing_position_overlap(
+            _sample_overlap_order("SELL"),
+            [_sample_position("Short")],
+        )
+    )
+
+    assert result["passed"] is False
+    assert len(result["overlaps"]) == 1
+
+
+def test_overlap_blocks_long_to_buy():
+    result = (
+        order_route._check_existing_position_overlap(
+            _sample_overlap_order("BUY"),
+            [_sample_position("Long")],
+        )
+    )
+
+    assert result["passed"] is False
+    assert len(result["overlaps"]) == 1
+
+
+def test_overlap_allows_different_symbol():
+    result = (
+        order_route._check_existing_position_overlap(
+            _sample_overlap_order("BUY"),
+            [
+                {
+                    "symbol": "SPXW DIFFERENT OPTION",
+                    "quantity": "4",
+                    "quantity-direction": "Short",
+                }
+            ],
+        )
+    )
+
+    assert result["passed"] is True
+    assert result["overlaps"] == []
