@@ -1378,6 +1378,39 @@ function renderOrderPreview({
           },
         );
 
+        const fees = safeNumber(
+          result?.broker_preflight?.fees,
+          0,
+        );
+
+        if (!liveSubmissionEnabled) {
+          updateReadinessCard(
+            submissionReadiness,
+            {
+              state: "pending",
+              icon: "LOCK",
+              detail: "BXK master switch is OFF",
+            },
+          );
+
+          setBrokerMessage(
+            fees > 0
+              ? `Broker preflight passed. Estimated fees: ${formatMoney(
+                  fees,
+                  2,
+                )}. Live trading is disabled.`
+              : "Broker preflight passed. Live trading is disabled.",
+          );
+
+          if (confirmButton) {
+            confirmButton.disabled = true;
+            confirmButton.textContent =
+              "LIVE TRADING OFF";
+          }
+
+          return;
+        }
+
         updateReadinessCard(
           submissionReadiness,
           {
@@ -1386,11 +1419,6 @@ function renderOrderPreview({
             detail:
               "Ready for explicit confirmation",
           },
-        );
-
-        const fees = safeNumber(
-          result?.broker_preflight?.fees,
-          0,
         );
 
         setBrokerMessage(
