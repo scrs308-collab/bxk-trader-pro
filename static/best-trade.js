@@ -1587,8 +1587,8 @@ function renderOrderPreview({
       }
 
       const errorMessage =
-        result?.message ||
         result?.errors?.[0] ||
+        result?.message ||
         "Tastytrade broker preflight did not pass.";
 
       updateReadinessCard(
