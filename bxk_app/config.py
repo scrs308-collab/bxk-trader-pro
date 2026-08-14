@@ -57,6 +57,18 @@ if BXK_MIN_ORDER_CREDIT <= 0:
         "BXK_MIN_ORDER_CREDIT must be greater than zero."
     )
 
+BXK_MIN_REMAINING_BUYING_POWER = float(
+    os.getenv(
+        "BXK_MIN_REMAINING_BUYING_POWER",
+        "15000",
+    )
+)
+
+if BXK_MIN_REMAINING_BUYING_POWER < 0:
+    raise ValueError(
+        "BXK_MIN_REMAINING_BUYING_POWER cannot be negative."
+    )
+
 BXK_MAX_ORDER_RISK = float(
     os.getenv(
         "BXK_MAX_ORDER_RISK",

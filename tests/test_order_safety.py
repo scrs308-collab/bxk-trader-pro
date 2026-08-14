@@ -520,9 +520,9 @@ def _valid_broker_dry_run():
                 },
                 "warnings": [],
                 "buying-power-effect": {
-                    "current-buying-power": "10000.00",
+                    "current-buying-power": "25000.00",
                     "change-in-buying-power": "831.88",
-                    "new-buying-power": "9168.12",
+                    "new-buying-power": "24168.12",
                 },
                 "fee-calculation": {
                     "total-fees": "6.88",
@@ -1622,3 +1622,96 @@ def test_order_credit_above_minimum_is_allowed(
         "BXK minimum" in error
         for error in errors
     )
+
+def buying_power_reserve_check(
+    monkeypatch,
+    remaining_buying_power,
+):
+    monkeypatch.setattr(
+        order_route,
+        "BXK_MIN_REMAINING_BUYING_POWER",
+        15000.0,
+    )
+
+    dry_run = _valid_broker_dry_run()
+    data = dry_run["broker_response"]["data"]
+    buying_power = data["buying-power-effect"]
+
+    broker_impact = float(
+        buying_power["change-in-buying-power"]
+    )
+
+    broker_fees = float(
+        data["fee-calculation"]["total-fees"]
+    )
+
+    buying_power["new-buying-power"] = (
+        f"{remaining_buying_power:.2f}"
+    )
+
+    buying_power["current-buying-power"] = (
+        f"{remaining_buying_power + broker_impact:.2f}"
+    )
+
+    result = order_route._evaluate_broker_dry_run(
+        dry_run,
+        {
+            "buying_power": round(
+                broker_impact - broker_fees,
+                2,
+            ),
+        },
+    )
+
+    checks = _broker_checks(result)
+
+    return (
+        result,
+        checks["broker_buying_power_reserve"],
+    )
+
+
+def test_buying_power_below_reserve_is_blocked(
+    monkeypatch,
+):
+    result, reserve_check = (
+        buying_power_reserve_check(
+            monkeypatch,
+            14999.99,
+        )
+    )
+
+    assert result["passed"] is False
+    assert reserve_check["passed"] is False
+    assert (
+        "$14,999.99 is below the $15,000.00 BXK reserve."
+        in reserve_check["message"]
+    )
+
+
+def test_buying_power_equal_to_reserve_is_allowed(
+    monkeypatch,
+):
+    result, reserve_check = (
+        buying_power_reserve_check(
+            monkeypatch,
+            15000.00,
+        )
+    )
+
+    assert result["passed"] is True
+    assert reserve_check["passed"] is True
+
+
+def test_buying_power_above_reserve_is_allowed(
+    monkeypatch,
+):
+    result, reserve_check = (
+        buying_power_reserve_check(
+            monkeypatch,
+            15000.01,
+        )
+    )
+
+    assert result["passed"] is True
+    assert reserve_check["passed"] is True

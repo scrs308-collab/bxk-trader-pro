@@ -10,6 +10,7 @@ from bxk_app.brokers.tastytrade import broker
 from bxk_app.config import (
     BXK_LIVE_TRADING_ENABLED,
     BXK_MIN_ORDER_CREDIT,
+    BXK_MIN_REMAINING_BUYING_POWER,
     BXK_MAX_ORDER_RISK,
 )
 from bxk_app.routes.scanner import get_best_trade
@@ -1053,6 +1054,22 @@ def _evaluate_broker_dry_run(
         ),
     )
 
+    buying_power_reserve_valid = (
+        buying_power_valid
+        and new_bp
+        >= BXK_MIN_REMAINING_BUYING_POWER
+    )
+
+    check(
+        "broker_buying_power_reserve",
+        buying_power_reserve_valid,
+        (
+            f"Remaining buying power ${new_bp:,.2f} "
+            "is below the "
+            f"${BXK_MIN_REMAINING_BUYING_POWER:,.2f} "
+            "BXK reserve."
+        ),
+    )
     buying_power_reconciled = (
         buying_power_valid
         and abs(
