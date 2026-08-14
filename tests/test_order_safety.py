@@ -1390,3 +1390,84 @@ def test_unconfirmed_broker_response_blocks_success(
         error["reason_code"]
         == "REVIEW_LOCK_CONSUMED"
     )
+
+def risk_limit_check(
+    monkeypatch,
+    max_risk,
+):
+    monkeypatch.setattr(
+        order_route,
+        "BXK_MAX_ORDER_RISK",
+        7500.0,
+    )
+
+    order = dict(
+        ready_preflight()["order"]
+    )
+
+    order["max_risk"] = max_risk
+    order["buying_power"] = max_risk
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    risk_check = next(
+        check
+        for check in checks
+        if check["name"]
+        == "maximum_risk_limit"
+    )
+
+    return risk_check, errors
+
+
+def test_order_risk_below_limit_is_allowed(
+    monkeypatch,
+):
+    risk_check, errors = risk_limit_check(
+        monkeypatch,
+        7499.99,
+    )
+
+    assert risk_check["passed"] is True
+    assert not any(
+        "BXK limit" in error
+        for error in errors
+    )
+
+
+def test_order_risk_equal_to_limit_is_allowed(
+    monkeypatch,
+):
+    risk_check, errors = risk_limit_check(
+        monkeypatch,
+        7500.00,
+    )
+
+    assert risk_check["passed"] is True
+    assert not any(
+        "BXK limit" in error
+        for error in errors
+    )
+
+
+def test_order_risk_above_limit_is_blocked(
+    monkeypatch,
+):
+    risk_check, errors = risk_limit_check(
+        monkeypatch,
+        7500.01,
+    )
+
+    assert risk_check["passed"] is False
+    assert any(
+        "$7,500.01 exceeds the $7,500.00 BXK limit."
+        in error
+        for error in errors
+    )

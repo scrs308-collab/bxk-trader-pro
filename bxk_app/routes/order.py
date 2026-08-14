@@ -7,7 +7,10 @@ from datetime import date, datetime
 from fastapi import APIRouter, Query
 
 from bxk_app.brokers.tastytrade import broker
-from bxk_app.config import BXK_LIVE_TRADING_ENABLED
+from bxk_app.config import (
+    BXK_LIVE_TRADING_ENABLED,
+    BXK_MAX_ORDER_RISK,
+)
 from bxk_app.routes.scanner import get_best_trade
 from bxk_app.services.order_builder import build_order
 
@@ -493,6 +496,21 @@ def _validate_order(
         "Maximum risk must be greater than zero.",
     )
 
+    check(
+        "maximum_risk_limit",
+        (
+            max_risk > 0
+            and max_risk <= BXK_MAX_ORDER_RISK
+        ),
+        (
+            "Maximum risk is within the "
+            f"${BXK_MAX_ORDER_RISK:,.2f} BXK limit."
+        ),
+        (
+            f"Maximum risk ${max_risk:,.2f} exceeds "
+            f"the ${BXK_MAX_ORDER_RISK:,.2f} BXK limit."
+        ),
+    )
     check(
         "order_type",
         order.get("order_type") == "LIMIT",

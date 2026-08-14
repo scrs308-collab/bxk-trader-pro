@@ -45,6 +45,18 @@ TARGET_PERCENT = 70
 # Live Trading Safety
 # ===============================
 
+BXK_MAX_ORDER_RISK = float(
+    os.getenv(
+        "BXK_MAX_ORDER_RISK",
+        "7500",
+    )
+)
+
+if BXK_MAX_ORDER_RISK <= 0:
+    raise ValueError(
+        "BXK_MAX_ORDER_RISK must be greater than zero."
+    )
+
 BXK_LIVE_TRADING_ENABLED = (
     os.getenv(
         "BXK_LIVE_TRADING_ENABLED",
