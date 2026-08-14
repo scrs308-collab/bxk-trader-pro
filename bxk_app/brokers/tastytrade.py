@@ -7,12 +7,13 @@ from bxk_app.brokers.base import BrokerBase
 from bxk_app.config import (
     BXK_LIVE_TRADING_ENABLED,
     TASTYTRADE_ACCOUNT_NUMBER,
+    TASTYTRADE_BASE_URL,
     TASTYTRADE_CLIENT_SECRET,
     TASTYTRADE_REFRESH_TOKEN,
 )
 
 
-TASTYTRADE_BASE_URL = "https://api.tastyworks.com"
+
 
 # Tastytrade access tokens normally last about 15 minutes.
 # Refresh slightly early so requests do not fail at the boundary.

@@ -25,7 +25,7 @@ TASTYTRADE_ACCOUNT_NUMBER = os.getenv(
     "TASTYTRADE_ACCOUNT_NUMBER",
     "",
 ).strip()
-TASTYTRADE_BASE_URL = os.getenv("TASTYTRADE_BASE_URL", "https://api.tastytrade.com")
+TASTYTRADE_BASE_URL = os.getenv("TASTYTRADE_BASE_URL", "https://api.tastyworks.com")
 
 # ===============================
 # Trading Settings
