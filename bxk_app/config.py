@@ -45,6 +45,18 @@ TARGET_PERCENT = 70
 # Live Trading Safety
 # ===============================
 
+BXK_MIN_ORDER_CREDIT = float(
+    os.getenv(
+        "BXK_MIN_ORDER_CREDIT",
+        "1.00",
+    )
+)
+
+if BXK_MIN_ORDER_CREDIT <= 0:
+    raise ValueError(
+        "BXK_MIN_ORDER_CREDIT must be greater than zero."
+    )
+
 BXK_MAX_ORDER_RISK = float(
     os.getenv(
         "BXK_MAX_ORDER_RISK",

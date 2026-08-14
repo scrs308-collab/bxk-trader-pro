@@ -1543,3 +1543,82 @@ def test_order_dte_above_maximum_is_blocked():
         "Requested DTE is outside the approved range."
         in errors
     )
+
+def minimum_credit_check(
+    monkeypatch,
+    credit,
+):
+    monkeypatch.setattr(
+        order_route,
+        "BXK_MIN_ORDER_CREDIT",
+        1.00,
+    )
+
+    order = dict(
+        ready_preflight()["order"]
+    )
+
+    order["limit_price"] = credit
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    credit_check = next(
+        check
+        for check in checks
+        if check["name"] == "minimum_credit"
+    )
+
+    return credit_check, errors
+
+
+def test_order_credit_below_minimum_is_blocked(
+    monkeypatch,
+):
+    credit_check, errors = minimum_credit_check(
+        monkeypatch,
+        0.99,
+    )
+
+    assert credit_check["passed"] is False
+    assert any(
+        "$0.99 is below the $1.00 BXK minimum."
+        in error
+        for error in errors
+    )
+
+
+def test_order_credit_equal_to_minimum_is_allowed(
+    monkeypatch,
+):
+    credit_check, errors = minimum_credit_check(
+        monkeypatch,
+        1.00,
+    )
+
+    assert credit_check["passed"] is True
+    assert not any(
+        "BXK minimum" in error
+        for error in errors
+    )
+
+
+def test_order_credit_above_minimum_is_allowed(
+    monkeypatch,
+):
+    credit_check, errors = minimum_credit_check(
+        monkeypatch,
+        1.01,
+    )
+
+    assert credit_check["passed"] is True
+    assert not any(
+        "BXK minimum" in error
+        for error in errors
+    )

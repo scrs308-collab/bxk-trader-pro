@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.config import (
     BXK_LIVE_TRADING_ENABLED,
+    BXK_MIN_ORDER_CREDIT,
     BXK_MAX_ORDER_RISK,
 )
 from bxk_app.routes.scanner import get_best_trade
@@ -490,6 +491,18 @@ def _validate_order(
         "Limit credit must be greater than zero.",
     )
 
+    check(
+        "minimum_credit",
+        credit >= BXK_MIN_ORDER_CREDIT,
+        (
+            "Limit credit meets the "
+            f"${BXK_MIN_ORDER_CREDIT:,.2f} BXK minimum."
+        ),
+        (
+            f"Limit credit ${credit:,.2f} is below "
+            f"the ${BXK_MIN_ORDER_CREDIT:,.2f} BXK minimum."
+        ),
+    )
     check(
         "maximum_risk",
         max_risk > 0,
