@@ -1717,6 +1717,31 @@ function renderOrderPreview({
           return;
         }
 
+        if (
+          result?.status ===
+          "SUBMISSION_UNCONFIRMED"
+        ) {
+          updateReadinessCard(
+            submissionReadiness,
+            {
+              state: "failed",
+              icon: "!",
+              detail:
+                "VERIFY TASTYTRADE - DO NOT RETRY",
+            },
+          );
+
+          setBrokerMessage(
+            result.message ||
+            "Submission could not be confirmed. Verify Tastytrade before taking any action.",
+          );
+
+          confirmButton.disabled = true;
+          confirmButton.textContent =
+            "VERIFY TASTYTRADE";
+
+          return;
+        }
         if (result?.status === "SUBMITTED") {
           updateReadinessCard(
             submissionReadiness,
