@@ -1700,6 +1700,54 @@ def order_submit(
     data = broker_response.get("data") or {}
     submitted_order = data.get("order") or {}
 
+    order_id = submitted_order.get("id")
+    broker_status = str(
+        submitted_order.get("status") or ""
+    ).strip()
+
+    accepted_statuses = {
+        "RECEIVED",
+        "ROUTED",
+        "IN FLIGHT",
+        "LIVE",
+        "PARTIALLY FILLED",
+        "FILLED",
+        "PENDING",
+    }
+
+    submission_confirmed = (
+        bool(order_id)
+        and broker_status.upper()
+        in accepted_statuses
+    )
+
+    if not submission_confirmed:
+        return {
+            "status":
+                "SUBMISSION_UNCONFIRMED",
+            "reason_code":
+                "BROKER_SUBMISSION_UNCONFIRMED",
+            "live_submission_enabled": False,
+            "submission_uncertain": True,
+            "message": (
+                "Tastytrade did not return a "
+                "confirmed live-order result. "
+                "Do not retry automatically. "
+                "Verify the broker account first."
+            ),
+            "errors": [
+                (
+                    "Missing broker order ID or "
+                    "unrecognized broker status."
+                )
+            ],
+            "broker_status":
+                broker_status or None,
+            "broker_order": submitted_order,
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
     account_text = str(account_number)
     masked_account = (
         f"***{account_text[-4:]}"

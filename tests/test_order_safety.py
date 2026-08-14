@@ -1225,3 +1225,168 @@ def test_consumed_review_lock_cannot_be_reused():
         second_error["reason_code"]
         == "REVIEW_LOCK_CONSUMED"
     )
+
+def test_expired_review_lock_is_rejected(
+    monkeypatch,
+):
+    clock = iter([
+        100.0,
+        (
+            100.0
+            + order_route._ORDER_REVIEW_TTL_SECONDS
+        ),
+    ])
+
+    monkeypatch.setattr(
+        order_route.time,
+        "monotonic",
+        lambda: next(clock),
+    )
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade={
+                "strategy": "SPX Iron Condor",
+            },
+            order={
+                "strategy": "SPX Iron Condor",
+                "symbol": "SPX",
+                "quantity": 1,
+                "limit_price": 3.25,
+                "max_risk": 2175.0,
+                "buying_power": 2175.0,
+                "legs": [],
+            },
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    review, error = (
+        order_route._get_order_review_lock(
+            review_id,
+        )
+    )
+
+    assert review is None
+    assert error["status"] == "BLOCKED"
+    assert (
+        error["reason_code"]
+        == "REVIEW_LOCK_EXPIRED"
+    )
+
+
+def test_unconfirmed_broker_response_blocks_success(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": None,
+            "message": "RTH test session verified.",
+            "policy": {
+                "session": "RTH",
+                "market_time":
+                    "2026-08-14T10:00:00-04:00",
+                "session_open": True,
+                "day_order_allowed": True,
+                "extended_order_required": False,
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "BXK_LIVE_TRADING_ENABLED",
+        True,
+    )
+
+    preflight = ready_preflight()
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade=preflight["trade"],
+            order=preflight["order"],
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "order_dry_run",
+        lambda **kwargs: preflight,
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_first_account_number",
+        lambda: "TEST1234",
+    )
+
+    def positions(
+        account_number=None,
+    ):
+        order_route.broker.last_error = None
+        return []
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_positions",
+        positions,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_check_existing_position_overlap",
+        lambda order, positions: {
+            "passed": True,
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        lambda order, account_number=None: {
+            "broker_response": {
+                "data": {
+                    "order": {
+                        "status": "Received",
+                    }
+                }
+            }
+        },
+    )
+
+    result = call_submit(
+        review_id=review_id,
+    )
+
+    assert (
+        result["status"]
+        == "SUBMISSION_UNCONFIRMED"
+    )
+    assert (
+        result["reason_code"]
+        == "BROKER_SUBMISSION_UNCONFIRMED"
+    )
+    assert result["submission_uncertain"] is True
+    assert result["live_submission_enabled"] is False
+
+    review, error = (
+        order_route._get_order_review_lock(
+            review_id,
+        )
+    )
+
+    assert review is None
+    assert (
+        error["reason_code"]
+        == "REVIEW_LOCK_CONSUMED"
+    )
