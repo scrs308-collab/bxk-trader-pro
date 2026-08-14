@@ -20,6 +20,7 @@ router = APIRouter(
 )
 
 
+_MAX_ORDER_DTE = 10
 _ORDER_REVIEW_TTL_SECONDS = 180
 _ORDER_REVIEW_LOCKS = {}
 _ORDER_REVIEW_LOCKS_GUARD = threading.Lock()
@@ -464,7 +465,7 @@ def _validate_order(
 
     check(
         "dte",
-        requested_dte in {0, 1, 2, 3},
+        0 <= requested_dte <= _MAX_ORDER_DTE,
         "Requested DTE is within the approved range.",
         "Requested DTE is outside the approved range.",
     )
@@ -557,7 +558,7 @@ def _build_current_order(
 @router.get("/order-preview")
 def order_preview(
     strategy: str = Query("auto"),
-    dte: int = Query(1, ge=0, le=3),
+    dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
 ):
@@ -610,7 +611,7 @@ def order_preview(
 @router.get("/order-validate")
 def order_validate(
     strategy: str = Query("auto"),
-    dte: int = Query(1, ge=0, le=3),
+    dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
 ):
@@ -1213,7 +1214,7 @@ def _execution_session_gate() -> dict:
 @router.post("/order-dry-run")
 def order_dry_run(
     strategy: str = Query("auto"),
-    dte: int = Query(1, ge=0, le=3),
+    dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     review_id: str | None = Query(None),
@@ -1488,7 +1489,7 @@ def order_dry_run(
 @router.post("/order-submit")
 def order_submit(
     strategy: str = Query("auto"),
-    dte: int = Query(1, ge=0, le=3),
+    dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     confirm_live: bool = Query(False),

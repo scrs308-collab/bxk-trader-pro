@@ -1471,3 +1471,59 @@ def test_order_risk_above_limit_is_blocked(
         in error
         for error in errors
     )
+
+def dte_range_check(
+    requested_dte,
+):
+    order = dict(
+        ready_preflight()["order"]
+    )
+
+    order["dte"] = requested_dte
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=requested_dte,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    dte_check = next(
+        check
+        for check in checks
+        if check["name"] == "dte"
+    )
+
+    return dte_check, errors
+
+
+def test_order_dte_zero_is_allowed():
+    dte_check, errors = dte_range_check(0)
+
+    assert dte_check["passed"] is True
+    assert (
+        "Requested DTE is outside the approved range."
+        not in errors
+    )
+
+
+def test_order_dte_ten_is_allowed():
+    dte_check, errors = dte_range_check(10)
+
+    assert dte_check["passed"] is True
+    assert (
+        "Requested DTE is outside the approved range."
+        not in errors
+    )
+
+
+def test_order_dte_above_maximum_is_blocked():
+    dte_check, errors = dte_range_check(11)
+
+    assert dte_check["passed"] is False
+    assert (
+        "Requested DTE is outside the approved range."
+        in errors
+    )
