@@ -1715,3 +1715,255 @@ def test_buying_power_above_reserve_is_allowed(
 
     assert result["passed"] is True
     assert reserve_check["passed"] is True
+
+def _prepare_submission_audit_test(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": None,
+            "message":
+                "RTH test session verified.",
+            "policy": {
+                "session": "RTH",
+                "market_time":
+                    "2026-08-14T10:00:00-04:00",
+                "session_open": True,
+                "day_order_allowed": True,
+                "extended_order_required": False,
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "BXK_LIVE_TRADING_ENABLED",
+        True,
+    )
+
+    preflight = ready_preflight()
+
+    review_id = (
+        order_route._create_order_review_lock(
+            trade=preflight["trade"],
+            order=preflight["order"],
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+        )
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "order_dry_run",
+        lambda **kwargs: preflight,
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_first_account_number",
+        lambda: "TEST1234",
+    )
+
+    def positions(
+        account_number=None,
+    ):
+        order_route.broker.last_error = None
+        return []
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_positions",
+        positions,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_check_existing_position_overlap",
+        lambda order, positions: {
+            "passed": True,
+        },
+    )
+
+    return review_id
+
+
+def test_audit_failure_prevents_live_submission(
+    monkeypatch,
+):
+    review_id = (
+        _prepare_submission_audit_test(
+            monkeypatch,
+        )
+    )
+
+    def audit_failure(*args, **kwargs):
+        raise OSError(
+            "Test audit storage failure."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "write_order_audit",
+        audit_failure,
+    )
+
+    def must_not_submit(*args, **kwargs):
+        raise AssertionError(
+            "Broker submission occurred "
+            "without an audit record."
+        )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        must_not_submit,
+    )
+
+    result = call_submit(
+        review_id=review_id,
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert (
+        result["reason_code"]
+        == "AUDIT_WRITE_FAILED"
+    )
+    assert (
+        result["live_submission_enabled"]
+        is False
+    )
+
+
+def test_missing_broker_response_is_uncertain(
+    monkeypatch,
+):
+    review_id = (
+        _prepare_submission_audit_test(
+            monkeypatch,
+        )
+    )
+
+    events = []
+
+    def capture_audit(event, **details):
+        events.append(event)
+        return {
+            "event": event,
+        }
+
+    monkeypatch.setattr(
+        order_route,
+        "write_order_audit",
+        capture_audit,
+    )
+
+    def no_broker_response(
+        order,
+        account_number=None,
+    ):
+        order_route.broker.last_error = (
+            "Test broker timeout."
+        )
+        return None
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        no_broker_response,
+    )
+
+    result = call_submit(
+        review_id=review_id,
+    )
+
+    assert (
+        result["status"]
+        == "SUBMISSION_UNCONFIRMED"
+    )
+    assert (
+        result["reason_code"]
+        == "BROKER_SUBMISSION_NO_RESPONSE"
+    )
+    assert result["submission_uncertain"] is True
+    assert result["audit_recorded"] is True
+    assert (
+        result["live_submission_enabled"]
+        is False
+    )
+    assert events == [
+        "SUBMISSION_ATTEMPT",
+        "SUBMISSION_UNCONFIRMED",
+    ]
+
+def test_confirmed_submission_audits_attempt_and_result(
+    monkeypatch,
+):
+    review_id = (
+        _prepare_submission_audit_test(
+            monkeypatch,
+        )
+    )
+
+    events = []
+
+    def capture_audit(event, **details):
+        events.append(
+            {
+                "event": event,
+                "details": details,
+            }
+        )
+        return {
+            "event": event,
+        }
+
+    monkeypatch.setattr(
+        order_route,
+        "write_order_audit",
+        capture_audit,
+    )
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        lambda order, account_number=None: {
+            "broker_response": {
+                "data": {
+                    "order": {
+                        "id": "AUDIT-ORDER-1",
+                        "status": "Received",
+                    }
+                }
+            }
+        },
+    )
+
+    result = call_submit(
+        review_id=review_id,
+    )
+
+    assert result["status"] == "SUBMITTED"
+    assert result["order_id"] == "AUDIT-ORDER-1"
+    assert result["audit_recorded"] is True
+
+    assert [
+        item["event"]
+        for item in events
+    ] == [
+        "SUBMISSION_ATTEMPT",
+        "SUBMITTED",
+    ]
+
+    assert (
+        events[1]["details"]["order_id"]
+        == "AUDIT-ORDER-1"
+    )
+    assert (
+        events[1]["details"]["broker_status"]
+        == "Received"
+    )

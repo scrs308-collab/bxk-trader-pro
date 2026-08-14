@@ -14,7 +14,28 @@ from bxk_app.config import (
     BXK_MAX_ORDER_RISK,
 )
 from bxk_app.routes.scanner import get_best_trade
+from bxk_app.services.execution_audit import (
+    write_order_audit,
+)
 from bxk_app.services.order_builder import build_order
+
+def _write_execution_audit(
+    event,
+    **details,
+):
+    try:
+        write_order_audit(
+            event,
+            **details,
+        )
+    except (
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return str(exc)
+
+    return None
 
 router = APIRouter(
     prefix="/api",
@@ -1495,6 +1516,40 @@ def order_dry_run(
             "dry_run": dry_run,
         }
 
+    audit_error = _write_execution_audit(
+        "PREFLIGHT_PASSED",
+        status="BROKER_PREFLIGHT_PASSED",
+        review_id=review["review_id"],
+        account=account_number,
+        order=order,
+    )
+
+    if audit_error:
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "AUDIT_WRITE_FAILED",
+            "live_submission_enabled": False,
+            "message": (
+                "BXK broker preflight passed, "
+                "but the required execution audit "
+                "record could not be created."
+            ),
+            "errors": [
+                (
+                    "Execution audit is unavailable. "
+                    "No live submission is permitted."
+                )
+            ],
+            "checks": checks,
+            "broker_checks":
+                broker_preflight["checks"],
+            "broker_preflight":
+                broker_preflight,
+            "trade": trade,
+            "order": order,
+        }
+
     return {
         "status": "BROKER_PREFLIGHT_PASSED",
         "review_id": review["review_id"],
@@ -1558,7 +1613,19 @@ def order_submit(
         return preflight
 
     if not BXK_LIVE_TRADING_ENABLED:
+        audit_error = _write_execution_audit(
+            "SUBMISSION_BLOCKED",
+            status="LIVE_TRADING_DISABLED",
+            reason_code=
+                "LIVE_TRADING_DISABLED",
+            review_id=review_id,
+            account=preflight.get("account"),
+            order=preflight.get("order"),
+        )
+
         return {
+            "audit_recorded":
+                audit_error is None,
             "status": "LIVE_TRADING_DISABLED",
             "live_submission_enabled": False,
             "message": (
@@ -1723,21 +1790,73 @@ def order_submit(
 
     order = locked_order
 
+    audit_error = _write_execution_audit(
+        "SUBMISSION_ATTEMPT",
+        status="PENDING",
+        review_id=review_id,
+        account=account_number,
+        order=order,
+    )
+
+    if audit_error:
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "AUDIT_WRITE_FAILED",
+            "live_submission_enabled": False,
+            "message": (
+                "BXK could not create the "
+                "required execution audit record. "
+                "No broker submission was attempted."
+            ),
+            "errors": [
+                (
+                    "Execution audit is unavailable. "
+                    "Build a fresh review after the "
+                    "audit problem is corrected."
+                )
+            ],
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
     live_order = broker.submit_live_order(
         order,
         account_number=account_number,
     )
 
     if live_order is None:
+        audit_error = _write_execution_audit(
+            "SUBMISSION_UNCONFIRMED",
+            status="SUBMISSION_UNCONFIRMED",
+            reason_code=
+                "BROKER_SUBMISSION_NO_RESPONSE",
+            review_id=review_id,
+            account=account_number,
+            order=order,
+        )
+
         return {
-            "status": "BLOCKED",
-            "live_submission_enabled": True,
+            "status":
+                "SUBMISSION_UNCONFIRMED",
+            "reason_code":
+                "BROKER_SUBMISSION_NO_RESPONSE",
+            "live_submission_enabled": False,
+            "submission_uncertain": True,
+            "audit_recorded":
+                audit_error is None,
             "message": (
-                "Tastytrade live submission failed."
+                "Tastytrade did not return a "
+                "confirmed live-order response. "
+                "Do not retry automatically. "
+                "Verify the broker account first."
             ),
             "errors": [
                 broker.last_error
-                or "Live order submission failed."
+                or (
+                    "No confirmed broker response "
+                    "was received."
+                )
             ],
             "trade": preflight.get("trade"),
             "order": order,
@@ -1771,7 +1890,22 @@ def order_submit(
     )
 
     if not submission_confirmed:
+        audit_error = _write_execution_audit(
+            "SUBMISSION_UNCONFIRMED",
+            status="SUBMISSION_UNCONFIRMED",
+            reason_code=
+                "BROKER_SUBMISSION_UNCONFIRMED",
+            review_id=review_id,
+            account=account_number,
+            order_id=order_id,
+            broker_status=
+                broker_status or None,
+            order=order,
+        )
+
         return {
+            "audit_recorded":
+                audit_error is None,
             "status":
                 "SUBMISSION_UNCONFIRMED",
             "reason_code":
@@ -1797,6 +1931,30 @@ def order_submit(
             "order": order,
         }
 
+    audit_error = _write_execution_audit(
+        "SUBMITTED",
+        status="SUBMITTED",
+        review_id=review_id,
+        account=account_number,
+        order_id=order_id,
+        broker_status=broker_status,
+        order=order,
+    )
+
+    submission_message = (
+        (
+            "BXK live order was submitted "
+            "to Tastytrade."
+        )
+        if audit_error is None
+        else (
+            "BXK live order was submitted "
+            "to Tastytrade, but the local "
+            "execution audit could not be written. "
+            "Verify the broker account."
+        )
+    )
+
     account_text = str(account_number)
     masked_account = (
         f"***{account_text[-4:]}"
@@ -1807,10 +1965,9 @@ def order_submit(
     return {
         "status": "SUBMITTED",
         "live_submission_enabled": True,
-        "message": (
-            "BXK live order was submitted "
-            "to Tastytrade."
-        ),
+        "message": submission_message,
+        "audit_recorded":
+            audit_error is None,
         "account": masked_account,
         "order_id": submitted_order.get("id"),
         "broker_status": submitted_order.get(

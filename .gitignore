@@ -29,3 +29,5 @@ schwab_tokens.json
 
 # Python cache
 .pytest_cache/
+logs/
+*.jsonl

@@ -90,3 +90,17 @@ BXK_LIVE_TRADING_ENABLED = (
     .lower()
     in {"1", "true", "yes", "on"}
 )
+
+# ===============================
+# Execution Audit
+# ===============================
+
+BXK_ORDER_AUDIT_FILE = os.getenv(
+    "BXK_ORDER_AUDIT_FILE",
+    "logs/order-audit.jsonl",
+).strip()
+
+if not BXK_ORDER_AUDIT_FILE:
+    raise ValueError(
+        "BXK_ORDER_AUDIT_FILE cannot be empty."
+    )
