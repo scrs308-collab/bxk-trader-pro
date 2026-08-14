@@ -4,7 +4,6 @@ import {
   API_URL,
   DASHBOARD_REFRESH_MS,
   STALE_AFTER_MS,
-  OFFLINE_AFTER_MS,
 } from "./config.js";
 
 import {
@@ -32,6 +31,8 @@ import {
 } from "./position.js";
 
 let lastSuccessfulUpdate = null;
+let consecutiveNetworkFailures = 0;
+let backendOffline = false;
 let dashboardRefreshInProgress = false;
 let dashboardRefreshTimer = null;
 
@@ -43,34 +44,34 @@ function setApiStatus(status) {
   }
 
   if (status === "live") {
-    apiStatus.textContent = "● MARKET LIVE";
+    apiStatus.textContent = "\u25CF MARKET LIVE";
     apiStatus.className = "status-pill online";
     return;
   }
 
   if (status === "stale") {
-    apiStatus.textContent = "● STALE";
+    apiStatus.textContent = "\u25CF STALE";
     apiStatus.className = "status-pill stale";
     return;
   }
 
-  apiStatus.textContent = "● OFFLINE";
+  apiStatus.textContent = "\u25CF OFFLINE";
   apiStatus.className = "status-pill offline";
 }
 
 function updateApiFreshness() {
-  if (!lastSuccessfulUpdate) {
+  if (backendOffline) {
     setApiStatus("offline");
+    return;
+  }
+
+  if (!lastSuccessfulUpdate) {
+    setApiStatus("stale");
     return;
   }
 
   const age =
     Date.now() - lastSuccessfulUpdate;
-
-  if (age >= OFFLINE_AFTER_MS) {
-    setApiStatus("offline");
-    return;
-  }
 
   if (age >= STALE_AFTER_MS) {
     setApiStatus("stale");
@@ -103,6 +104,8 @@ async function fetchRecommendation() {
     );
 
     lastSuccessfulUpdate = Date.now();
+    consecutiveNetworkFailures = 0;
+    backendOffline = false;
     setApiStatus("live");
   } catch (error) {
     console.error(
@@ -110,11 +113,29 @@ async function fetchRecommendation() {
       error,
     );
 
-    setApiStatus("offline");
-    setText(
-      "recommendation",
-      "API Offline",
+    const networkFailure =
+      error instanceof TypeError;
+
+    if (networkFailure) {
+      consecutiveNetworkFailures += 1;
+    } else {
+      consecutiveNetworkFailures = 0;
+    }
+
+    backendOffline =
+      networkFailure &&
+      consecutiveNetworkFailures >= 3;
+
+    setApiStatus(
+      backendOffline ? "offline" : "stale",
     );
+
+    if (backendOffline) {
+      setText(
+        "recommendation",
+        "API Offline",
+      );
+    }
   }
 }
 
