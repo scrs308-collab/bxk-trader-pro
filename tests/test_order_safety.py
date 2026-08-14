@@ -1171,7 +1171,23 @@ def test_order_dry_run_uses_frozen_review_order(
     )
 
 
-def test_order_dry_run_requires_review_lock():
+def test_order_dry_run_requires_review_lock(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        order_route,
+        "_execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": None,
+            "message": "RTH test session verified.",
+            "policy": {
+                "session": "RTH",
+                "market_time":
+                    "2026-08-14T10:00:00-04:00",
+            },
+        },
+    )
     result = order_route.order_dry_run(
         review_id=None,
     )
