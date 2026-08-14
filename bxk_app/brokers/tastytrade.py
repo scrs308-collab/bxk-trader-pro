@@ -6,6 +6,7 @@ import requests
 from bxk_app.brokers.base import BrokerBase
 from bxk_app.config import (
     BXK_LIVE_TRADING_ENABLED,
+    TASTYTRADE_ACCOUNT_NUMBER,
     TASTYTRADE_CLIENT_SECRET,
     TASTYTRADE_REFRESH_TOKEN,
 )
@@ -231,6 +232,16 @@ class TastytradeBroker(BrokerBase):
         return self._items_from_response(response)
 
     def get_first_account_number(self):
+        target_account = str(
+            TASTYTRADE_ACCOUNT_NUMBER or ""
+        ).strip()
+
+        if not target_account:
+            self.last_error = (
+                "TASTYTRADE_ACCOUNT_NUMBER is not configured."
+            )
+            return None
+
         accounts = self.get_accounts()
 
         if not accounts:
@@ -240,15 +251,23 @@ class TastytradeBroker(BrokerBase):
             )
             return None
 
-        account = accounts[0].get("account", {})
-        account_number = account.get("account-number")
-
-        if not account_number:
-            self.last_error = (
-                "First account did not contain an account number"
+        for item in accounts:
+            account = (
+                (item or {}).get("account") or {}
             )
 
-        return account_number
+            account_number = str(
+                account.get("account-number") or ""
+            ).strip()
+
+            if account_number == target_account:
+                self.last_error = None
+                return account_number
+
+        self.last_error = (
+            "Configured Tastytrade account was not returned."
+        )
+        return None
 
     # ---------------------------------------------------------
     # Balances

@@ -21,6 +21,10 @@ SCHWAB_TOKEN_FILE = os.getenv("SCHWAB_TOKEN_FILE", "schwab_tokens.json")
 TASTYTRADE_CLIENT_ID = os.getenv("TASTYTRADE_CLIENT_ID", "")
 TASTYTRADE_CLIENT_SECRET = os.getenv("TASTYTRADE_CLIENT_SECRET", "")
 TASTYTRADE_REFRESH_TOKEN = os.getenv("TASTYTRADE_REFRESH_TOKEN", "")
+TASTYTRADE_ACCOUNT_NUMBER = os.getenv(
+    "TASTYTRADE_ACCOUNT_NUMBER",
+    "",
+).strip()
 TASTYTRADE_BASE_URL = os.getenv("TASTYTRADE_BASE_URL", "https://api.tastytrade.com")
 
 # ===============================
