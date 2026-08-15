@@ -1967,3 +1967,83 @@ def test_confirmed_submission_audits_attempt_and_result(
         events[1]["details"]["broker_status"]
         == "Received"
     )
+
+def _sample_live_order(
+    *,
+    status="Live",
+    symbol="SPXW TEST OPTION",
+    cancellable=True,
+):
+    return {
+        "id": "WORKING-ORDER-1",
+        "status": status,
+        "cancellable": cancellable,
+        "legs": [
+            {
+                "symbol": symbol,
+                "action": "Sell to Open",
+                "quantity": "1",
+                "remaining-quantity": "1",
+            }
+        ],
+    }
+
+
+def test_working_order_overlap_blocks_exact_symbol():
+    result = (
+        order_route._check_existing_order_overlap(
+            _sample_overlap_order("BUY"),
+            [
+                _sample_live_order(),
+            ],
+        )
+    )
+
+    assert result["passed"] is False
+    assert len(result["overlaps"]) == 1
+    assert (
+        result["overlaps"][0]["order_id"]
+        == "WORKING-ORDER-1"
+    )
+
+
+def test_terminal_orders_do_not_block_overlap():
+    for status in (
+        "Cancelled",
+        "Canceled",
+        "Filled",
+        "Rejected",
+        "Removed",
+        "Expired",
+    ):
+        result = (
+            order_route._check_existing_order_overlap(
+                _sample_overlap_order("BUY"),
+                [
+                    _sample_live_order(
+                        status=status,
+                        cancellable=False,
+                    ),
+                ],
+            )
+        )
+
+        assert result["passed"] is True
+        assert result["overlaps"] == []
+
+
+def test_working_order_allows_different_symbol():
+    result = (
+        order_route._check_existing_order_overlap(
+            _sample_overlap_order("BUY"),
+            [
+                _sample_live_order(
+                    symbol=
+                        "SPXW DIFFERENT OPTION",
+                ),
+            ],
+        )
+    )
+
+    assert result["passed"] is True
+    assert result["overlaps"] == []

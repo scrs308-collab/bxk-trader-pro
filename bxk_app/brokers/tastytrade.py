@@ -302,6 +302,98 @@ class TastytradeBroker(BrokerBase):
             return None
 
     # ---------------------------------------------------------
+    # Live Orders
+    # ---------------------------------------------------------
+
+    def get_live_orders(
+        self,
+        account_number=None,
+    ):
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No account number available"
+            )
+            return []
+
+        orders = []
+        page_offset = 0
+        per_page = 100
+
+        while True:
+            response = self._request(
+                "GET",
+                (
+                    f"/accounts/{account_number}"
+                    "/orders/live"
+                ),
+                params={
+                    "per-page": per_page,
+                    "page-offset": page_offset,
+                },
+            )
+
+            if response is None:
+                return []
+
+            try:
+                payload = response.json()
+                data = payload.get("data") or {}
+                items = data.get("items") or []
+                pagination = (
+                    payload.get("pagination") or {}
+                )
+            except (AttributeError, TypeError, ValueError) as exc:
+                self.last_error = (
+                    "Invalid Tastytrade live-orders "
+                    f"response: {exc}"
+                )
+                return []
+
+            if not isinstance(items, list):
+                self.last_error = (
+                    "Invalid Tastytrade live-orders "
+                    "items collection."
+                )
+                return []
+
+            orders.extend(items)
+
+            try:
+                total_pages = int(
+                    pagination.get(
+                        "total-pages",
+                        1,
+                    )
+                    or 1
+                )
+            except (TypeError, ValueError):
+                self.last_error = (
+                    "Invalid Tastytrade live-orders "
+                    "pagination."
+                )
+                return []
+
+            if total_pages < 1 or total_pages > 100:
+                self.last_error = (
+                    "Unsafe Tastytrade live-orders "
+                    "pagination range."
+                )
+                return []
+
+            page_offset += 1
+
+            if page_offset >= total_pages:
+                break
+
+        self.last_error = None
+        return orders
+    # ---------------------------------------------------------
     # Positions
     # ---------------------------------------------------------
 

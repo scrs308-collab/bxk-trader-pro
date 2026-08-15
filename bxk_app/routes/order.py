@@ -833,6 +833,97 @@ def _check_existing_position_overlap(
     }
 
 
+_TERMINAL_ORDER_STATUSES = {
+    "CANCELLED",
+    "CANCELED",
+    "FILLED",
+    "REJECTED",
+    "REMOVED",
+    "EXPIRED",
+}
+
+
+def _check_existing_order_overlap(
+    order: dict,
+    live_orders: list[dict],
+):
+    proposed_symbols = {
+        str(
+            leg.get("symbol") or ""
+        ).strip()
+        for leg in (
+            order.get("legs") or []
+        )
+        if str(
+            leg.get("symbol") or ""
+        ).strip()
+    }
+
+    overlaps = []
+
+    for existing_order in live_orders or []:
+        status = str(
+            existing_order.get("status") or ""
+        ).strip()
+
+        if (
+            status.upper()
+            in _TERMINAL_ORDER_STATUSES
+        ):
+            continue
+
+        for leg in (
+            existing_order.get("legs") or []
+        ):
+            symbol = str(
+                leg.get("symbol") or ""
+            ).strip()
+
+            if (
+                not symbol
+                or symbol not in proposed_symbols
+            ):
+                continue
+
+            try:
+                remaining_quantity = float(
+                    leg.get(
+                        "remaining-quantity",
+                        leg.get("quantity", 0),
+                    )
+                    or 0
+                )
+            except (TypeError, ValueError):
+                remaining_quantity = 0.0
+
+            overlaps.append({
+                "order_id":
+                    existing_order.get("id"),
+                "status": status or None,
+                "cancellable":
+                    existing_order.get(
+                        "cancellable"
+                    ),
+                "symbol": symbol,
+                "action": leg.get("action"),
+                "remaining_quantity":
+                    remaining_quantity,
+            })
+
+    return {
+        "passed": len(overlaps) == 0,
+        "overlaps": overlaps,
+        "message": (
+            "No proposed option legs overlap "
+            "existing working orders."
+            if not overlaps
+            else (
+                "One or more proposed option legs "
+                "already exist in a working order."
+            )
+        ),
+    }
+
 def _evaluate_broker_dry_run(
     dry_run: dict,
     order: dict,
