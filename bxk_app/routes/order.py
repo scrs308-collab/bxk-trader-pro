@@ -1799,6 +1799,62 @@ def order_submit(
             "order": order,
         }
 
+    live_orders = broker.get_live_orders(
+        account_number=account_number,
+    )
+
+    if broker.last_error:
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "WORKING_ORDER_VERIFICATION_FAILED",
+            "live_submission_enabled": False,
+            "message": (
+                "BXK could not verify working "
+                "orders immediately before "
+                "submission."
+            ),
+            "errors": [
+                broker.last_error
+                or (
+                    "Working-order verification "
+                    "failed."
+                )
+            ],
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
+    working_order_overlap = (
+        _check_existing_order_overlap(
+            order,
+            live_orders,
+        )
+    )
+
+    if not working_order_overlap["passed"]:
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "WORKING_ORDER_OVERLAP",
+            "live_submission_enabled": False,
+            "message": (
+                "Proposed BXK order now overlaps "
+                "an existing Tastytrade working "
+                "order."
+            ),
+            "errors": [
+                (
+                    "Broker working orders changed "
+                    "after preflight."
+                )
+            ],
+            "working_order_overlap":
+                working_order_overlap,
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
     submission_session_gate = (
         _execution_session_gate()
     )

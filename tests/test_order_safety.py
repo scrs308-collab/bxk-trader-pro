@@ -1,4 +1,19 @@
+import pytest
+
 import bxk_app.routes.order as order_route
+@pytest.fixture(autouse=True)
+def no_working_orders(monkeypatch):
+    def empty_live_orders(
+        account_number=None,
+    ):
+        order_route.broker.last_error = None
+        return []
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_live_orders",
+        empty_live_orders,
+    )
 
 
 def ready_preflight():
@@ -2047,3 +2062,100 @@ def test_working_order_allows_different_symbol():
 
     assert result["passed"] is True
     assert result["overlaps"] == []
+
+
+def test_working_order_change_blocks_submission(
+    monkeypatch,
+):
+    review_id = (
+        _prepare_submission_audit_test(
+            monkeypatch,
+        )
+    )
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_live_orders",
+        lambda account_number=None: [
+            _sample_live_order(),
+        ],
+    )
+    order_route.broker.last_error = None
+    monkeypatch.setattr(
+        order_route,
+        "_check_existing_order_overlap",
+        lambda order, live_orders: {
+            "passed": False,
+            "message":
+                "Working order overlap.",
+            "overlaps": [
+                {
+                    "order_id":
+                        "WORKING-ORDER-1",
+                }
+            ],
+        },
+    )
+    def must_not_submit(*args, **kwargs):
+        raise AssertionError(
+            "Broker submission occurred despite "
+            "a working-order overlap."
+        )
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        must_not_submit,
+    )
+    result = call_submit(
+        review_id=review_id,
+    )
+    assert result["status"] == "BLOCKED"
+    assert (
+        result["reason_code"]
+        == "WORKING_ORDER_OVERLAP"
+    )
+    assert (
+        result["live_submission_enabled"]
+        is False
+    )
+def test_working_order_lookup_failure_blocks_submission(
+    monkeypatch,
+):
+    review_id = (
+        _prepare_submission_audit_test(
+            monkeypatch,
+        )
+    )
+    def failed_live_orders(
+        account_number=None,
+    ):
+        order_route.broker.last_error = (
+            "Test working-order lookup failure."
+        )
+        return []
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_live_orders",
+        failed_live_orders,
+    )
+    def must_not_submit(*args, **kwargs):
+        raise AssertionError(
+            "Broker submission occurred after "
+            "working-order lookup failure."
+        )
+    monkeypatch.setattr(
+        order_route.broker,
+        "submit_live_order",
+        must_not_submit,
+    )
+    result = call_submit(
+        review_id=review_id,
+    )
+    assert result["status"] == "BLOCKED"
+    assert (
+        result["reason_code"]
+        == "WORKING_ORDER_VERIFICATION_FAILED"
+    )
+    assert (
+        result["live_submission_enabled"]
+        is False
+    )
