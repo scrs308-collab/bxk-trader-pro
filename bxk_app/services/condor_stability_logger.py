@@ -20,6 +20,9 @@ FIELDNAMES = [
     "timestamp",
     "session_phase",
     "minutes_since_open",
+    "expected_pace_pct",
+    "pressure_ratio",
+    "pace_delta_pct",
     "spx",
     "vix",
     "vix1d",
@@ -173,6 +176,11 @@ def log_condor_stability(
         current_time
     )
 
+    pressure = stability.get(
+        "range_expansion_pressure",
+        {},
+    )
+
     row = {
         "timestamp": current_time.isoformat(
             timespec="seconds"
@@ -181,6 +189,15 @@ def log_condor_stability(
             session["session_phase"],
         "minutes_since_open":
             session["minutes_since_open"],
+        "expected_pace_pct": _clean(
+            pressure.get("expected_pace_pct")
+        ),
+        "pressure_ratio": _clean(
+            pressure.get("pressure_ratio")
+        ),
+        "pace_delta_pct": _clean(
+            pressure.get("pace_delta_pct")
+        ),
         "spx": _clean(
             getattr(market_data, "spx", None)
         ),

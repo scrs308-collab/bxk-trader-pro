@@ -41,6 +41,13 @@ def build_market_data(
             "current_displacement_pct": 40.0,
             "overnight_gap": 5.0,
             "overnight_gap_pct": 10.0,
+            "range_expansion_pressure": {
+                "available": True,
+                "state": "OBSERVING",
+                "expected_pace_pct": 27.7,
+                "pressure_ratio": 2.17,
+                "pace_delta_pct": 32.3,
+            },
         },
     )
 
@@ -85,6 +92,9 @@ def test_logger_writes_valid_live_observation(
     assert len(rows) == 1
     assert rows[0]["session_phase"] == "OPENING"
     assert rows[0]["minutes_since_open"] == "15"
+    assert rows[0]["expected_pace_pct"] == "27.7"
+    assert rows[0]["pressure_ratio"] == "2.17"
+    assert rows[0]["pace_delta_pct"] == "32.3"
     assert rows[0]["spx"] == "7800.0"
     assert rows[0]["vix1d"] == "16.0"
     assert (

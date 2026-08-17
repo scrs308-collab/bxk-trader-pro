@@ -8,6 +8,12 @@ from bxk_app.condor_stability import (
 from bxk_app.condor_risk_profile import (
     build_condor_risk_profile,
 )
+from bxk_app.market_session import (
+    get_market_session_phase,
+)
+from bxk_app.range_expansion_pressure import (
+    calculate_range_expansion_pressure,
+)
 from bxk_app.market_data import market_data
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.services.condor_stability_logger import (
@@ -118,6 +124,38 @@ class MarketEngine:
             expected_move_source=expected_move_source,
             market_status=market_data.market_status(),
         )
+
+        session = get_market_session_phase()
+
+        expansion_pressure = (
+            calculate_range_expansion_pressure(
+                directional_consumed_pct=
+                    condor_stability.get(
+                        "directional_consumed_pct"
+                    ),
+                minutes_since_open=
+                    session["minutes_since_open"],
+                session_phase=
+                    session["session_phase"],
+                signal_ready=
+                    condor_stability.get(
+                        "signal_ready",
+                        False,
+                    ),
+            )
+        )
+
+        condor_stability[
+            "session_phase"
+        ] = session["session_phase"]
+
+        condor_stability[
+            "minutes_since_open"
+        ] = session["minutes_since_open"]
+
+        condor_stability[
+            "range_expansion_pressure"
+        ] = expansion_pressure
 
         condor_risk_profile = build_condor_risk_profile(
             current_implied_move=expected_move,

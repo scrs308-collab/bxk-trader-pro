@@ -164,3 +164,67 @@ def test_logger_failure_does_not_break_market_update(
         result["condor_stability"]["available"]
         is True
     )
+
+
+def test_live_market_exposes_expansion_pressure(
+    monkeypatch,
+):
+    fresh_market_data = MarketData()
+
+    monkeypatch.setattr(
+        fresh_market_data,
+        "market_status",
+        lambda: "LIVE",
+    )
+
+    monkeypatch.setattr(
+        market_engine_module,
+        "market_data",
+        fresh_market_data,
+    )
+
+    monkeypatch.setattr(
+        market_engine_module.broker,
+        "authenticate",
+        lambda: True,
+    )
+
+    monkeypatch.setattr(
+        market_engine_module,
+        "get_market_session_phase",
+        lambda: {
+            "session_phase": "EARLY",
+            "minutes_since_open": 30,
+        },
+    )
+
+    engine = market_engine_module.MarketEngine()
+
+    result = engine.update(
+        spx={
+            "last": "7835",
+            "open": "7800",
+            "day-high-price": "7840",
+            "day-low-price": "7795",
+            "prev-close": "7790",
+        },
+        vix={"last": "15"},
+        vix1d={"last": "16"},
+        qqq={},
+        account={},
+        positions=[],
+    )
+
+    stability = result["condor_stability"]
+
+    assert stability["session_phase"] == "EARLY"
+    assert stability["minutes_since_open"] == 30
+
+    pressure = (
+        stability["range_expansion_pressure"]
+    )
+
+    assert pressure["available"] is True
+    assert pressure["state"] == "OBSERVING"
+    assert pressure["expected_pace_pct"] == 27.7
+    assert pressure["pressure_ratio"] > 0
