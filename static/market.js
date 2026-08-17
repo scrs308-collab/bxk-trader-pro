@@ -381,6 +381,12 @@ function renderMarketSummary(data) {
   const pressureAvailable =
     expansionPressure.available === true;
 
+  const stabilityScore =
+    stability.stability_score ?? {};
+
+  const stabilityScoreAvailable =
+    stabilityScore.available === true;
+
   let stabilityMessage =
     "Waiting for Condor Stability data.";
 
@@ -643,16 +649,28 @@ function renderMarketSummary(data) {
         style="margin-top: 14px;"
       >
         <div class="market-summary-metric">
-          <span>Session Phase</span>
-          <strong>${sessionPhase}</strong>
+          <span>Stability Score</span>
+          <strong>
+            ${
+              stabilityScoreAvailable
+                ? `${formatNumber(
+                    stabilityScore.score,
+                    1
+                  )} / 100`
+                : "--"
+            }
+          </strong>
         </div>
 
         <div class="market-summary-metric">
-          <span>Minutes Since Open</span>
+          <span>Expansion Pressure</span>
           <strong>
             ${
-              minutesSinceOpen != null
-                ? Math.round(minutesSinceOpen)
+              pressureAvailable
+                ? `${formatNumber(
+                    expansionPressure.pressure_ratio,
+                    2
+                  )}x`
                 : "--"
             }
           </strong>
@@ -673,15 +691,14 @@ function renderMarketSummary(data) {
         </div>
 
         <div class="market-summary-metric">
-          <span>Expansion Pressure</span>
+          <span>Session</span>
           <strong>
-            ${
-              pressureAvailable
-                ? `${formatNumber(
-                    expansionPressure.pressure_ratio,
-                    2
-                  )}x`
-                : "--"
+            ${sessionPhase}${
+              minutesSinceOpen != null
+                ? ` ? ${Math.round(
+                    minutesSinceOpen
+                  )} min`
+                : ""
             }
           </strong>
         </div>
