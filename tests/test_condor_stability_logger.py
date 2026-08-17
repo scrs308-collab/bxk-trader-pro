@@ -223,3 +223,34 @@ def test_logger_skips_when_signal_not_ready(
         tmp_path /
         "2026-08-16.csv"
     ).exists()
+
+
+def test_logger_rejects_weekend_even_if_signal_claims_live(
+    tmp_path,
+):
+    market = build_market_data(
+        signal_ready=True,
+        market_status="LIVE",
+        expected_move_source="VIX1D",
+    )
+
+    result = log_condor_stability(
+        market,
+        now=datetime(
+            2026,
+            8,
+            16,
+            10,
+            0,
+            0,
+        ),
+        log_dir=tmp_path,
+    )
+
+    assert result["logged"] is False
+    assert result["reason"] == "MARKET_NOT_LIVE"
+
+    assert not (
+        tmp_path /
+        "2026-08-16.csv"
+    ).exists()

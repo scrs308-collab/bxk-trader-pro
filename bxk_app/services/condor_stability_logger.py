@@ -159,6 +159,19 @@ def log_condor_stability(
 
     current_time = now or datetime.now()
 
+    # Independently verify the actual timestamp is inside
+    # regular market hours. This prevents stale, mocked, or
+    # inconsistent market-status data from creating bad history.
+    session = get_market_session_phase(
+        current_time
+    )
+
+    if session["session_phase"] == "CLOSED":
+        return {
+            "logged": False,
+            "reason": "MARKET_NOT_LIVE",
+        }
+
     directory = Path(
         log_dir
         if log_dir is not None
@@ -171,10 +184,6 @@ def log_condor_stability(
     )
 
     minute = _minute_key(current_time)
-
-    session = get_market_session_phase(
-        current_time
-    )
 
     pressure = stability.get(
         "range_expansion_pressure",

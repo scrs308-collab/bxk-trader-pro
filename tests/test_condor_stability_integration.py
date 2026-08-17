@@ -1,6 +1,25 @@
+import pytest
+
 import bxk_app.market_engine as market_engine_module
 
 from bxk_app.market_data import MarketData
+
+
+@pytest.fixture(autouse=True)
+def disable_real_condor_logger(monkeypatch):
+    """
+    Integration tests must never write into the real
+    Condor Stability history directory.
+    """
+
+    monkeypatch.setattr(
+        market_engine_module,
+        "log_condor_stability",
+        lambda _market: {
+            "logged": False,
+            "reason": "TEST_LOG_DISABLED",
+        },
+    )
 
 
 def test_live_market_exposes_condor_stability(monkeypatch):
