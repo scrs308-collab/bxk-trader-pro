@@ -389,6 +389,43 @@ function renderMarketSummary(data) {
       "Observation only - signal not ready.";
   }
 
+  const riskProfile =
+    data.condor_risk_profile ??
+    data.snapshot?.condor_risk_profile ??
+    {};
+
+  const riskStatus = String(
+    riskProfile.status ||
+    "INSUFFICIENT_HISTORY",
+  ).toUpperCase();
+
+  const riskSampleDays = safeNumber(
+    riskProfile.sample_days,
+  );
+
+  const rangeRisk =
+    riskProfile.range_expansion ?? {};
+
+  const forwardRisk =
+    riskProfile.forward_risk ?? {};
+
+  const forward0945 =
+    forwardRisk["0945"] ?? {};
+
+  const forward1000 =
+    forwardRisk["1000"] ?? {};
+
+  const forward1030 =
+    forwardRisk["1030"] ?? {};
+
+  let riskStatusLabel = "LEARNING";
+
+  if (riskStatus === "AVAILABLE") {
+    riskStatusLabel = "HISTORY READY";
+  } else if (riskStatus === "OBSERVING") {
+    riskStatusLabel = "BUILDING HISTORY";
+  }
+
   const rawMarketPermission = String(
     data.market_permission ||
     data.market_regime ||
@@ -518,6 +555,139 @@ function renderMarketSummary(data) {
               1
             )} pts
           </strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="market-summary-outlook">
+      <div class="card-label">
+        Historical Range Risk
+      </div>
+
+      <div class="market-summary-permission">
+        <span
+          style="
+            color: #94a3b8;
+            font-weight: 800;
+          "
+        >
+          &#9679; ${riskStatusLabel}
+        </span>
+      </div>
+
+      <div class="market-summary-recommendation">
+        ${Math.round(riskSampleDays)} completed trading
+        ${Math.round(riskSampleDays) === 1 ? "day" : "days"}
+        in the current risk sample.
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>Implied Move</span>
+          <strong>
+            &plusmn;${formatNumber(
+              riskProfile.current_implied_move ??
+              stability.implied_move,
+              1
+            )} pts
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Normal Stress</span>
+          <strong>
+            ${
+              rangeRisk.normal_stress_move != null
+                ? `&plusmn;${formatNumber(
+                    rangeRisk.normal_stress_move,
+                    1
+                  )} pts`
+                : "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>High Stress</span>
+          <strong>
+            ${
+              rangeRisk.high_stress_move != null
+                ? `&plusmn;${formatNumber(
+                    rangeRisk.high_stress_move,
+                    1
+                  )} pts`
+                : "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Recent Extreme</span>
+          <strong>
+            ${
+              rangeRisk.recent_extreme_move != null
+                ? `&plusmn;${formatNumber(
+                    rangeRisk.recent_extreme_move,
+                    1
+                  )} pts`
+                : "--"
+            }
+          </strong>
+        </div>
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>09:45 90% Forward</span>
+          <strong>
+            ${
+              forward0945.p90_forward_move != null
+                ? `${formatNumber(
+                    forward0945.p90_forward_move,
+                    1
+                  )} pts`
+                : "LEARNING"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>10:00 90% Forward</span>
+          <strong>
+            ${
+              forward1000.p90_forward_move != null
+                ? `${formatNumber(
+                    forward1000.p90_forward_move,
+                    1
+                  )} pts`
+                : "LEARNING"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>10:30 90% Forward</span>
+          <strong>
+            ${
+              forward1030.p90_forward_move != null
+                ? `${formatNumber(
+                    forward1030.p90_forward_move,
+                    1
+                  )} pts`
+                : "LEARNING"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>History Status</span>
+          <strong>${riskStatus}</strong>
         </div>
       </div>
     </div>
