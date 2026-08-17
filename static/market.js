@@ -156,6 +156,21 @@ export function renderMarketBlockers(data) {
     .join("");
 }
 
+function getMarketStatus(data = {}) {
+  return String(
+    data.condor_stability?.market_status ??
+    data.market_status ??
+    data.snapshot?.market_status ??
+    "UNKNOWN",
+  ).toUpperCase();
+}
+
+
+function isMarketLive(data = {}) {
+  return getMarketStatus(data) === "LIVE";
+}
+
+
 export function updateThermometer(score, data = {}) {
   const safeScore = Math.max(
     0,
@@ -185,6 +200,17 @@ export function updateThermometer(score, data = {}) {
     data.market_regime ||
     "WAIT",
   ).toUpperCase();
+
+  if (!isMarketLive(data)) {
+    setText("thermoStatus", "MARKET CLOSED");
+    setText(
+      "thermoMessage",
+      "New trade entry is disabled outside regular market hours.",
+    );
+    status?.classList.add("wait");
+    renderMarketBlockers(data);
+    return;
+  }
 
   if (finalDecision === "ENTER TRADE") {
     setText("thermoStatus", "TRADE WINDOW OPEN");
@@ -320,15 +346,68 @@ function renderMarketSummary(data) {
     data.expected_move_state || "UNKNOWN",
   ).toUpperCase();
 
-  const marketPermission = String(
+  const stability =
+    data.condor_stability ??
+    data.snapshot?.condor_stability ??
+    {};
+
+  const stabilityAvailable =
+    stability.available === true;
+
+  const stabilitySignalReady =
+    stability.signal_ready === true;
+
+  const stabilityState = String(
+    stability.state || "UNAVAILABLE",
+  ).toUpperCase();
+
+  const stabilityReason = String(
+    stability.reason_code || "",
+  ).toUpperCase();
+
+  let stabilityMessage =
+    "Waiting for Condor Stability data.";
+
+  if (!stabilityAvailable) {
+    stabilityMessage =
+      "Stability data unavailable.";
+  } else if (
+    stabilityReason === "MARKET_NOT_LIVE"
+  ) {
+    stabilityMessage =
+      "Market closed - signal disabled.";
+  } else if (
+    stabilityReason === "VIX1D_UNAVAILABLE"
+  ) {
+    stabilityMessage =
+      "VIX1D unavailable - signal disabled.";
+  } else if (stabilitySignalReady) {
+    stabilityMessage =
+      "Live inputs available - observing thresholds.";
+  } else {
+    stabilityMessage =
+      "Observation only - signal not ready.";
+  }
+
+  const rawMarketPermission = String(
     data.market_permission ||
     data.market_regime ||
     data.trade ||
     "WAIT",
   ).toUpperCase();
 
+  const marketPermission =
+    isMarketLive(data)
+      ? rawMarketPermission
+      : "MARKET CLOSED";
+
   const recommendation =
-    data.recommendation || "No recommendation available.";
+    isMarketLive(data)
+      ? (
+          data.recommendation ||
+          "No recommendation available."
+        )
+      : "New trade entry is disabled outside regular market hours.";
 
   const score = Math.max(
     0,
@@ -375,6 +454,71 @@ function renderMarketSummary(data) {
       <div class="market-summary-metric">
         <span>Market Score</span>
         <strong>${Math.round(score)} / 100</strong>
+      </div>
+    </div>
+
+    <div class="market-summary-outlook">
+      <div class="card-label">
+        Condor Stability
+      </div>
+
+      <div class="market-summary-permission">
+        <span
+          style="
+            color: #94a3b8;
+            font-weight: 800;
+          "
+        >
+          &#9679; ${stabilityState}
+        </span>
+      </div>
+
+      <div class="market-summary-recommendation">
+        ${stabilityMessage}
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>Implied Move</span>
+          <strong>
+            &plusmn;${formatNumber(
+              stability.implied_move
+            )} pts
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Directional Used</span>
+          <strong>
+            ${formatNumber(
+              stability.directional_consumed_pct,
+              1
+            )}%
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Range Used</span>
+          <strong>
+            ${formatNumber(
+              stability.range_band_consumed_pct,
+              1
+            )}%
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Directional Excursion</span>
+          <strong>
+            ${formatNumber(
+              stability.max_directional_excursion,
+              1
+            )} pts
+          </strong>
+        </div>
       </div>
     </div>
 
@@ -1171,7 +1315,10 @@ export function updateDashboard(data, updateChecklist) {
   let recommendationAction =
     "MONITOR MARKET";
 
-  if (
+  if (!isMarketLive(data)) {
+    recommendationAction =
+      "MARKET CLOSED";
+  } else if (
     recommendationState.includes("TRADE ALLOWED") ||
     recommendationState.includes("ENTER TRADE")
   ) {
@@ -1208,7 +1355,9 @@ setScore(data.score);
 
 setText(
   "tradeState",
-  tradeState || "--",
+  isMarketLive(data)
+    ? (tradeState || "--")
+    : "MARKET CLOSED",
 );
 
 updateCoach(data);

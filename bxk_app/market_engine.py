@@ -1,5 +1,8 @@
 from math import sqrt
 
+from bxk_app.condor_stability import (
+    calculate_condor_stability_metrics,
+)
 from bxk_app.market_data import market_data
 from bxk_app.brokers.tastytrade import broker
 
@@ -80,15 +83,37 @@ class MarketEngine:
         vix_value = get_quote_price(vix)
         vix1d_value = get_quote_price(vix1d)
 
-        volatility_value = vix1d_value if vix1d_value > 0 else vix_value
+        if vix1d_value > 0:
+            volatility_value = vix1d_value
+            expected_move_source = "VIX1D"
+        elif vix_value > 0:
+            volatility_value = vix_value
+            expected_move_source = "VIX"
+        else:
+            volatility_value = 0.0
+            expected_move_source = "NONE"
 
         expected_move = calculate_expected_move(spx_price, volatility_value)
+
+        spx_quote = spx if isinstance(spx, dict) else {}
+
+        condor_stability = calculate_condor_stability_metrics(
+            spx_price=spx_price,
+            expected_move=expected_move,
+            session_open=spx_quote.get("open"),
+            day_high=spx_quote.get("day-high-price"),
+            day_low=spx_quote.get("day-low-price"),
+            prev_close=spx_quote.get("prev-close"),
+            expected_move_source=expected_move_source,
+            market_status=market_data.market_status(),
+        )
 
         market_data.update(
             spx=spx_price,
             vix=vix_value,
             vix1d=vix1d_value,
             expected_move=expected_move,
+            condor_stability=condor_stability,
         )
 
         market_data.account = account or {}

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from bxk_app.market_engine import MarketEngine
+from bxk_app.market_data import market_data
 from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import rank_strategies
@@ -419,6 +420,9 @@ def get_recommendation():
                 "UNKNOWN",
             ),
             "reasons": reasons,
+
+            # Pre-entry iron-condor stability observation
+            "condor_stability": market_data.condor_stability,
 
             "strategies": strategies,
 

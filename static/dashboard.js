@@ -44,7 +44,7 @@ function setApiStatus(status) {
   }
 
   if (status === "live") {
-    apiStatus.textContent = "\u25CF MARKET LIVE";
+    apiStatus.textContent = "\u25CF API LIVE";
     apiStatus.className = "status-pill online";
     return;
   }

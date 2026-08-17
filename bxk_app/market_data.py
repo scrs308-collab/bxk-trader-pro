@@ -8,6 +8,11 @@ class MarketData:
         self.vix = "--"
         self.vix1d = "--"
         self.expected_move = "--"
+        self.condor_stability = {
+            "available": False,
+            "state": "UNAVAILABLE",
+            "reason_code": "STABILITY_DATA_UNAVAILABLE",
+        }
         self.iv_rank = None
         self.account = {}
         self.positions = []
@@ -36,6 +41,7 @@ class MarketData:
         vix=None,
         vix1d=None,
         expected_move=None,
+        condor_stability=None,
         iv_rank=None,
     ):
         if spx is not None:
@@ -52,6 +58,9 @@ class MarketData:
 
         if expected_move is not None:
             self.expected_move = round(float(expected_move), 2)
+
+        if condor_stability is not None:
+            self.condor_stability = condor_stability
 
         if iv_rank is not None:
             self.iv_rank = round(float(iv_rank), 2)
@@ -70,6 +79,7 @@ class MarketData:
             "atr": 0,
             "iv_rank": self.iv_rank,
             "expected_move": float(self.expected_move) if self.expected_move != "--" else 0,
+            "condor_stability": self.condor_stability,
             "market_status": self.market_status(),
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }
@@ -100,6 +110,7 @@ class MarketData:
             "vix": self.vix,
             "vix1d": self.vix1d,
             "expected_move": self.expected_move,
+            "condor_stability": self.condor_stability,
             "short_put": short_put,
             "short_call": short_call,
             "trade_setup": {
