@@ -59,3 +59,41 @@ def test_condor_stability_unavailable_without_required_data():
     assert result["reason_code"] == "STABILITY_DATA_UNAVAILABLE"
     assert result["expected_move_source"] == "VIX1D"
     assert result["market_status"] == "LIVE"
+
+
+
+def test_condor_stability_allows_live_vix_fallback():
+    result = calculate_condor_stability_metrics(
+        spx_price=7780,
+        expected_move=73.5,
+        session_open=7790,
+        day_high=7792,
+        day_low=7775,
+        prev_close=7785,
+        expected_move_source="VIX",
+        market_status="LIVE",
+    )
+
+    assert result["available"] is True
+    assert result["signal_ready"] is True
+    assert result["state"] == "OBSERVING"
+    assert result["reason_code"] == "VIX_FALLBACK_ACTIVE"
+    assert result["expected_move_source"] == "VIX"
+    assert result["market_status"] == "LIVE"
+
+
+def test_condor_stability_not_ready_when_market_closed():
+    result = calculate_condor_stability_metrics(
+        spx_price=7780,
+        expected_move=73.5,
+        session_open=7790,
+        day_high=7792,
+        day_low=7775,
+        prev_close=7785,
+        expected_move_source="VIX1D",
+        market_status="CLOSED",
+    )
+
+    assert result["available"] is True
+    assert result["signal_ready"] is False
+    assert result["reason_code"] == "MARKET_NOT_LIVE"

@@ -22,9 +22,12 @@ def calculate_condor_stability_metrics(
 
     GREEN/YELLOW/RED decisions are intentionally NOT made here yet.
 
-    signal_ready becomes True only when:
+    signal_ready becomes True when:
       - regular market is LIVE
-      - expected move is based on VIX1D
+      - expected move is based on VIX1D or VIX
+
+    VIX1D is the preferred source. VIX may be used as a live fallback
+    when VIX1D is unavailable.
 
     Raw metrics remain available for observation even when signal_ready
     is False.
@@ -87,15 +90,17 @@ def calculate_condor_stability_metrics(
 
     signal_ready = (
         status == "LIVE"
-        and source == "VIX1D"
+        and source in {"VIX1D", "VIX"}
     )
 
     if status != "LIVE":
         reason_code = "MARKET_NOT_LIVE"
-    elif source != "VIX1D":
-        reason_code = "VIX1D_UNAVAILABLE"
-    else:
+    elif source == "VIX1D":
         reason_code = "STABILITY_METRICS_AVAILABLE"
+    elif source == "VIX":
+        reason_code = "VIX_FALLBACK_ACTIVE"
+    else:
+        reason_code = "EXPECTED_MOVE_SOURCE_UNSUPPORTED"
 
     return {
         "available": True,

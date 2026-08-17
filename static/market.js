@@ -143,8 +143,8 @@ export function renderMarketBlockers(data) {
         : "blocked";
 
       const icon = condition.passed
-        ? "✓"
-        : "✕";
+        ? "âœ“"
+        : "âœ•";
 
       return `
         <div class="thermo-condition ${className}">
@@ -519,18 +519,27 @@ function renderMarketSummary(data) {
     "WAIT",
   ).toUpperCase();
 
+    const stabilityObserving =
+    stabilityAvailable &&
+    !stabilitySignalReady;
+
   const marketPermission =
-    isMarketLive(data)
-      ? rawMarketPermission
-      : "MARKET CLOSED";
+    !isMarketLive(data)
+      ? "MARKET CLOSED"
+      : stabilityObserving
+        ? "WAIT"
+        : rawMarketPermission;
 
   const recommendation =
-    isMarketLive(data)
-      ? (
-          data.recommendation ||
-          "No recommendation available."
-        )
-      : "New trade entry is disabled outside regular market hours.";
+    !isMarketLive(data)
+      ? "New trade entry is disabled outside regular market hours."
+      : stabilityObserving
+        ? "Stability signal is still observing opening conditions."
+        : (
+            data.recommendation ||
+            "No recommendation available."
+          );
+
 
   const score = Math.max(
     0,
@@ -556,7 +565,7 @@ function renderMarketSummary(data) {
 
       <div class="market-summary-metric">
         <span>Expected Move</span>
-        <strong>±${formatNumber(expectedMove)} pts</strong>
+        <strong>Â±${formatNumber(expectedMove)} pts</strong>
       </div>
 
       <div class="market-summary-metric">
@@ -695,7 +704,7 @@ function renderMarketSummary(data) {
           <strong>
             ${sessionPhase}${
               minutesSinceOpen != null
-                ? ` ? ${Math.round(
+                ? ` \u00B7 ${Math.round(
                     minutesSinceOpen
                   )} min`
                 : ""
@@ -961,7 +970,7 @@ export function updateMarketSummaryLiveData(data = {}) {
 
   const maskedAccount =
     accountNumber.length > 4
-      ? `••••${accountNumber.slice(-4)}`
+      ? `â€¢â€¢â€¢â€¢${accountNumber.slice(-4)}`
       : accountNumber || "Unavailable";
 
   const brokerConnectionKnown =
@@ -1005,14 +1014,14 @@ export function updateMarketSummaryLiveData(data = {}) {
   setText(
     "systemSpxStatus",
     spxAvailable
-      ? `${formatNumber(spx, 2)} · LIVE`
+      ? `${formatNumber(spx, 2)} Â· LIVE`
       : "Unavailable",
   );
 
   setText(
     "systemVix1dStatus",
     vix1dAvailable
-      ? `${formatNumber(vix1d, 2)} · LIVE`
+      ? `${formatNumber(vix1d, 2)} Â· LIVE`
       : "Unavailable",
   );
 
@@ -1170,7 +1179,7 @@ function renderStrategyPlaybook(data) {
       description:
         "Primary BXK strategy for a range-bound market with healthy premium.",
       conditions:
-        "Mixed or neutral trend · Ideal VIX · Healthy expected move",
+        "Mixed or neutral trend Â· Ideal VIX Â· Healthy expected move",
       risk: "Defined",
     },
 
@@ -1178,7 +1187,7 @@ function renderStrategyPlaybook(data) {
       description:
         "Directional premium-selling strategy for a clearly bullish or bearish market.",
       conditions:
-        "Confirmed direction · Healthy premium · Strong market score",
+        "Confirmed direction Â· Healthy premium Â· Strong market score",
       risk: "Defined",
     },
 
@@ -1186,7 +1195,7 @@ function renderStrategyPlaybook(data) {
       description:
         "Higher-credit strategy when SPX is expected to remain near a central price.",
       conditions:
-        "Range-bound market · High confidence · Strong premium",
+        "Range-bound market Â· High confidence Â· Strong premium",
       risk: "Defined / Higher",
     },
 
@@ -1194,7 +1203,7 @@ function renderStrategyPlaybook(data) {
       description:
         "Directional structure with asymmetric wings and controlled risk.",
       conditions:
-        "Directional bias · Favorable pricing · Strong setup",
+        "Directional bias Â· Favorable pricing Â· Strong setup",
       risk: "Defined",
     },
   };
@@ -1260,7 +1269,7 @@ function renderStrategyPlaybook(data) {
   description:
     "Protect capital when BXK entry requirements are not satisfied.",
   conditions:
-    "Weak score · Poor premium · Conflicting market conditions",
+    "Weak score Â· Poor premium Â· Conflicting market conditions",
   risk: "None",
 
   score:
@@ -1328,7 +1337,7 @@ function renderStrategyPlaybook(data) {
   <div class="strategy-assessment-row">
 
     <span class="assessment-pass">
-      ✓
+      âœ“
     </span>
 
     <span class="assessment-label">
@@ -1349,7 +1358,7 @@ function renderStrategyPlaybook(data) {
         : `
             <div class="strategy-assessment-row">
               <span class="assessment-neutral">
-                —
+                â€”
               </span>
 
               <span class="assessment-label">
@@ -1652,7 +1661,7 @@ function renderSystemDashboard(data) {
 
         <div class="system-row">
           <span>Stop-Loss Rule</span>
-          <strong>2× opening credit</strong>
+          <strong>2Ã— opening credit</strong>
         </div>
 
         <div class="system-row">
@@ -1751,7 +1760,7 @@ updateThermometer(data.score, data);
 setText(
   "expectedMove",
   expectedMoveValue != null
-    ? `±${formatNumber(expectedMoveValue)}`
+    ? `Â±${formatNumber(expectedMoveValue)}`
     : "--",
 );
  
