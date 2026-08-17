@@ -36,6 +36,18 @@ let backendOffline = false;
 let dashboardRefreshInProgress = false;
 let dashboardRefreshTimer = null;
 
+const RECENT_CONDOR_RISK_REFRESH_MS =
+  5 * 60 * 1000;
+
+let recentCondorRiskCache = {
+  status: "NO_DATA",
+  count: 0,
+  limit: 10,
+  summaries: [],
+};
+
+let lastRecentCondorRiskFetch = 0;
+
 function setApiStatus(status) {
   const apiStatus = el("apiStatus");
 
@@ -81,6 +93,48 @@ function updateApiFreshness() {
   setApiStatus("live");
 }
 
+async function fetchRecentCondorRisk() {
+  const now = Date.now();
+
+  const cacheFresh =
+    lastRecentCondorRiskFetch > 0 &&
+    (
+      now - lastRecentCondorRiskFetch
+    ) < RECENT_CONDOR_RISK_REFRESH_MS;
+
+  if (cacheFresh) {
+    return recentCondorRiskCache;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/condor-risk-summary/recent?limit=10&_=${now}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Recent Condor risk error ${response.status}`,
+      );
+    }
+
+    recentCondorRiskCache =
+      await response.json();
+
+    lastRecentCondorRiskFetch = now;
+  } catch (error) {
+    console.error(
+      "Recent Condor risk history failed:",
+      error,
+    );
+  }
+
+  return recentCondorRiskCache;
+}
+
+
 async function fetchRecommendation() {
   try {
     const response = await fetch(
@@ -98,8 +152,17 @@ async function fetchRecommendation() {
 
     const data = await response.json();
 
+    const recentCondorRisk =
+      await fetchRecentCondorRisk();
+
+    const dashboardData = {
+      ...data,
+      recent_condor_risk:
+        recentCondorRisk,
+    };
+
     updateDashboard(
-      data,
+      dashboardData,
       updateChecklist,
     );
 

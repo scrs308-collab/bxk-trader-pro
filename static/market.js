@@ -434,6 +434,70 @@ function renderMarketSummary(data) {
   const forward1030 =
     forwardRisk["1030"] ?? {};
 
+  const recentRisk =
+    data.recent_condor_risk ?? {};
+
+  const recentSummaries =
+    Array.isArray(recentRisk.summaries)
+      ? recentRisk.summaries
+      : [];
+
+  const recentRowsHtml =
+    recentSummaries.length > 0
+      ? recentSummaries.map((summary) => {
+          const rawDate = String(
+            summary.date || "--"
+          );
+
+          const displayDate =
+            rawDate.length >= 10
+              ? `${rawDate.slice(5, 7)}/${rawDate.slice(8, 10)}`
+              : rawDate;
+
+          const implied =
+            summary.opening_implied_move != null
+              ? formatNumber(
+                  summary.opening_implied_move,
+                  1
+                )
+              : "--";
+
+          const maxMove =
+            summary.max_directional_excursion != null
+              ? formatNumber(
+                  summary.max_directional_excursion,
+                  1
+                )
+              : "--";
+
+          const expansion =
+            summary.expansion_ratio != null
+              ? `${formatNumber(
+                  summary.expansion_ratio,
+                  2
+                )}x`
+              : "--";
+
+          const peakPressure =
+            summary.peak_pressure_ratio != null
+              ? `${formatNumber(
+                  summary.peak_pressure_ratio,
+                  2
+                )}x`
+              : "--";
+
+          return `
+            <tr>
+              <td>${displayDate}</td>
+              <td>${implied}</td>
+              <td>${maxMove}</td>
+              <td>${expansion}</td>
+              <td>${peakPressure}</td>
+            </tr>
+          `;
+        }).join("")
+      : "";
+
   let riskStatusLabel = "LEARNING";
 
   if (riskStatus === "AVAILABLE") {
@@ -755,6 +819,58 @@ function renderMarketSummary(data) {
           <strong>${riskStatus}</strong>
         </div>
       </div>
+    </div>
+
+    <div class="market-summary-outlook">
+      <div class="card-label">
+        Recent Condor Risk
+      </div>
+
+      <div class="market-summary-recommendation">
+        Last completed trading days
+      </div>
+
+      ${
+        recentSummaries.length > 0
+          ? `
+            <div
+              style="
+                overflow-x: auto;
+                margin-top: 14px;
+              "
+            >
+              <table
+                style="
+                  width: 100%;
+                  border-collapse: collapse;
+                  text-align: center;
+                "
+              >
+                <thead>
+                  <tr>
+                    <th style="padding: 8px;">Date</th>
+                    <th style="padding: 8px;">Implied</th>
+                    <th style="padding: 8px;">Max Move</th>
+                    <th style="padding: 8px;">Expansion</th>
+                    <th style="padding: 8px;">Peak Pressure</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  ${recentRowsHtml}
+                </tbody>
+              </table>
+            </div>
+          `
+          : `
+            <div
+              class="market-summary-recommendation"
+              style="margin-top: 14px;"
+            >
+              No completed trading-day history yet.
+            </div>
+          `
+      }
     </div>
 
     <div class="market-summary-outlook">
