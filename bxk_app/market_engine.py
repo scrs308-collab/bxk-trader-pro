@@ -1,8 +1,12 @@
 import logging
+from datetime import date
 from math import sqrt
 
 from bxk_app.condor_stability import (
     calculate_condor_stability_metrics,
+)
+from bxk_app.condor_risk_profile import (
+    build_condor_risk_profile,
 )
 from bxk_app.market_data import market_data
 from bxk_app.brokers.tastytrade import broker
@@ -115,12 +119,18 @@ class MarketEngine:
             market_status=market_data.market_status(),
         )
 
+        condor_risk_profile = build_condor_risk_profile(
+            current_implied_move=expected_move,
+            exclude_date=date.today().isoformat(),
+        )
+
         market_data.update(
             spx=spx_price,
             vix=vix_value,
             vix1d=vix1d_value,
             expected_move=expected_move,
             condor_stability=condor_stability,
+            condor_risk_profile=condor_risk_profile,
         )
 
         market_data.account = account or {}

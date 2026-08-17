@@ -423,6 +423,7 @@ def get_recommendation():
 
             # Pre-entry iron-condor stability observation
             "condor_stability": market_data.condor_stability,
+            "condor_risk_profile": market_data.condor_risk_profile,
 
             "strategies": strategies,
 

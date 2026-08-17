@@ -207,6 +207,7 @@ def load_range_expansion_history(
     directory,
     *,
     limit=20,
+    exclude_date=None,
 ):
     """
     Load recent completed daily Condor Stability files.
@@ -225,6 +226,12 @@ def load_range_expansion_history(
     summaries = []
 
     for path in paths:
+        if (
+            exclude_date is not None
+            and path.stem == str(exclude_date)
+        ):
+            continue
+
         summary = summarize_daily_file(path)
 
         if summary is not None:

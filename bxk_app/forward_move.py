@@ -235,6 +235,7 @@ def load_forward_history(
     checkpoint_minute,
     *,
     limit=20,
+    exclude_date=None,
 ):
     directory = Path(directory)
 
@@ -249,6 +250,12 @@ def load_forward_history(
     results = []
 
     for path in paths:
+        if (
+            exclude_date is not None
+            and path.stem == str(exclude_date)
+        ):
+            continue
+
         result = analyze_forward_move(
             path,
             checkpoint_minute,

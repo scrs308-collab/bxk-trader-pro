@@ -243,3 +243,73 @@ def test_profile_becomes_available_at_ten_days(
 
     assert result["sample_days"] == 10
     assert result["status"] == "AVAILABLE"
+
+
+def test_profile_excludes_current_partial_day(
+    tmp_path,
+):
+    completed = tmp_path / "2026-08-14.csv"
+    current = tmp_path / "2026-08-17.csv"
+
+    write_day(
+        completed,
+        [
+            {
+                "minutes_since_open": 15,
+                "spx": 7800,
+                "expected_move": 50,
+                "upside_excursion": 25,
+                "downside_excursion": 0,
+                "max_directional_excursion": 25,
+                "session_range": 25,
+            },
+            {
+                "minutes_since_open": 60,
+                "spx": 7825,
+                "expected_move": 45,
+                "upside_excursion": 25,
+                "downside_excursion": 0,
+                "max_directional_excursion": 25,
+                "session_range": 25,
+            },
+        ],
+    )
+
+    # Deliberately extreme partial current day.
+    write_day(
+        current,
+        [
+            {
+                "minutes_since_open": 15,
+                "spx": 7800,
+                "expected_move": 50,
+                "upside_excursion": 100,
+                "downside_excursion": 0,
+                "max_directional_excursion": 100,
+                "session_range": 100,
+            },
+            {
+                "minutes_since_open": 60,
+                "spx": 7900,
+                "expected_move": 45,
+                "upside_excursion": 100,
+                "downside_excursion": 0,
+                "max_directional_excursion": 100,
+                "session_range": 100,
+            },
+        ],
+    )
+
+    result = build_condor_risk_profile(
+        current_implied_move=50,
+        history_dir=tmp_path,
+        exclude_date="2026-08-17",
+    )
+
+    assert result["sample_days"] == 1
+
+    assert (
+        result["range_expansion"]
+        ["worst_expansion_ratio"]
+        == 0.5
+    )

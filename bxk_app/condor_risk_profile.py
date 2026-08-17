@@ -29,6 +29,7 @@ def build_condor_risk_profile(
     current_implied_move=None,
     history_dir=None,
     history_limit=20,
+    exclude_date=None,
 ):
     """
     Build one observation-only historical risk profile.
@@ -52,6 +53,7 @@ def build_condor_risk_profile(
         load_range_expansion_history(
             directory,
             limit=history_limit,
+            exclude_date=exclude_date,
         )
     )
 
@@ -70,6 +72,7 @@ def build_condor_risk_profile(
             directory,
             minute,
             limit=history_limit,
+            exclude_date=exclude_date,
         )
 
         profile = calculate_forward_profile(
