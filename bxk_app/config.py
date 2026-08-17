@@ -56,6 +56,59 @@ BXK_APP_PASSWORD_HASH = os.getenv(
 
 
 # ===============================
+# BXK Authentication
+# ===============================
+
+BXK_AUTH_ENABLED = (
+    os.getenv(
+        "BXK_AUTH_ENABLED",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
+BXK_SESSION_SECRET = os.getenv(
+    "BXK_SESSION_SECRET",
+    "",
+)
+
+BXK_SESSION_TTL_SECONDS = int(
+    os.getenv(
+        "BXK_SESSION_TTL_SECONDS",
+        "43200",
+    )
+)
+
+if BXK_SESSION_TTL_SECONDS <= 0:
+    raise ValueError(
+        "BXK_SESSION_TTL_SECONDS must "
+        "be greater than zero."
+    )
+
+BXK_AUTH_COOKIE_SECURE = (
+    os.getenv(
+        "BXK_AUTH_COOKIE_SECURE",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
+if (
+    BXK_AUTH_ENABLED
+    and len(BXK_SESSION_SECRET) < 32
+):
+    raise ValueError(
+        "BXK_SESSION_SECRET must be at least "
+        "32 characters when authentication "
+        "is enabled."
+    )
+
+
+# ===============================
 # Trading Settings
 # ===============================
 
