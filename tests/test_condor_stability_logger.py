@@ -83,6 +83,8 @@ def test_logger_writes_valid_live_observation(
     rows = read_rows(path)
 
     assert len(rows) == 1
+    assert rows[0]["session_phase"] == "OPENING"
+    assert rows[0]["minutes_since_open"] == "15"
     assert rows[0]["spx"] == "7800.0"
     assert rows[0]["vix1d"] == "16.0"
     assert (

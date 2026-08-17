@@ -3,6 +3,10 @@ from datetime import datetime
 from pathlib import Path
 from threading import Lock
 
+from bxk_app.market_session import (
+    get_market_session_phase,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -14,6 +18,8 @@ DEFAULT_LOG_DIR = (
 
 FIELDNAMES = [
     "timestamp",
+    "session_phase",
+    "minutes_since_open",
     "spx",
     "vix",
     "vix1d",
@@ -163,10 +169,18 @@ def log_condor_stability(
 
     minute = _minute_key(current_time)
 
+    session = get_market_session_phase(
+        current_time
+    )
+
     row = {
         "timestamp": current_time.isoformat(
             timespec="seconds"
         ),
+        "session_phase":
+            session["session_phase"],
+        "minutes_since_open":
+            session["minutes_since_open"],
         "spx": _clean(
             getattr(market_data, "spx", None)
         ),
