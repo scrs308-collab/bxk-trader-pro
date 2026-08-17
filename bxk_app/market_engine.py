@@ -5,6 +5,9 @@ from math import sqrt
 from bxk_app.condor_stability import (
     calculate_condor_stability_metrics,
 )
+from bxk_app.condor_stability_score import (
+    calculate_condor_stability_score,
+)
 from bxk_app.condor_risk_profile import (
     build_condor_risk_profile,
 )
@@ -156,6 +159,40 @@ class MarketEngine:
         condor_stability[
             "range_expansion_pressure"
         ] = expansion_pressure
+
+        stability_score = (
+            calculate_condor_stability_score(
+                signal_ready=
+                    condor_stability.get(
+                        "signal_ready",
+                        False,
+                    ),
+                directional_consumed_pct=
+                    condor_stability.get(
+                        "directional_consumed_pct"
+                    ),
+                current_displacement_pct=
+                    condor_stability.get(
+                        "current_displacement_pct"
+                    ),
+                range_band_consumed_pct=
+                    condor_stability.get(
+                        "range_band_consumed_pct"
+                    ),
+                overnight_gap_pct=
+                    condor_stability.get(
+                        "overnight_gap_pct"
+                    ),
+                pressure_ratio=
+                    expansion_pressure.get(
+                        "pressure_ratio"
+                    ),
+            )
+        )
+
+        condor_stability[
+            "stability_score"
+        ] = stability_score
 
         condor_risk_profile = build_condor_risk_profile(
             current_implied_move=expected_move,

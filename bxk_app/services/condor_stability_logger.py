@@ -23,6 +23,8 @@ FIELDNAMES = [
     "expected_pace_pct",
     "pressure_ratio",
     "pace_delta_pct",
+    "stability_score",
+    "stability_total_penalty",
     "spx",
     "vix",
     "vix1d",
@@ -190,6 +192,11 @@ def log_condor_stability(
         {},
     )
 
+    score_data = stability.get(
+        "stability_score",
+        {},
+    )
+
     row = {
         "timestamp": current_time.isoformat(
             timespec="seconds"
@@ -206,6 +213,12 @@ def log_condor_stability(
         ),
         "pace_delta_pct": _clean(
             pressure.get("pace_delta_pct")
+        ),
+        "stability_score": _clean(
+            score_data.get("score")
+        ),
+        "stability_total_penalty": _clean(
+            score_data.get("total_penalty")
         ),
         "spx": _clean(
             getattr(market_data, "spx", None)
