@@ -4,6 +4,7 @@ from bxk_app.services.market_service import (
     get_debug_market,
     get_live_market,
     get_market_brief,
+    get_recent_condor_risk_summaries,
     get_today_condor_risk_summary,
     refresh_market_data,
 )
@@ -38,3 +39,12 @@ def debug_market():
 @router.get("/condor-risk-summary/today")
 def condor_risk_summary_today():
     return get_today_condor_risk_summary()
+
+
+@router.get("/condor-risk-summary/recent")
+def condor_risk_summary_recent(
+    limit: int = 10,
+):
+    return get_recent_condor_risk_summaries(
+        limit=limit
+    )

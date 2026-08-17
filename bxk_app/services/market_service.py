@@ -145,3 +145,72 @@ def get_today_condor_risk_summary():
             market_data.market_status(),
         "summary": result,
     }
+
+
+def get_recent_condor_risk_summaries(
+    limit=10,
+):
+    """
+    Return recent completed Condor Stability daily summaries.
+
+    Today's file is always excluded because it may represent
+    an incomplete trading session.
+
+    Observation-only. This data does not influence trading
+    decisions or order execution.
+    """
+
+    try:
+        requested_limit = int(limit)
+    except (TypeError, ValueError):
+        requested_limit = 10
+
+    requested_limit = max(
+        1,
+        min(30, requested_limit),
+    )
+
+    today = date.today().isoformat()
+
+    if not DEFAULT_LOG_DIR.exists():
+        return {
+            "status": "NO_DATA",
+            "count": 0,
+            "limit": requested_limit,
+            "summaries": [],
+        }
+
+    paths = sorted(
+        DEFAULT_LOG_DIR.glob("*.csv"),
+        reverse=True,
+    )
+
+    summaries = []
+
+    for path in paths:
+        # Never treat today's partial file as completed history.
+        if path.stem == today:
+            continue
+
+        summary = summarize_condor_risk_day(
+            path
+        )
+
+        if summary.get("available") is not True:
+            continue
+
+        summaries.append(summary)
+
+        if len(summaries) >= requested_limit:
+            break
+
+    return {
+        "status": (
+            "AVAILABLE"
+            if summaries
+            else "NO_DATA"
+        ),
+        "count": len(summaries),
+        "limit": requested_limit,
+        "summaries": summaries,
+    }
