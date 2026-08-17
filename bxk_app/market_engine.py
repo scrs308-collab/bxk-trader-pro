@@ -1,3 +1,4 @@
+import logging
 from math import sqrt
 
 from bxk_app.condor_stability import (
@@ -5,6 +6,12 @@ from bxk_app.condor_stability import (
 )
 from bxk_app.market_data import market_data
 from bxk_app.brokers.tastytrade import broker
+from bxk_app.services.condor_stability_logger import (
+    log_condor_stability,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_expected_move(spx_price: float, vix1d_value: float) -> float:
@@ -120,7 +127,15 @@ class MarketEngine:
         market_data.positions = positions or []
         market_data.qqq = qqq or {}
 
-        
+        # Observation logging must never interfere with
+        # market analysis or trade decisions.
+        try:
+            log_condor_stability(market_data)
+        except Exception:
+            logger.exception(
+                "Condor Stability logging failed"
+            )
+
         return market_data.get_header()
 
 

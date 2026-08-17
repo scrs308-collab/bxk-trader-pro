@@ -31,3 +31,6 @@ schwab_tokens.json
 .pytest_cache/
 logs/
 *.jsonl
+
+# Condor Stability market history
+data/condor_stability/
