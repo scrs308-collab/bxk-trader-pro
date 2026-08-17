@@ -30,6 +30,10 @@ import {
   loadPositions,
 } from "./position.js";
 
+import {
+  initializeSystemSettings,
+} from "./system-settings.js?v=1";
+
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;
 let backendOffline = false;
@@ -322,3 +326,6 @@ function initializeDashboardTabs() {
 
 initializeTradeBuilder();
 initializeDashboardTabs();
+
+
+initializeSystemSettings();

@@ -25,7 +25,35 @@ TASTYTRADE_ACCOUNT_NUMBER = os.getenv(
     "TASTYTRADE_ACCOUNT_NUMBER",
     "",
 ).strip()
-TASTYTRADE_BASE_URL = os.getenv("TASTYTRADE_BASE_URL", "https://api.tastyworks.com")
+TASTYTRADE_BASE_URL = os.getenv(
+    "TASTYTRADE_BASE_URL",
+    "https://api.tastyworks.com",
+).strip()
+
+TASTYTRADE_USERNAME = os.getenv(
+    "TASTYTRADE_USERNAME",
+    "",
+).strip()
+
+TASTYTRADE_PASSWORD = os.getenv(
+    "TASTYTRADE_PASSWORD",
+    "",
+)
+
+# ===============================
+# BXK Application Access
+# ===============================
+
+BXK_APP_USERNAME = os.getenv(
+    "BXK_APP_USERNAME",
+    "",
+).strip()
+
+BXK_APP_PASSWORD_HASH = os.getenv(
+    "BXK_APP_PASSWORD_HASH",
+    "",
+)
+
 
 # ===============================
 # Trading Settings
