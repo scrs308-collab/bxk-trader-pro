@@ -1,6 +1,12 @@
-from datetime import datetime
+from datetime import date, datetime
 
+from bxk_app.condor_daily_summary import (
+    summarize_condor_risk_day,
+)
 from bxk_app.market_data import market_data
+from bxk_app.services.condor_stability_logger import (
+    DEFAULT_LOG_DIR,
+)
 from bxk_app.market_engine import market_engine
 from bxk_app.scoring import run_trade_quality
 
@@ -108,4 +114,34 @@ def get_debug_market():
         "vix1d": market_data.vix1d,
         "expected_move": market_data.expected_move,
         "snapshot": market_data.get_snapshot(),
+    }
+
+def get_today_condor_risk_summary():
+    """
+    Return today's Condor Stability diagnostic summary.
+
+    During regular market hours this may represent a partial
+    trading day. After the session closes it becomes the
+    completed daily summary.
+
+    This endpoint is observational only and does not influence
+    recommendation or order execution.
+    """
+
+    trading_date = date.today().isoformat()
+
+    path = (
+        DEFAULT_LOG_DIR /
+        f"{trading_date}.csv"
+    )
+
+    result = summarize_condor_risk_day(path)
+
+    return {
+        "trading_date": trading_date,
+        "partial_session":
+            market_data.market_status() == "LIVE",
+        "market_status":
+            market_data.market_status(),
+        "summary": result,
     }
