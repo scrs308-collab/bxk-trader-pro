@@ -1586,6 +1586,115 @@ function renderOrderPreview({
         return;
       }
 
+      const brokerPreflight =
+        result?.broker_preflight || {};
+
+      const brokerChecks =
+        result?.broker_checks || [];
+
+      const brokerBuyingPower =
+        brokerPreflight?.buying_power || {};
+
+      const fees = safeNumber(
+        brokerPreflight?.fees,
+        0,
+      );
+
+      const failedBrokerChecks =
+        brokerChecks.filter(
+          (check) => check?.passed === false,
+        );
+
+      const reserveCheck =
+        failedBrokerChecks.find(
+          (check) =>
+            check?.name ===
+            "broker_buying_power_reserve",
+        );
+
+      const nonReserveFailures =
+        failedBrokerChecks.filter(
+          (check) =>
+            check?.name !==
+            "broker_buying_power_reserve",
+        );
+
+      const reconciliationCheck =
+        brokerChecks.find(
+          (check) =>
+            check?.name ===
+            "broker_buying_power_matches_bxk",
+        );
+
+      const sessionAdvisory =
+        (result?.checks || []).find(
+          (check) =>
+            check?.name === "execution_session" &&
+            check?.advisory,
+        );
+
+      const brokerVerified =
+        Boolean(brokerPreflight) &&
+        nonReserveFailures.length === 0;
+
+      setBrokerRiskAudit({
+        state:
+          reconciliationCheck?.passed
+            ? "ready"
+            : "failed",
+        bxkRisk:
+          brokerBuyingPower.bxk_expected,
+        brokerImpact:
+          brokerBuyingPower.impact,
+        fees,
+        variance:
+          brokerBuyingPower.variance,
+      });
+
+      if (
+        brokerVerified &&
+        reserveCheck
+      ) {
+        updateReadinessCard(
+          accountReadiness,
+          {
+            state: "ready",
+            icon: "OK",
+            detail:
+              result.account
+                ? `Tastytrade verified ${result.account}`
+                : "Tastytrade verified",
+          },
+        );
+
+        updateReadinessCard(
+          submissionReadiness,
+          {
+            state: "pending",
+            icon: "X",
+            detail: "BXK capital reserve blocked",
+          },
+        );
+
+        const advisoryText =
+          sessionAdvisory
+            ? " GTH advisory active."
+            : "";
+
+        setBrokerMessage(
+          `TASTYTRADE VERIFIED.${advisoryText} ` +
+          reserveCheck.message,
+        );
+
+        if (confirmButton) {
+          confirmButton.disabled = true;
+          confirmButton.textContent =
+            "RISK BLOCKED";
+        }
+
+        return;
+      }
+
       const errorMessage =
         result?.errors?.[0] ||
         result?.message ||
