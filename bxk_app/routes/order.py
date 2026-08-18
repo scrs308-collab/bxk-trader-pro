@@ -964,23 +964,37 @@ def _evaluate_broker_dry_run(
             "Broker fee calculation is valid.",
     }
 
-    def check(name, passed, message):
+    def check(
+        name,
+        passed,
+        message,
+        *,
+        success_message=None,
+        advisory=False,
+    ):
         passed = bool(passed)
 
-        display_message = (
-            success_messages.get(
-                name,
-                "Broker check passed.",
+        if passed:
+            display_message = (
+                success_message
+                or success_messages.get(
+                    name,
+                    "Broker check passed.",
+                )
             )
-            if passed
-            else message
-        )
+        else:
+            display_message = message
 
-        checks.append({
+        result = {
             "name": name,
             "passed": passed,
             "message": display_message,
-        })
+        }
+
+        if advisory:
+            result["advisory"] = True
+
+        checks.append(result)
 
         if not passed:
             errors.append(message)
@@ -1023,13 +1037,67 @@ def _evaluate_broker_dry_run(
         ),
     )
 
+    approved_warning_codes = {
+        "tif.next_valid_session",
+    }
+
+    advisory_warnings = []
+    blocking_warnings = []
+
+    for warning in warnings:
+        warning_code = ""
+
+        if isinstance(warning, dict):
+            warning_code = str(
+                warning.get("code") or ""
+            ).strip()
+
+        if warning_code in approved_warning_codes:
+            advisory_warnings.append(warning)
+        else:
+            blocking_warnings.append(warning)
+
+    if blocking_warnings:
+        blocking_codes = [
+            (
+                str(
+                    warning.get("code")
+                    or "<missing code>"
+                )
+                if isinstance(warning, dict)
+                else "<invalid warning>"
+            )
+            for warning in blocking_warnings
+        ]
+
+        warning_failure_message = (
+            "Tastytrade returned one or more "
+            "unapproved broker warnings: "
+            + ", ".join(blocking_codes)
+            + "."
+        )
+    else:
+        warning_failure_message = (
+            "Tastytrade returned an "
+            "unapproved broker warning."
+        )
+
+    if advisory_warnings:
+        warning_success_message = (
+            "Tastytrade dry-run accepted with "
+            "approved next-session advisory."
+        )
+    else:
+        warning_success_message = (
+            "Tastytrade returned no broker warnings."
+        )
+
     check(
         "broker_warning_free",
-        len(warnings) == 0,
-        (
-            "Tastytrade returned one or more "
-            "broker warnings."
-        ),
+        len(blocking_warnings) == 0,
+        warning_failure_message,
+        success_message=warning_success_message,
+        advisory=bool(advisory_warnings),
     )
 
     check(
@@ -1370,36 +1438,16 @@ def order_dry_run(
 
     session_gate = _execution_session_gate()
 
-    if not session_gate["passed"]:
-        policy = session_gate["policy"]
-
-        return {
-            "status": "BLOCKED",
-            "reason_code": (
-                session_gate["reason_code"]
-            ),
-            "live_submission_enabled": False,
-            "session": policy.get("session"),
-            "market_time": (
-                policy.get("market_time")
-            ),
-            "session_policy": policy,
-            "message": (
-                session_gate["message"]
-            ),
-            "errors": [
-                session_gate["message"]
-            ],
-            "checks": [
-                {
-                    "name": "execution_session",
-                    "passed": False,
-                    "message": (
-                        session_gate["message"]
-                    ),
-                }
-            ],
-        }
+    if session_gate["passed"]:
+        session_check_message = (
+            session_gate["message"]
+        )
+    else:
+        session_check_message = (
+            "Dry-run/preflight only. "
+            "Live DAY-order submission remains blocked. "
+            + session_gate["message"]
+        )
 
     review, review_error = (
         _get_order_review_lock(
@@ -1441,9 +1489,13 @@ def order_dry_run(
         {
             "name": "execution_session",
             "passed": True,
-            "message": (
-                session_gate["message"]
+            "advisory": (
+                not session_gate["passed"]
             ),
+            "reason_code": (
+                session_gate["reason_code"]
+            ),
+            "message": session_check_message,
         },
     )
 

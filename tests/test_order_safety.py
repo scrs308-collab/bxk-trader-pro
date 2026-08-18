@@ -600,7 +600,7 @@ def test_broker_preflight_accepts_valid_response():
     )
 
 
-def test_broker_warning_fails_preflight():
+def test_next_valid_session_warning_is_advisory():
     dry_run = _valid_broker_dry_run()
 
     dry_run["broker_response"]["data"][
@@ -615,10 +615,107 @@ def test_broker_warning_fails_preflight():
         }
     ]
 
+    data = dry_run[
+        "broker_response"
+    ]["data"]
+
+    broker_impact = float(
+        data[
+            "buying-power-effect"
+        ][
+            "change-in-buying-power"
+        ]
+    )
+
+    broker_fees = float(
+        data[
+            "fee-calculation"
+        ]["total-fees"]
+    )
+
     result = (
         order_route._evaluate_broker_dry_run(
             dry_run,
-            {},
+            {
+                "buying_power": round(
+                    broker_impact
+                    - broker_fees,
+                    2,
+                ),
+            },
+        )
+    )
+
+    checks = _broker_checks(result)
+
+    assert result["passed"] is True
+
+    assert (
+        checks[
+            "broker_warning_free"
+        ]["passed"]
+        is True
+    )
+
+    assert (
+        checks[
+            "broker_warning_free"
+        ].get("advisory")
+        is True
+    )
+
+    assert (
+        "approved next-session advisory"
+        in checks[
+            "broker_warning_free"
+        ]["message"]
+    )
+
+    assert result["errors"] == []
+
+
+def test_unknown_broker_warning_fails_preflight():
+    dry_run = _valid_broker_dry_run()
+
+    dry_run["broker_response"]["data"][
+        "warnings"
+    ] = [
+        {
+            "code": "risk.unexpected_warning",
+            "message": (
+                "Unexpected broker warning."
+            ),
+        }
+    ]
+
+    data = dry_run[
+        "broker_response"
+    ]["data"]
+
+    broker_impact = float(
+        data[
+            "buying-power-effect"
+        ][
+            "change-in-buying-power"
+        ]
+    )
+
+    broker_fees = float(
+        data[
+            "fee-calculation"
+        ]["total-fees"]
+    )
+
+    result = (
+        order_route._evaluate_broker_dry_run(
+            dry_run,
+            {
+                "buying_power": round(
+                    broker_impact
+                    - broker_fees,
+                    2,
+                ),
+            },
         )
     )
 
@@ -627,8 +724,16 @@ def test_broker_warning_fails_preflight():
     assert result["passed"] is False
 
     assert (
-        checks["broker_warning_free"]["passed"]
+        checks[
+            "broker_warning_free"
+        ]["passed"]
         is False
+    )
+
+    assert any(
+        "unapproved broker warnings"
+        in error
+        for error in result["errors"]
     )
 
 
@@ -707,7 +812,7 @@ def test_execution_session_gate_allows_rth(
     assert result["reason_code"] is None
 
 
-def test_order_dry_run_blocks_gth_before_scan(
+def test_order_dry_run_allows_gth_to_reach_review_lock(
     monkeypatch,
 ):
     from bxk_app import trading_session
@@ -725,43 +830,52 @@ def test_order_dry_run_blocks_gth_before_scan(
         },
     )
 
-    def scanner_must_not_run(*args, **kwargs):
-        raise AssertionError(
-            "Scanner must not run when "
-            "DAY execution is session-blocked."
-        )
+    reached = {
+        "review_lock": False,
+    }
+
+    sentinel = {
+        "status": "BLOCKED",
+        "reason_code":
+            "TEST_REVIEW_SENTINEL",
+        "live_submission_enabled":
+            False,
+        "message":
+            "Test review sentinel.",
+        "errors": [
+            "Test review sentinel."
+        ],
+        "checks": [],
+    }
+
+    def fake_review_lock(review_id):
+        reached["review_lock"] = True
+
+        assert review_id == "review-1"
+
+        return None, sentinel
 
     monkeypatch.setattr(
         order_route,
-        "_build_current_order",
-        scanner_must_not_run,
+        "_get_order_review_lock",
+        fake_review_lock,
     )
 
     result = order_route.order_dry_run(
-        strategy="iron_condor",
+        strategy="auto",
         dte=1,
         wing_width=25,
         contracts=1,
+        review_id="review-1",
     )
 
-    assert result["status"] == "BLOCKED"
+    assert reached["review_lock"] is True
 
     assert (
         result["reason_code"]
-        == "EXTENDED_SESSION_REQUIRES_GTH_ORDER"
+        == "TEST_REVIEW_SENTINEL"
     )
 
-    assert result["session"] == "GTH"
-
-    assert (
-        result["checks"][0]["name"]
-        == "execution_session"
-    )
-
-    assert (
-        result["checks"][0]["passed"]
-        is False
-    )
 
 def test_submit_blocks_if_session_changes_after_preflight(
     monkeypatch,
