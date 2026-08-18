@@ -1,3 +1,4 @@
+import { initializeAuthUi } from "./auth-ui.js?v=1";
 console.log("BXK Trader Pro Dashboard - V10");
 
 import {
@@ -329,3 +330,5 @@ initializeDashboardTabs();
 
 
 initializeSystemSettings();
+
+initializeAuthUi();

@@ -1,8 +1,5 @@
-from fastapi import Request
-from fastapi.responses import (
-    JSONResponse,
-    RedirectResponse,
-)
+﻿from fastapi import Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from bxk_app import config
 from bxk_app.services.auth_service import (
@@ -49,7 +46,8 @@ async def enforce_bxk_authentication(
         return JSONResponse(
             status_code=401,
             content={
-                "detail": "BXK authentication required."
+                "detail":
+                    "BXK authentication required."
             },
         )
 
