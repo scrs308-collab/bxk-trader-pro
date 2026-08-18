@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 
 from dotenv import dotenv_values
 
+from bxk_app import config
+
 
 ENV_PATH = Path(".env")
 
@@ -360,6 +362,75 @@ def get_system_settings():
     }
 
 
+
+
+def _apply_runtime_updates(updates):
+    """
+    Apply supported settings immediately to the running
+    BXK process while also preserving module-level settings
+    used by the trading engine and tests.
+    """
+
+    float_fields = {
+        "BXK_MAX_ORDER_RISK",
+        "BXK_MIN_ORDER_CREDIT",
+        "BXK_MIN_REMAINING_BUYING_POWER",
+    }
+
+    broker_fields = {
+        "TASTYTRADE_CLIENT_ID",
+        "TASTYTRADE_CLIENT_SECRET",
+        "TASTYTRADE_REFRESH_TOKEN",
+        "TASTYTRADE_ACCOUNT_NUMBER",
+        "TASTYTRADE_BASE_URL",
+        "TASTYTRADE_USERNAME",
+        "TASTYTRADE_PASSWORD",
+    }
+
+    # Central configuration object.
+    for key in float_fields:
+        if key in updates:
+            setattr(
+                config,
+                key,
+                float(updates[key]),
+            )
+
+    for key in broker_fields:
+        if key in updates:
+            setattr(
+                config,
+                key,
+                str(updates[key]).strip(),
+            )
+
+    # Keep the already-imported order engine synchronized.
+    if float_fields.intersection(updates):
+        from bxk_app.routes import order as order_route
+
+        for key in float_fields:
+            if key in updates:
+                setattr(
+                    order_route,
+                    key,
+                    float(updates[key]),
+                )
+
+    # Keep the already-imported broker module synchronized.
+    if broker_fields.intersection(updates):
+        from bxk_app.brokers import tastytrade as tastytrade_module
+
+        for key in broker_fields:
+            if key in updates:
+                setattr(
+                    tastytrade_module,
+                    key,
+                    str(updates[key]).strip(),
+                )
+
+        tastytrade_module.broker.reset_authentication()
+
+
 def update_system_settings(payload):
     if (
         "BXK_LIVE_TRADING_ENABLED" in payload
@@ -528,12 +599,19 @@ def update_system_settings(payload):
 
     _write_env_updates(updates)
 
+    _apply_runtime_updates(updates)
+
     response = get_system_settings()
 
     response.update(
         {
             "saved": True,
-            "restart_required": True,
+            "restart_required": bool(
+                {
+                    "BXK_APP_USERNAME",
+                    "BXK_APP_PASSWORD_HASH",
+                }.intersection(updates)
+            ),
             "changed_fields": sorted(
                 updates.keys()
             ),

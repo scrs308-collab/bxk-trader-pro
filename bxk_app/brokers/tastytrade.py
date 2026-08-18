@@ -27,6 +27,17 @@ class TastytradeBroker(BrokerBase):
         self.last_error: str | None = None
         self.session = requests.Session()
 
+    def reset_authentication(self):
+        """
+        Clear cached OAuth state after broker settings change.
+
+        The next broker request will authenticate using the
+        current runtime configuration.
+        """
+        self.access_token = None
+        self.token_created_at = 0.0
+        self.last_error = None
+
     # ---------------------------------------------------------
     # Authentication
     # ---------------------------------------------------------

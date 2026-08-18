@@ -99,7 +99,7 @@ def test_blank_secret_preserves_existing_value(
         in text
     )
 
-    assert result["restart_required"] is True
+    assert result["restart_required"] is False
 
 
 def test_app_password_is_hashed(
