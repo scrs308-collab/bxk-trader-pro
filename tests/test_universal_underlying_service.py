@@ -69,6 +69,10 @@ def quote(symbol):
     return {
         "symbol": symbol,
         "last": "100.25",
+        "open": "99.50",
+        "day-high-price": "101.75",
+        "day-low-price": "98.90",
+        "prev-close": "99.10",
         "instrument-type":
             "Equity",
     }
@@ -315,3 +319,35 @@ def test_missing_chain_fails_closed(
         result["reason_code"]
         == "OPTION_CHAIN_UNAVAILABLE"
     )
+
+
+def test_session_market_metrics_are_exposed(
+    monkeypatch,
+):
+    patch_quote(
+        monkeypatch,
+        "SPY",
+    )
+
+    monkeypatch.setattr(
+        service.tastytrade_api,
+        "get_nested_option_chain",
+        lambda value: chain(
+            delivery_type="Shares",
+            amount=100,
+            symbol=value,
+        ),
+    )
+
+    result = (
+        service.discover_underlying(
+            "SPY"
+        )
+    )
+
+    assert result["price"] == 100.25
+    assert result["session_open"] == 99.50
+    assert result["day_high"] == 101.75
+    assert result["day_low"] == 98.90
+    assert result["prev_close"] == 99.10
+    assert result["quote_symbol"] == "SPY"

@@ -414,6 +414,65 @@ def discover_underlying(
 
         "price": price,
 
+        "session_open": (
+            _safe_float(
+                quote.get("open")
+            )
+            if isinstance(
+                quote,
+                dict,
+            )
+            else None
+        ),
+
+        "day_high": (
+            _safe_float(
+                quote.get(
+                    "day-high-price"
+                )
+            )
+            if isinstance(
+                quote,
+                dict,
+            )
+            else None
+        ),
+
+        "day_low": (
+            _safe_float(
+                quote.get(
+                    "day-low-price"
+                )
+            )
+            if isinstance(
+                quote,
+                dict,
+            )
+            else None
+        ),
+
+        "prev_close": (
+            _safe_float(
+                quote.get(
+                    "prev-close"
+                )
+            )
+            if isinstance(
+                quote,
+                dict,
+            )
+            else None
+        ),
+
+        "quote_symbol": (
+            quote.get("symbol")
+            if isinstance(
+                quote,
+                dict,
+            )
+            else None
+        ),
+
         "broker_instrument_type": (
             quote.get("instrument-type")
             if isinstance(
