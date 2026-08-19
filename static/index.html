@@ -77,6 +77,21 @@
 
  <div class="trade-parameters">
   <div class="trade-parameter">
+    <label for="underlyingSelector">
+      Underlying
+    </label>
+
+    <select id="underlyingSelector">
+      <option value="SPX" selected>
+        SPX
+      </option>
+      <option value="QQQ">
+        QQQ
+      </option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
     <label for="strategySelector">
       Strategy
     </label>
@@ -156,6 +171,13 @@
       BUILD TRADE
     </button>
   </div>
+</div>
+
+<div
+  id="underlyingModeNotice"
+  class="underlying-mode-notice spx-mode"
+>
+  SPX | STANDARD MODE
 </div>
 
     <section

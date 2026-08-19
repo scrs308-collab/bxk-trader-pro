@@ -211,10 +211,424 @@ function updateClock() {
   setText("clock", nowTime());
 }
 
+let savedSpxTradeControls = null;
+
+
+function getSelectedUnderlying() {
+  const selector =
+    document.getElementById(
+      "underlyingSelector",
+    );
+
+  return String(
+    selector?.value || "SPX",
+  ).toUpperCase();
+}
+
+
+function setSelectValue(id, value) {
+  const control =
+    document.getElementById(id);
+
+  if (!control) {
+    return;
+  }
+
+  control.value = String(value);
+}
+
+
+function setTradeControlsDisabled(disabled) {
+  [
+    "strategySelector",
+    "dteSelector",
+    "wingWidthSelector",
+    "contractsSelector",
+  ].forEach((id) => {
+    const control =
+      document.getElementById(id);
+
+    if (control) {
+      control.disabled = disabled;
+    }
+  });
+}
+
+
+function applyUnderlyingMode() {
+  const underlying =
+    getSelectedUnderlying();
+
+  const strategy =
+    document.getElementById(
+      "strategySelector",
+    );
+
+  const dte =
+    document.getElementById(
+      "dteSelector",
+    );
+
+  const wing =
+    document.getElementById(
+      "wingWidthSelector",
+    );
+
+  const contracts =
+    document.getElementById(
+      "contractsSelector",
+    );
+
+  const buildButton =
+    document.getElementById(
+      "buildTradeButton",
+    );
+
+  const notice =
+    document.getElementById(
+      "underlyingModeNotice",
+    );
+
+  document.body.dataset.underlying =
+    underlying.toLowerCase();
+
+  if (underlying === "QQQ") {
+    if (!savedSpxTradeControls) {
+      savedSpxTradeControls = {
+        strategy:
+          strategy?.value || "auto",
+        dte:
+          dte?.value || "1",
+        wing:
+          wing?.value || "25",
+        contracts:
+          contracts?.value || "1",
+      };
+    }
+
+    setSelectValue(
+      "strategySelector",
+      "iron_condor",
+    );
+
+    setSelectValue(
+      "dteSelector",
+      "0",
+    );
+
+    setSelectValue(
+      "wingWidthSelector",
+      "5",
+    );
+
+    setSelectValue(
+      "contractsSelector",
+      "1",
+    );
+
+    setTradeControlsDisabled(true);
+
+    if (buildButton) {
+      buildButton.disabled = true;
+      buildButton.textContent =
+        "OBSERVATION ONLY";
+    }
+
+    if (notice) {
+      notice.className =
+        "underlying-mode-notice qqq-mode";
+
+      notice.textContent =
+        "QQQ | OBSERVATION ONLY | EXECUTION BLOCKED";
+    }
+
+    return;
+  }
+
+  setTradeControlsDisabled(false);
+
+  if (savedSpxTradeControls) {
+    setSelectValue(
+      "strategySelector",
+      savedSpxTradeControls.strategy,
+    );
+
+    setSelectValue(
+      "dteSelector",
+      savedSpxTradeControls.dte,
+    );
+
+    setSelectValue(
+      "wingWidthSelector",
+      savedSpxTradeControls.wing,
+    );
+
+    setSelectValue(
+      "contractsSelector",
+      savedSpxTradeControls.contracts,
+    );
+  }
+
+  savedSpxTradeControls = null;
+
+  if (buildButton) {
+    buildButton.disabled = false;
+    buildButton.textContent =
+      "BUILD TRADE";
+  }
+
+  if (notice) {
+    notice.className =
+      "underlying-mode-notice spx-mode";
+
+    notice.textContent =
+      "SPX | STANDARD MODE";
+  }
+}
+
+
+function htmlSafe(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+function displayNumber(
+  value,
+  digits = 2,
+) {
+  const number = Number(value);
+
+  return Number.isFinite(number)
+    ? number.toFixed(digits)
+    : "--";
+}
+
+
+function renderQqqObservationCard(data = {}) {
+  if (
+    getSelectedUnderlying() !== "QQQ"
+  ) {
+    return;
+  }
+
+  const card =
+    document.getElementById(
+      "bestTradeCard",
+    );
+
+  if (!card) {
+    return;
+  }
+
+  const candidate =
+    data.candidate_preview || null;
+
+  const decision =
+    data.qqq_decision || {};
+
+  const stabilityScore =
+    decision.stability_score ??
+    data.stability_score_detail?.score ??
+    null;
+
+  const decisionText =
+    decision.final_decision ??
+    data.final_decision ??
+    "NO TRADE";
+
+  const reason =
+    decision.reason_code ??
+    data.decision_reason_code ??
+    data.candidate_reason_code ??
+    "QQQ_OBSERVATION_ONLY";
+
+  const marketPermission =
+    decision.market_permission ??
+    data.market_permission ??
+    "WAIT";
+
+  if (!candidate) {
+    card.innerHTML = `
+      <div class="hero-header">
+        <div>
+          <div class="eyebrow">
+            QQQ | OBSERVATION ONLY
+          </div>
+
+          <h1>No Candidate Available</h1>
+
+          <div class="subline">
+            QQQ price:
+            ${displayNumber(data.price)}
+            |
+            Expected Move:
+            ${displayNumber(
+              data.expected_move,
+            )}
+          </div>
+        </div>
+
+        <div class="hero-badge no-trade">
+          NO TRADE
+        </div>
+      </div>
+
+      <div class="no-trade-message">
+        ${htmlSafe(reason)}
+      </div>
+    `;
+
+    return;
+  }
+
+  const strikes = [
+    candidate.buy_put,
+    candidate.sell_put,
+    candidate.sell_call,
+    candidate.buy_call,
+  ]
+    .map((value) =>
+      displayNumber(value, 0),
+    )
+    .join(" / ");
+
+  card.innerHTML = `
+    <div class="hero-header">
+      <div>
+        <div class="eyebrow">
+          QQQ | OBSERVATION ONLY
+        </div>
+
+        <h1>Iron Condor Candidate</h1>
+
+        <div class="subline">
+          ${strikes}
+          |
+          0 DTE
+          |
+          ${displayNumber(
+            candidate.wing_width,
+            0,
+          )}-Point Wings
+        </div>
+      </div>
+
+      <div class="hero-badge no-trade">
+        ${htmlSafe(decisionText)}
+      </div>
+    </div>
+
+    <div class="qqq-preview-grid">
+      <div class="qqq-preview-item">
+        <span>QQQ</span>
+        <strong>
+          ${displayNumber(
+            data.price ??
+            candidate.underlying_price,
+          )}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Expected Move</span>
+        <strong>
+          ${displayNumber(
+            data.expected_move ??
+            candidate.expected_move,
+          )}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Stability</span>
+        <strong>
+          ${
+            stabilityScore !== null
+              ? `${displayNumber(
+                  stabilityScore,
+                  1,
+                )} / 100`
+              : "--"
+          }
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Market Permission</span>
+        <strong>
+          ${htmlSafe(marketPermission)}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Live Credit</span>
+        <strong>
+          $${displayNumber(
+            candidate.live_credit,
+          )}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Max Profit</span>
+        <strong>
+          $${displayNumber(
+            candidate.max_profit,
+          )}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Max Risk</span>
+        <strong>
+          $${displayNumber(
+            candidate.max_risk,
+          )}
+        </strong>
+      </div>
+
+      <div class="qqq-preview-item">
+        <span>Return on Risk</span>
+        <strong>
+          ${displayNumber(
+            candidate.return_on_risk,
+          )}%
+        </strong>
+      </div>
+    </div>
+
+    <div class="qqq-observation-reason">
+      <strong>
+        Decision:
+        ${htmlSafe(decisionText)}
+      </strong>
+
+      <span>
+        ${htmlSafe(reason)}
+      </span>
+
+      <span>
+        Candidate may be evaluated,
+        but QQQ order execution remains blocked.
+      </span>
+    </div>
+  `;
+}
+
+
 async function fetchLiveMarketSummary() {
   try {
     const response = await fetch(
-      `/api/live-market?_=${Date.now()}`,
+      `/api/live-market?underlying=${
+        encodeURIComponent(
+          getSelectedUnderlying(),
+        )
+      }&_=${Date.now()}`,
       {
         cache: "no-store",
       },
@@ -229,6 +643,8 @@ async function fetchLiveMarketSummary() {
     const data = await response.json();
 
     updateMarketSummaryLiveData(data);
+
+    renderQqqObservationCard(data);
   } catch (error) {
     console.error(
       "Live market summary failed:",
@@ -332,3 +748,39 @@ initializeDashboardTabs();
 initializeSystemSettings();
 
 initializeAuthUi();
+
+
+function initializeUnderlyingSelector() {
+  const selector =
+    document.getElementById(
+      "underlyingSelector",
+    );
+
+  if (!selector) {
+    return;
+  }
+
+  applyUnderlyingMode();
+
+  selector.addEventListener(
+    "change",
+    () => {
+      applyUnderlyingMode();
+
+      refreshDashboard();
+    },
+  );
+}
+
+
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    initializeUnderlyingSelector,
+    {
+      once: true,
+    },
+  );
+} else {
+  initializeUnderlyingSelector();
+}

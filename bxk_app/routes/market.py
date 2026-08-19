@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 from bxk_app.services.market_service import (
     get_debug_market,
@@ -7,6 +7,9 @@ from bxk_app.services.market_service import (
     get_recent_condor_risk_summaries,
     get_today_condor_risk_summary,
     refresh_market_data,
+)
+from bxk_app.universal_underlying_service import (
+    discover_underlying,
 )
 
 
@@ -27,8 +30,45 @@ def market_brief():
 
 
 @router.get("/live-market")
-def live_market():
-    return get_live_market()
+def live_market(
+    underlying: str = Query(
+        "SPX",
+        description=(
+            "Currently enabled live analytical "
+            "underlying: SPX or QQQ"
+        ),
+    ),
+):
+    try:
+        return get_live_market(underlying)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/underlying-discovery")
+def underlying_discovery(
+    symbol: str = Query(
+        ...,
+        min_length=1,
+        max_length=32,
+        description=(
+            "Underlying symbol to discover "
+            "through the broker option chain"
+        ),
+    ),
+):
+    try:
+        return discover_underlying(
+            symbol
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/debug/market")
