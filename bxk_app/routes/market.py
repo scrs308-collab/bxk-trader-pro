@@ -11,6 +11,9 @@ from bxk_app.services.market_service import (
 from bxk_app.universal_underlying_service import (
     discover_underlying,
 )
+from bxk_app.universal_option_analysis_service import (
+    analyze_underlying,
+)
 
 
 router = APIRouter(
@@ -63,6 +66,45 @@ def underlying_discovery(
     try:
         return discover_underlying(
             symbol
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/underlying-analysis")
+def underlying_analysis(
+    symbol: str = Query(
+        ...,
+        min_length=1,
+        max_length=32,
+        description=(
+            "Option underlying symbol"
+        ),
+    ),
+    dte: int | None = Query(
+        None,
+        ge=0,
+        le=3650,
+        description=(
+            "Exact days to expiration"
+        ),
+    ),
+    wing_width: float | None = Query(
+        None,
+        gt=0,
+        description=(
+            "Requested iron-condor wing width"
+        ),
+    ),
+):
+    try:
+        return analyze_underlying(
+            symbol,
+            days_to_expiration=dte,
+            wing_width=wing_width,
         )
     except ValueError as exc:
         raise HTTPException(
