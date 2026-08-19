@@ -9,6 +9,18 @@ from bxk_app.option_chain_service import (
 from bxk_app.underlying_condor_scanner import (
     build_and_price_underlying_condor,
 )
+from bxk_app.underlying_stability import (
+    calculate_underlying_stability_metrics,
+)
+from bxk_app.condor_stability_score import (
+    calculate_condor_stability_score,
+)
+from bxk_app.range_expansion_pressure import (
+    calculate_range_expansion_pressure,
+)
+from bxk_app.market_session import (
+    get_market_session_phase,
+)
 
 
 def _safe_int(value):
@@ -134,6 +146,13 @@ def analyze_underlying(
         "candidate_preview": None,
         "candidate_result": None,
 
+        "stability_available": False,
+        "stability_signal_ready": False,
+        "stability_metrics": None,
+        "range_expansion_pressure": None,
+        "stability_score": None,
+        "stability_score_detail": None,
+
         "analysis_ready": False,
 
         "signal_ready": False,
@@ -235,6 +254,173 @@ def analyze_underlying(
             )
         )
         return result
+
+    # -------------------------------------------------
+    # UNIVERSAL STABILITY
+    # -------------------------------------------------
+
+    try:
+        session = (
+            get_market_session_phase()
+        )
+    except Exception:
+        session = {
+            "session_phase": None,
+            "minutes_since_open": None,
+            "market_status": "UNKNOWN",
+        }
+
+    market_status = str(
+        session.get(
+            "market_status",
+            "LIVE",
+        )
+        or "LIVE"
+    ).upper()
+
+    stability = (
+        calculate_underlying_stability_metrics(
+            symbol=discovery["symbol"],
+            underlying_price=(
+                discovery.get("price")
+            ),
+            expected_move=(
+                expected.get(
+                    "expected_move"
+                )
+            ),
+            session_open=(
+                discovery.get(
+                    "session_open"
+                )
+            ),
+            day_high=(
+                discovery.get(
+                    "day_high"
+                )
+            ),
+            day_low=(
+                discovery.get(
+                    "day_low"
+                )
+            ),
+            prev_close=(
+                discovery.get(
+                    "prev_close"
+                )
+            ),
+            expected_move_source=(
+                expected.get(
+                    "source"
+                )
+            ),
+            market_status=market_status,
+        )
+    )
+
+    result[
+        "stability_metrics"
+    ] = stability
+
+    result[
+        "stability_available"
+    ] = (
+        stability.get("available")
+        is True
+    )
+
+    result[
+        "stability_signal_ready"
+    ] = (
+        stability.get(
+            "signal_ready"
+        )
+        is True
+    )
+
+    pressure = (
+        calculate_range_expansion_pressure(
+            signal_ready=(
+                stability.get(
+                    "signal_ready"
+                )
+            ),
+            session_phase=(
+                session.get(
+                    "session_phase"
+                )
+            ),
+            minutes_since_open=(
+                session.get(
+                    "minutes_since_open"
+                )
+            ),
+            directional_consumed_pct=(
+                stability.get(
+                    "directional_consumed_pct"
+                )
+            ),
+        )
+    )
+
+    result[
+        "range_expansion_pressure"
+    ] = pressure
+
+    stability_score = (
+        calculate_condor_stability_score(
+            signal_ready=(
+                stability.get(
+                    "signal_ready"
+                )
+            ),
+            directional_consumed_pct=(
+                stability.get(
+                    "directional_consumed_pct"
+                )
+            ),
+            current_displacement_pct=(
+                stability.get(
+                    "current_displacement_pct"
+                )
+            ),
+            range_band_consumed_pct=(
+                stability.get(
+                    "range_band_consumed_pct"
+                )
+            ),
+            overnight_gap_pct=(
+                stability.get(
+                    "overnight_gap_pct"
+                )
+            ),
+            pressure_ratio=(
+                pressure.get(
+                    "pressure_ratio"
+                )
+                if isinstance(
+                    pressure,
+                    dict,
+                )
+                else None
+            ),
+        )
+    )
+
+    result[
+        "stability_score_detail"
+    ] = stability_score
+
+    result["stability_score"] = (
+        stability_score.get(
+            "score"
+        )
+        if isinstance(
+            stability_score,
+            dict,
+        )
+        else None
+    )
 
     # -------------------------------------------------
     # CANDIDATE
