@@ -21,6 +21,9 @@ from bxk_app.range_expansion_pressure import (
 from bxk_app.market_session import (
     get_market_session_phase,
 )
+from bxk_app.underlying_decision import (
+    evaluate_underlying_condor_decision,
+)
 
 
 def _safe_int(value):
@@ -152,6 +155,12 @@ def analyze_underlying(
         "range_expansion_pressure": None,
         "stability_score": None,
         "stability_score_detail": None,
+
+        "decision": None,
+        "strategy_status": None,
+        "market_permission": None,
+        "final_decision": "NO TRADE",
+        "decision_reason_code": None,
 
         "analysis_ready": False,
 
@@ -483,6 +492,50 @@ def analyze_underlying(
         and result[
             "candidate_pricing_ready"
         ]
+    )
+
+    decision = (
+        evaluate_underlying_condor_decision(
+            symbol=discovery["symbol"],
+            stability_score_detail=(
+                stability_score
+            ),
+            candidate_result=(
+                candidate_result
+            ),
+            verified_profile=(
+                discovery.get(
+                    "verified_profile",
+                    False,
+                )
+            ),
+        )
+    )
+
+    result["decision"] = decision
+
+    result["strategy_status"] = (
+        decision.get(
+            "strategy_status"
+        )
+    )
+
+    result["market_permission"] = (
+        decision.get(
+            "market_permission"
+        )
+    )
+
+    result["final_decision"] = (
+        decision.get(
+            "final_decision"
+        )
+    )
+
+    result["decision_reason_code"] = (
+        decision.get(
+            "reason_code"
+        )
     )
 
     # Explicit safety boundary.

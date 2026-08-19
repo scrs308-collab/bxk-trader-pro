@@ -393,3 +393,111 @@ def test_universal_stability_is_exposed(
         result["execution_enabled"]
         is False
     )
+
+
+def test_universal_decision_is_exposed(
+    monkeypatch,
+):
+    base = discovery(
+        "SPY",
+        dtes=(0,),
+    )
+
+    base.update(
+        {
+            "session_open": 99.0,
+            "day_high": 101.0,
+            "day_low": 98.0,
+            "prev_close": 98.5,
+            "verified_profile": False,
+        }
+    )
+
+    monkeypatch.setattr(
+        service,
+        "discover_underlying",
+        lambda symbol: base,
+    )
+
+    monkeypatch.setattr(
+        service,
+        "calculate_atm_straddle_expected_move",
+        lambda *args, **kwargs: {
+            "available": True,
+            "expected_move": 4.0,
+            "expected_move_pct": 4.0,
+            "source":
+                "OPTION_CHAIN_ATM_STRADDLE",
+        },
+    )
+
+    monkeypatch.setattr(
+        service,
+        "get_market_session_phase",
+        lambda: {
+            "market_status": "LIVE",
+            "session_phase": "EARLY",
+            "minutes_since_open": 60,
+        },
+    )
+
+    monkeypatch.setattr(
+        service,
+        "calculate_range_expansion_pressure",
+        lambda **kwargs: {
+            "available": True,
+            "pressure_ratio": 1.0,
+        },
+    )
+
+    monkeypatch.setattr(
+        service,
+        "calculate_condor_stability_score",
+        lambda **kwargs: {
+            "available": True,
+            "score": 82.0,
+        },
+    )
+
+    monkeypatch.setattr(
+        service,
+        "build_and_price_underlying_condor",
+        lambda *args, **kwargs:
+            priced_candidate(),
+    )
+
+    result = (
+        service.analyze_underlying(
+            "SPY",
+            days_to_expiration=0,
+            wing_width=5,
+        )
+    )
+
+    assert (
+        result["strategy_status"]
+        == "APPROVED"
+    )
+
+    assert (
+        result["market_permission"]
+        == "TRADE"
+    )
+
+    assert (
+        result["final_decision"]
+        == "NO TRADE"
+    )
+
+    assert (
+        result["decision_reason_code"]
+        == (
+            "UNVERIFIED_PROFILE_"
+            "EXECUTION_BLOCKED"
+        )
+    )
+
+    assert (
+        result["execution_enabled"]
+        is False
+    )
