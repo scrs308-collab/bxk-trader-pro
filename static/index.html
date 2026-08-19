@@ -81,14 +81,35 @@
       Underlying
     </label>
 
-    <select id="underlyingSelector">
-      <option value="SPX" selected>
-        SPX
-      </option>
-      <option value="QQQ">
-        QQQ
-      </option>
-    </select>
+    <div class="underlying-input-row">
+      <input
+        id="underlyingSelector"
+        type="text"
+        value="SPX"
+        maxlength="16"
+        autocomplete="off"
+        spellcheck="false"
+        list="underlyingSuggestions"
+        aria-label="Option underlying symbol"
+      />
+
+      <button
+        id="underlyingLoadButton"
+        class="underlying-load-button"
+        type="button"
+      >
+        LOAD
+      </button>
+    </div>
+
+    <datalist id="underlyingSuggestions">
+      <option value="SPX"></option>
+      <option value="QQQ"></option>
+      <option value="SPY"></option>
+      <option value="IWM"></option>
+      <option value="DIA"></option>
+      <option value="XSP"></option>
+    </datalist>
   </div>
 
   <div class="trade-parameter">

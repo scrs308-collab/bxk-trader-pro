@@ -5639,3 +5639,42 @@ body[data-theme="light"]
       repeat(2, minmax(0, 1fr));
   }
 }
+
+/* =========================================================
+   UNIVERSAL UNDERLYING SEARCH
+   ========================================================= */
+
+.underlying-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.underlying-input-row input {
+  width: 100%;
+  min-width: 90px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(140, 170, 210, 0.28);
+  background: rgba(10, 18, 30, 0.70);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.underlying-load-button {
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(120, 190, 255, 0.35);
+  background: rgba(70, 120, 180, 0.16);
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.underlying-load-button:hover {
+  background: rgba(70, 120, 180, 0.26);
+}
