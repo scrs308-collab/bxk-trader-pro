@@ -102,3 +102,46 @@ def test_future_timestamp_fails_closed():
         result["reason_code"]
         == "ES_QUOTE_TIMESTAMP_IN_FUTURE"
     )
+
+
+def test_naive_quote_timestamp_fails_closed():
+    result = evaluate_future_quote_health(
+        quote={
+            "updated-at":
+                "2026-08-20T13:11:45",
+            "is-trading-halted": False,
+        },
+        as_of=NOW,
+    )
+
+    assert result["healthy"] is False
+
+    assert (
+        result["reason_code"]
+        == "ES_QUOTE_TIMESTAMP_UNAVAILABLE"
+    )
+
+
+def test_naive_as_of_fails_closed():
+    result = evaluate_future_quote_health(
+        quote={
+            "updated-at":
+                "2026-08-20T13:11:45Z",
+            "is-trading-halted": False,
+        },
+        as_of=datetime(
+            2026,
+            8,
+            20,
+            13,
+            12,
+            0,
+        ),
+    )
+
+    assert result["healthy"] is False
+
+    assert (
+        result["reason_code"]
+        == "ES_QUOTE_AS_OF_INVALID"
+    )

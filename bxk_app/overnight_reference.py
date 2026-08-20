@@ -218,16 +218,15 @@ def _utc_datetime(value):
         except (TypeError, ValueError):
             return None
 
+    # A risk-control timestamp without an explicit
+    # timezone is ambiguous. Fail closed rather than
+    # silently assuming UTC.
     if result.tzinfo is None:
-        result = result.replace(
-            tzinfo=timezone.utc
-        )
-    else:
-        result = result.astimezone(
-            timezone.utc
-        )
+        return None
 
-    return result
+    return result.astimezone(
+        timezone.utc
+    )
 
 
 def evaluate_future_quote_health(
@@ -284,14 +283,22 @@ def evaluate_future_quote_health(
                 "ES_QUOTE_TIMESTAMP_UNAVAILABLE",
         }
 
-    current = _utc_datetime(
-        as_of
-    )
-
-    if current is None:
+    if as_of is None:
         current = datetime.now(
             timezone.utc
         )
+    else:
+        current = _utc_datetime(
+            as_of
+        )
+
+        if current is None:
+            return {
+                "available": False,
+                "healthy": False,
+                "reason_code":
+                    "ES_QUOTE_AS_OF_INVALID",
+            }
 
     age_seconds = (
         current - updated_at
