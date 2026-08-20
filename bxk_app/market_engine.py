@@ -24,6 +24,10 @@ from bxk_app.services.condor_stability_logger import (
 )
 
 
+from bxk_app.services.overnight_baseline_service import (
+    maybe_capture_overnight_baseline,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -219,6 +223,20 @@ class MarketEngine:
         except Exception:
             logger.exception(
                 "Condor Stability logging failed"
+            )
+
+        # Capture a synchronized SPX / ES overnight
+        # baseline near the regular-session close.
+        #
+        # Observation only. Failure here must never
+        # interfere with market analysis or trading.
+        try:
+            maybe_capture_overnight_baseline(
+                spx_price=spx_price,
+            )
+        except Exception:
+            logger.exception(
+                "Overnight baseline capture failed"
             )
 
         return market_data.get_header()
