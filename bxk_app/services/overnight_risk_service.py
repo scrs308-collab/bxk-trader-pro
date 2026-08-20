@@ -6,6 +6,7 @@ from bxk_app.overnight_baseline import (
 )
 from bxk_app.overnight_reference import (
     calculate_overnight_spx_reference,
+    evaluate_future_quote_health,
 )
 from bxk_app.overnight_risk import (
     calculate_overnight_risk,
@@ -244,6 +245,32 @@ def get_live_overnight_risk(
         )
 
     # -------------------------------------------------
+    # Quote health gate.
+    #
+    # Never calculate overnight risk from stale or
+    # explicitly halted ES market data.
+    # -------------------------------------------------
+
+    quote_health = evaluate_future_quote_health(
+        quote=es_quote,
+    )
+
+    if not quote_health.get(
+        "healthy",
+        False,
+    ):
+        return _unavailable(
+            quote_health.get(
+                "reason_code",
+                "ES_QUOTE_UNHEALTHY",
+            ),
+            session=session,
+            baseline=baseline,
+            es_symbol=quote_symbol,
+            quote_health=quote_health,
+        )
+
+    # -------------------------------------------------
     # Calculate overnight SPX proxy.
     # -------------------------------------------------
 
@@ -404,6 +431,9 @@ def get_live_overnight_risk(
             baseline_source,
 
         "baseline": baseline,
+
+        "quote_health":
+            quote_health,
 
         "reference": reference,
 

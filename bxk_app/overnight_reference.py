@@ -195,3 +195,157 @@ def calculate_overnight_spx_reference(
 
         "updated_at": updated_at,
     }
+
+from datetime import datetime, timezone
+
+
+def _utc_datetime(value):
+    if isinstance(value, datetime):
+        result = value
+    else:
+        text = str(value or "").strip()
+
+        if not text:
+            return None
+
+        try:
+            result = datetime.fromisoformat(
+                text.replace(
+                    "Z",
+                    "+00:00",
+                )
+            )
+        except (TypeError, ValueError):
+            return None
+
+    if result.tzinfo is None:
+        result = result.replace(
+            tzinfo=timezone.utc
+        )
+    else:
+        result = result.astimezone(
+            timezone.utc
+        )
+
+    return result
+
+
+def evaluate_future_quote_health(
+    *,
+    quote,
+    as_of=None,
+    max_age_seconds=120,
+    future_tolerance_seconds=5,
+):
+    """
+    Fail-closed health evaluation for a live
+    futures quote.
+
+    This function is observation only.
+    """
+
+    if not isinstance(quote, dict):
+        return {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_UNAVAILABLE",
+        }
+
+    halted = quote.get(
+        "is-trading-halted"
+    )
+
+    halted_text = str(
+        halted
+    ).strip().lower()
+
+    if (
+        halted is True
+        or halted_text
+        in {"true", "1", "yes"}
+    ):
+        return {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_HALTED",
+        }
+
+    updated_at = _utc_datetime(
+        quote.get("updated-at")
+    )
+
+    if updated_at is None:
+        return {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_TIMESTAMP_UNAVAILABLE",
+        }
+
+    current = _utc_datetime(
+        as_of
+    )
+
+    if current is None:
+        current = datetime.now(
+            timezone.utc
+        )
+
+    age_seconds = (
+        current - updated_at
+    ).total_seconds()
+
+    if (
+        age_seconds
+        < -float(
+            future_tolerance_seconds
+        )
+    ):
+        return {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_TIMESTAMP_IN_FUTURE",
+            "quote_age_seconds":
+                round(age_seconds, 3),
+            "updated_at":
+                updated_at.isoformat(),
+        }
+
+    if (
+        age_seconds
+        > float(max_age_seconds)
+    ):
+        return {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_STALE",
+            "quote_age_seconds":
+                round(age_seconds, 3),
+            "max_age_seconds":
+                max_age_seconds,
+            "updated_at":
+                updated_at.isoformat(),
+        }
+
+    return {
+        "available": True,
+        "healthy": True,
+        "reason_code":
+            "ES_QUOTE_HEALTHY",
+        "quote_age_seconds":
+            round(
+                max(
+                    age_seconds,
+                    0.0,
+                ),
+                3,
+            ),
+        "max_age_seconds":
+            max_age_seconds,
+        "updated_at":
+            updated_at.isoformat(),
+    }

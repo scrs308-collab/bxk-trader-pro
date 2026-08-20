@@ -450,3 +450,65 @@ def test_inactive_session_does_not_require_baseline(
         result["reason_code"]
         == "SPX_GTH_INACTIVE"
     )
+
+
+@pytest.fixture(autouse=True)
+def healthy_es_quote_gate(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "evaluate_future_quote_health",
+        lambda **kwargs: {
+            "available": True,
+            "healthy": True,
+            "reason_code":
+                "ES_QUOTE_HEALTHY",
+            "quote_age_seconds": 1.0,
+        },
+    )
+
+
+def test_service_fails_closed_on_stale_es_quote(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: STORED_BASELINE,
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service.broker,
+        "get_future_quote",
+        lambda symbol: ES_QUOTE,
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "evaluate_future_quote_health",
+        lambda **kwargs: {
+            "available": False,
+            "healthy": False,
+            "reason_code":
+                "ES_QUOTE_STALE",
+            "quote_age_seconds": 300,
+        },
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["available"] is False
+
+    assert (
+        result["reason_code"]
+        == "ES_QUOTE_STALE"
+    )
+
+    assert (
+        result["execution_authorized"]
+        is False
+    )
