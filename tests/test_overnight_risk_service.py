@@ -24,6 +24,25 @@ ES_QUOTE = {
 }
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def active_gth_session(monkeypatch):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_spx_gth_session",
+        lambda: {
+            "active": True,
+            "state": "GTH",
+            "reason_code":
+                "SPX_GTH_ACTIVE",
+            "eastern_time":
+                "2026-08-20T08:00:00-04:00",
+        },
+    )
+
+
 TODAY_POSITION = {
     "strategy": "SPX Iron Condor",
     "underlying": "SPX",
@@ -209,4 +228,39 @@ def test_service_fails_closed_without_prior_close():
     assert (
         result["reason_code"]
         == "PRIOR_SPX_CLOSE_UNAVAILABLE"
+    )
+
+
+def test_service_fails_closed_outside_gth(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_spx_gth_session",
+        lambda: {
+            "active": False,
+            "state": "INACTIVE",
+            "reason_code":
+                "SPX_GTH_INACTIVE",
+            "eastern_time":
+                "2026-08-20T12:00:00-04:00",
+        },
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk(
+            prior_spx_close=7707.98
+        )
+    )
+
+    assert result["available"] is False
+    assert result["state"] == "INACTIVE"
+    assert (
+        result["reason_code"]
+        == "SPX_GTH_INACTIVE"
+    )
+    assert (
+        result["execution_authorized"]
+        is False
     )

@@ -7,6 +7,9 @@ from bxk_app.overnight_reference import (
 from bxk_app.overnight_risk import (
     calculate_overnight_risk,
 )
+from bxk_app.overnight_session import (
+    get_spx_gth_session,
+)
 from bxk_app.services.position_service import (
     get_position_monitor,
 )
@@ -81,6 +84,20 @@ def get_live_overnight_risk(
             "state": "UNAVAILABLE",
             "reason_code":
                 "PRIOR_SPX_CLOSE_UNAVAILABLE",
+        }
+
+    session = get_spx_gth_session()
+
+    if not session.get("active", False):
+        return {
+            "available": False,
+            "observation_only": True,
+            "execution_authorized": False,
+            "state": "INACTIVE",
+            "recommendation": "NONE",
+            "reason_code":
+                "SPX_GTH_INACTIVE",
+            "session": session,
         }
 
     active_contract = (
@@ -275,6 +292,8 @@ def get_live_overnight_risk(
         ].get(
             "reason_code"
         ),
+
+        "session": session,
 
         "reference": reference,
 

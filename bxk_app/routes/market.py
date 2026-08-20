@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
 
+from bxk_app.services.overnight_risk_service import (
+    get_live_overnight_risk,
+)
+
 from bxk_app.services.market_service import (
     get_debug_market,
     get_live_market,
@@ -111,6 +115,30 @@ def underlying_analysis(
             status_code=400,
             detail=str(exc),
         ) from exc
+
+
+@router.get("/overnight-risk")
+def overnight_risk(
+    prior_spx_close: float = Query(
+        ...,
+        gt=0,
+        description=(
+            "Prior regular-session SPX close"
+        ),
+    ),
+    es_anchor_price: float | None = Query(
+        None,
+        gt=0,
+        description=(
+            "Optional ES price captured alongside "
+            "the SPX closing snapshot"
+        ),
+    ),
+):
+    return get_live_overnight_risk(
+        prior_spx_close=prior_spx_close,
+        es_anchor_price=es_anchor_price,
+    )
 
 
 @router.get("/debug/market")
