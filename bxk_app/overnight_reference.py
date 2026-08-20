@@ -46,6 +46,19 @@ def _select_future_price(quote):
     return None, "NONE"
 
 
+def select_future_reference_price(
+    quote,
+):
+    """
+    Return the preferred futures reference price
+    and its source label.
+    """
+
+    return _select_future_price(
+        quote
+    )
+
+
 def calculate_overnight_spx_reference(
     *,
     prior_spx_close,
