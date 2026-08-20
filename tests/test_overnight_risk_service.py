@@ -216,11 +216,11 @@ def test_service_fails_closed_without_es_contract(
     )
 
 
-def test_service_fails_closed_without_prior_close():
+def test_service_fails_closed_with_invalid_manual_close():
     result = (
         overnight_risk_service
         .get_live_overnight_risk(
-            prior_spx_close=None
+            prior_spx_close=-1
         )
     )
 
@@ -228,6 +228,10 @@ def test_service_fails_closed_without_prior_close():
     assert (
         result["reason_code"]
         == "PRIOR_SPX_CLOSE_UNAVAILABLE"
+    )
+    assert (
+        result["execution_authorized"]
+        is False
     )
 
 
@@ -263,4 +267,186 @@ def test_service_fails_closed_outside_gth(
     assert (
         result["execution_authorized"]
         is False
+    )
+
+
+STORED_BASELINE = {
+    "schema_version": 1,
+    "trading_date": "2026-08-20",
+    "captured_at":
+        "2026-08-20T15:59:45-04:00",
+    "reference_source":
+        "RTH_CLOSE_SNAPSHOT",
+    "spx_close": 7707.98,
+    "es_anchor_price": 7729.0,
+    "es_symbol": "/ESU6",
+}
+
+
+def test_service_auto_loads_stored_baseline(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: STORED_BASELINE,
+    )
+
+    captured = {}
+
+    def fake_quote(symbol):
+        captured["symbol"] = symbol
+        return ES_QUOTE
+
+    monkeypatch.setattr(
+        overnight_risk_service.broker,
+        "get_future_quote",
+        fake_quote,
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service.broker,
+        "get_active_future",
+        lambda product_code: (
+            (_ for _ in ()).throw(
+                AssertionError(
+                    "Active future should not "
+                    "be rediscovered when a "
+                    "stored baseline exists."
+                )
+            )
+        ),
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_position_monitor",
+        lambda: {
+            "positions": [
+                TODAY_POSITION,
+            ]
+        },
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["available"] is True
+
+    assert (
+        result["baseline_source"]
+        == "STORED"
+    )
+
+    assert captured["symbol"] == "/ESU6"
+
+    assert (
+        result["es_contract"][
+            "selection_source"
+        ]
+        == "BASELINE"
+    )
+
+    assert (
+        result["reference"][
+            "calibration_quality"
+        ]
+        == "PREFERRED"
+    )
+
+
+def test_service_fails_closed_without_baseline(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: None,
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["available"] is False
+
+    assert (
+        result["reason_code"]
+        == "OVERNIGHT_BASELINE_UNAVAILABLE"
+    )
+
+    assert (
+        result["execution_authorized"]
+        is False
+    )
+
+
+def test_service_fails_closed_with_invalid_baseline(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: {
+            "spx_close": 7707.98,
+            "es_anchor_price": None,
+            "es_symbol": "/ESU6",
+        },
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["available"] is False
+
+    assert (
+        result["reason_code"]
+        == "OVERNIGHT_BASELINE_INVALID"
+    )
+
+
+def test_inactive_session_does_not_require_baseline(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_spx_gth_session",
+        lambda: {
+            "active": False,
+            "state": "INACTIVE",
+            "reason_code":
+                "SPX_GTH_INACTIVE",
+            "eastern_time":
+                "2026-08-20T12:00:00-04:00",
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: (
+            (_ for _ in ()).throw(
+                AssertionError(
+                    "Baseline should not load "
+                    "outside GTH."
+                )
+            )
+        ),
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["state"] == "INACTIVE"
+
+    assert (
+        result["reason_code"]
+        == "SPX_GTH_INACTIVE"
     )

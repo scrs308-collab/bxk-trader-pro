@@ -119,11 +119,12 @@ def underlying_analysis(
 
 @router.get("/overnight-risk")
 def overnight_risk(
-    prior_spx_close: float = Query(
-        ...,
+    prior_spx_close: float | None = Query(
+        None,
         gt=0,
         description=(
-            "Prior regular-session SPX close"
+            "Optional diagnostic override for "
+            "the stored SPX close baseline"
         ),
     ),
     es_anchor_price: float | None = Query(

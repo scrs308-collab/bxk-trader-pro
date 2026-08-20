@@ -1,6 +1,9 @@
 from datetime import datetime
 
 from bxk_app.brokers.tastytrade import broker
+from bxk_app.overnight_baseline import (
+    load_overnight_baseline,
+)
 from bxk_app.overnight_reference import (
     calculate_overnight_spx_reference,
 )
@@ -53,120 +56,216 @@ def _extract_position_fields(position):
     return required
 
 
+def _unavailable(
+    reason_code,
+    *,
+    state="UNAVAILABLE",
+    **extra,
+):
+    payload = {
+        "available": False,
+        "observation_only": True,
+        "execution_authorized": False,
+        "state": state,
+        "reason_code": reason_code,
+    }
+
+    payload.update(extra)
+
+    return payload
+
+
 def get_live_overnight_risk(
     *,
-    prior_spx_close,
+    prior_spx_close=None,
     es_anchor_price=None,
 ):
     """
     Build one live observation-only overnight
     SPX iron-condor risk assessment.
 
-    This service:
-      - discovers the active ES future
-      - retrieves its live quote
-      - estimates the overnight SPX level
-      - retrieves the current open SPX condor
-      - evaluates overnight position risk
+    Normal operation automatically loads the
+    synchronized RTH-close SPX / ES baseline.
 
-    It does NOT submit or modify orders.
+    Manual prior_spx_close and es_anchor_price
+    remain available for diagnostics.
+
+    This service does NOT submit, modify,
+    authorize, or cancel orders.
     """
 
-    close = _safe_float(
-        prior_spx_close
-    )
-
-    if close is None or close <= 0:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
-                "PRIOR_SPX_CLOSE_UNAVAILABLE",
-        }
+    # -------------------------------------------------
+    # Session gate first.
+    #
+    # Outside GTH there is no reason to require,
+    # load, or validate an overnight baseline.
+    # -------------------------------------------------
 
     session = get_spx_gth_session()
 
     if not session.get("active", False):
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "INACTIVE",
-            "recommendation": "NONE",
-            "reason_code":
-                "SPX_GTH_INACTIVE",
-            "session": session,
-        }
+        return _unavailable(
+            "SPX_GTH_INACTIVE",
+            state="INACTIVE",
+            recommendation="NONE",
+            session=session,
+        )
 
-    active_contract = (
-        broker.get_active_future("ES")
+    # -------------------------------------------------
+    # Resolve baseline/reference inputs.
+    # -------------------------------------------------
+
+    manual_close = _safe_float(
+        prior_spx_close
     )
 
-    if not active_contract:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
+    baseline = None
+    baseline_source = "MANUAL"
+
+    close = manual_close
+    anchor = _safe_float(
+        es_anchor_price
+    )
+
+    es_symbol = None
+    active_contract = None
+
+    if close is None:
+        baseline = load_overnight_baseline()
+
+        if not baseline:
+            return _unavailable(
+                "OVERNIGHT_BASELINE_UNAVAILABLE",
+                session=session,
+            )
+
+        close = _safe_float(
+            baseline.get("spx_close")
+        )
+
+        anchor = _safe_float(
+            baseline.get(
+                "es_anchor_price"
+            )
+        )
+
+        es_symbol = str(
+            baseline.get("es_symbol")
+            or ""
+        ).strip()
+
+        if (
+            close is None
+            or close <= 0
+            or anchor is None
+            or anchor <= 0
+            or not es_symbol
+        ):
+            return _unavailable(
+                "OVERNIGHT_BASELINE_INVALID",
+                session=session,
+                baseline=baseline,
+            )
+
+        baseline_source = "STORED"
+
+    elif close <= 0:
+        return _unavailable(
+            "PRIOR_SPX_CLOSE_UNAVAILABLE",
+            session=session,
+        )
+
+    # -------------------------------------------------
+    # Stored baseline:
+    #
+    # Use the SAME ES contract captured at RTH close.
+    # This protects the proxy from futures rollover.
+    # -------------------------------------------------
+
+    if baseline_source == "STORED":
+        quote_symbol = es_symbol
+
+    else:
+        active_contract = (
+            broker.get_active_future("ES")
+        )
+
+        if not active_contract:
+            return _unavailable(
                 "ACTIVE_ES_CONTRACT_UNAVAILABLE",
-            "broker_error":
-                broker.last_error,
-        }
+                session=session,
+                broker_error=broker.last_error,
+            )
 
-    es_symbol = active_contract.get(
-        "symbol"
-    )
+        quote_symbol = str(
+            active_contract.get("symbol")
+            or ""
+        ).strip()
 
-    if not es_symbol:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
+        if not quote_symbol:
+            return _unavailable(
                 "ACTIVE_ES_SYMBOL_UNAVAILABLE",
-        }
+                session=session,
+            )
+
+    # -------------------------------------------------
+    # Retrieve current ES quote.
+    # -------------------------------------------------
 
     es_quote = broker.get_future_quote(
-        es_symbol
+        quote_symbol
     )
 
     if not es_quote:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
-                "ES_QUOTE_UNAVAILABLE",
-            "es_symbol": es_symbol,
-            "broker_error":
-                broker.last_error,
-        }
+        return _unavailable(
+            "ES_QUOTE_UNAVAILABLE",
+            session=session,
+            baseline=baseline,
+            es_symbol=quote_symbol,
+            broker_error=broker.last_error,
+        )
+
+    returned_symbol = str(
+        es_quote.get("symbol")
+        or ""
+    ).strip()
+
+    if (
+        returned_symbol
+        and returned_symbol.upper()
+        != quote_symbol.upper()
+    ):
+        return _unavailable(
+            "ES_QUOTE_SYMBOL_MISMATCH",
+            session=session,
+            baseline=baseline,
+            requested_symbol=quote_symbol,
+            returned_symbol=returned_symbol,
+        )
+
+    # -------------------------------------------------
+    # Calculate overnight SPX proxy.
+    # -------------------------------------------------
 
     reference = (
         calculate_overnight_spx_reference(
             prior_spx_close=close,
             es_quote=es_quote,
-            es_anchor_price=es_anchor_price,
+            es_anchor_price=anchor,
         )
     )
 
-    if not reference.get(
-        "available"
-    ):
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
-                "OVERNIGHT_REFERENCE_UNAVAILABLE",
-            "reference": reference,
-        }
+    if not reference.get("available"):
+        return _unavailable(
+            "OVERNIGHT_REFERENCE_UNAVAILABLE",
+            session=session,
+            baseline=baseline,
+            reference=reference,
+        )
+
+    # -------------------------------------------------
+    # Retrieve actual open SPX condor(s).
+    # -------------------------------------------------
 
     monitor = get_position_monitor()
 
@@ -177,15 +276,13 @@ def get_live_overnight_risk(
     ) or []
 
     if not positions:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "NO_POSITION",
-            "reason_code":
-                "NO_OPEN_SPX_CONDOR",
-            "reference": reference,
-        }
+        return _unavailable(
+            "NO_OPEN_SPX_CONDOR",
+            state="NO_POSITION",
+            session=session,
+            baseline=baseline,
+            reference=reference,
+        )
 
     results = []
 
@@ -202,21 +299,11 @@ def get_live_overnight_risk(
                 reference["estimated_spx"]
             ),
             prior_close=close,
-            long_put=fields[
-                "long_put"
-            ],
-            short_put=fields[
-                "short_put"
-            ],
-            short_call=fields[
-                "short_call"
-            ],
-            long_call=fields[
-                "long_call"
-            ],
-            quantity=fields[
-                "quantity"
-            ],
+            long_put=fields["long_put"],
+            short_put=fields["short_put"],
+            short_call=fields["short_call"],
+            long_call=fields["long_call"],
+            quantity=fields["quantity"],
             opening_credit=fields[
                 "opening_credit"
             ],
@@ -240,15 +327,16 @@ def get_live_overnight_risk(
         )
 
     if not results:
-        return {
-            "available": False,
-            "observation_only": True,
-            "execution_authorized": False,
-            "state": "UNAVAILABLE",
-            "reason_code":
-                "SUPPORTED_POSITION_UNAVAILABLE",
-            "reference": reference,
-        }
+        return _unavailable(
+            "SUPPORTED_POSITION_UNAVAILABLE",
+            session=session,
+            baseline=baseline,
+            reference=reference,
+        )
+
+    # -------------------------------------------------
+    # Roll multiple positions into one headline state.
+    # -------------------------------------------------
 
     state_rank = {
         "GREEN": 0,
@@ -260,15 +348,38 @@ def get_live_overnight_risk(
 
     worst = max(
         results,
-        key=lambda item: (
-            state_rank.get(
-                item["risk"].get(
-                    "state"
-                ),
-                -1,
-            )
+        key=lambda item: state_rank.get(
+            item["risk"].get("state"),
+            -1,
         ),
     )
+
+    contract_metadata = {
+        "symbol": quote_symbol,
+        "selection_source": (
+            "BASELINE"
+            if baseline_source == "STORED"
+            else "ACTIVE_MONTH"
+        ),
+    }
+
+    if active_contract:
+        contract_metadata.update(
+            {
+                "streamer_symbol":
+                    active_contract.get(
+                        "streamer-symbol"
+                    ),
+                "expiration_date":
+                    active_contract.get(
+                        "expiration-date"
+                    ),
+                "active_month":
+                    active_contract.get(
+                        "active-month"
+                    ),
+            }
+        )
 
     return {
         "available": True,
@@ -277,23 +388,22 @@ def get_live_overnight_risk(
 
         "state": worst[
             "risk"
-        ].get(
-            "state"
-        ),
+        ].get("state"),
 
         "recommendation": worst[
             "risk"
-        ].get(
-            "recommendation"
-        ),
+        ].get("recommendation"),
 
         "reason_code": worst[
             "risk"
-        ].get(
-            "reason_code"
-        ),
+        ].get("reason_code"),
 
         "session": session,
+
+        "baseline_source":
+            baseline_source,
+
+        "baseline": baseline,
 
         "reference": reference,
 
@@ -302,19 +412,6 @@ def get_live_overnight_risk(
 
         "positions": results,
 
-        "es_contract": {
-            "symbol": es_symbol,
-            "streamer_symbol":
-                active_contract.get(
-                    "streamer-symbol"
-                ),
-            "expiration_date":
-                active_contract.get(
-                    "expiration-date"
-                ),
-            "active_month":
-                active_contract.get(
-                    "active-month"
-                ),
-        },
+        "es_contract":
+            contract_metadata,
     }
