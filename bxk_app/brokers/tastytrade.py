@@ -515,6 +515,93 @@ class TastytradeBroker(BrokerBase):
     # Quotes
     # ---------------------------------------------------------
 
+    def get_future_instruments(
+        self,
+        product_code: str,
+    ) -> list[dict]:
+        """
+        Retrieve futures contracts for one product code.
+
+        Observation/data retrieval only.
+        """
+
+        code = str(
+            product_code or ""
+        ).strip().upper()
+
+        if not code:
+            self.last_error = (
+                "Future product code is required."
+            )
+            return []
+
+        response = self._request(
+            "GET",
+            "/instruments/futures",
+            params={
+                "product-code": code,
+            },
+        )
+
+        return self._items_from_response(
+            response
+        )
+
+    def get_active_future(
+        self,
+        product_code: str,
+    ) -> dict | None:
+        """
+        Return Tastytrade's currently active-month
+        futures contract for a product.
+        """
+
+        contracts = self.get_future_instruments(
+            product_code
+        )
+
+        for contract in contracts:
+            if (
+                contract.get("active") is True
+                and
+                contract.get(
+                    "active-month"
+                ) is True
+            ):
+                return contract
+
+        self.last_error = (
+            "No active-month future found for "
+            f"{str(product_code).upper()}."
+        )
+
+        return None
+
+    def get_future_quote(
+        self,
+        symbol: str,
+    ) -> dict | None:
+        """
+        Retrieve one futures market-data quote.
+        """
+
+        clean_symbol = str(
+            symbol or ""
+        ).strip()
+
+        if not clean_symbol:
+            self.last_error = (
+                "Future symbol is required."
+            )
+            return None
+
+        items = self.get_market_data_by_type(
+            "future",
+            [clean_symbol],
+        )
+
+        return items[0] if items else None
+
     def get_market_data_by_type(
         self,
         instrument_type: str,
