@@ -52,6 +52,31 @@ def safe_float(value, default: float = 0.0) -> float:
 
 
 
+
+def get_spxw_chain_item(chain):
+    """
+    Return the SPXW PM-settled option-chain item.
+
+    BXK short-DTE SPX strategies use SPXW contracts.
+    Never silently fall back to the standard SPX AM chain.
+    """
+
+    if not isinstance(chain, dict):
+        return None
+
+    items = chain.get("items", [])
+
+    for item in items:
+        root_symbol = str(
+            item.get("root-symbol") or ""
+        ).strip().upper()
+
+        if root_symbol == "SPXW":
+            return item
+
+    return None
+
+
 def get_spx_expiration_status(
     days_to_expiration: int = 0,
 ):
@@ -76,12 +101,12 @@ def get_spx_expiration_status(
     if not chain:
         return status
 
-    items = chain.get("items", [])
+    item = get_spxw_chain_item(chain)
 
-    if not items:
+    if not item:
         return status
 
-    expirations = items[0].get(
+    expirations = item.get(
         "expirations",
         [],
     )
@@ -166,12 +191,12 @@ def get_spx_strikes_by_dte(days_to_expiration: int = 0):
     if not chain:
         return []
 
-    items = chain.get("items", [])
+    item = get_spxw_chain_item(chain)
 
-    if not items:
+    if not item:
         return []
 
-    expirations = items[0].get("expirations", [])
+    expirations = item.get("expirations", [])
 
     valid_expirations = []
 

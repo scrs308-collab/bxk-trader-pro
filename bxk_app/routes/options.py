@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from bxk_app.broker_tastytrade import tastytrade_api
+from bxk_app.option_scanner import get_spxw_chain_item
 
 
 router = APIRouter(
@@ -62,9 +63,15 @@ def test_expirations():
             "error": "No chain",
         }
 
-    item = chain["items"][0]
+    item = get_spxw_chain_item(chain)
+
+    if not item:
+        return {
+            "error": "SPXW chain unavailable",
+        }
 
     return {
+        "root_symbol": item.get("root-symbol"),
         "expirations": [
             {
                 "date": expiration.get(
@@ -90,7 +97,7 @@ def test_expirations():
                 "expirations",
                 [],
             )[:10]
-        ]
+        ],
     }
 
 
