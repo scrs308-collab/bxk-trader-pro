@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from bxk_app.services import (
     overnight_risk_service,
 )
@@ -506,6 +507,167 @@ def test_service_fails_closed_on_stale_es_quote(
     assert (
         result["reason_code"]
         == "ES_QUOTE_STALE"
+    )
+
+    assert (
+        result["execution_authorized"]
+        is False
+    )
+
+
+def test_expired_0dte_position_is_excluded_from_overnight_rollup(
+    monkeypatch,
+):
+    """
+    Regression case:
+    Aug 20 GTH test contained an expired Aug 20
+    condor plus a live Aug 21 condor.
+
+    The expired position must not make the
+    overnight headline CRITICAL.
+    """
+
+    expired_position = {
+        "strategy": "SPX Iron Condor",
+        "underlying": "SPX",
+        "quantity": 4,
+        "expiration": "2026-08-20",
+        "expires_at":
+            "2026-08-20T20:00:00.000Z",
+        "dte": 0,
+        "buy_put": 7670,
+        "sell_put": 7695,
+        "sell_call": 7790,
+        "buy_call": 7815,
+        "opening_credit": 4.50,
+    }
+
+    active_position = {
+        "strategy": "SPX Iron Condor",
+        "underlying": "SPX",
+        "quantity": 4,
+        "expiration": "2026-08-21",
+        "expires_at":
+            "2026-08-21T20:00:00.000Z",
+        "dte": 1,
+        "buy_put": 7600,
+        "sell_put": 7625,
+        "sell_call": 7740,
+        "buy_call": 7765,
+        "opening_credit": 5.10,
+    }
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "_utc_now",
+        lambda: datetime(
+            2026,
+            8,
+            21,
+            0,
+            16,
+            18,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_spx_gth_session",
+        lambda: {
+            "active": True,
+            "state": "GTH",
+            "reason_code":
+                "SPX_GTH_ACTIVE",
+            "eastern_time":
+                "2026-08-20T20:16:18-04:00",
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: {
+            "schema_version": 1,
+            "trading_date": "2026-08-20",
+            "captured_at":
+                "2026-08-20T15:59:38-04:00",
+            "reference_source":
+                "RTH_CLOSE_SNAPSHOT",
+            "spx_close": 7644.63,
+            "es_anchor_price": 7665.375,
+            "es_symbol": "/ESU6",
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service.broker,
+        "get_future_quote",
+        lambda symbol: {
+            "symbol": "/ESU6",
+            "bid": "7669.75",
+            "ask": "7670.00",
+            "mark": "7669.875",
+            "updated-at":
+                "2026-08-21T00:16:17Z",
+            "is-trading-halted": False,
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "evaluate_future_quote_health",
+        lambda **kwargs: {
+            "available": True,
+            "healthy": True,
+            "reason_code":
+                "ES_QUOTE_HEALTHY",
+            "quote_age_seconds": 1,
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_position_monitor",
+        lambda: {
+            "positions": [
+                expired_position,
+                active_position,
+            ]
+        },
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    assert result["available"] is True
+
+    assert result["position_count"] == 1
+
+    assert (
+        result["expired_position_count"]
+        == 1
+    )
+
+    assert result["state"] == "GREEN"
+
+    assert (
+        result["recommendation"]
+        == "HOLD"
+    )
+
+    assert (
+        result["reason_code"]
+        == "OVERNIGHT_RISK_NORMAL"
+    )
+
+    assert (
+        result["positions"][0][
+            "position"
+        ]["expiration"]
+        == "2026-08-21"
     )
 
     assert (

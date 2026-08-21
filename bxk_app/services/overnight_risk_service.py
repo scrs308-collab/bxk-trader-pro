@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.overnight_baseline import (
@@ -17,6 +17,53 @@ from bxk_app.overnight_session import (
 from bxk_app.services.position_service import (
     get_position_monitor,
 )
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
+
+
+def _parse_datetime(value):
+    text = str(value or "").strip()
+
+    if not text:
+        return None
+
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+
+    try:
+        result = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+    if result.tzinfo is None:
+        return None
+
+    return result.astimezone(timezone.utc)
+
+
+def _position_is_expired(
+    position,
+    *,
+    as_of,
+):
+    """
+    Return True only when the broker position has a
+    trustworthy expiration timestamp at or before now.
+    """
+
+    if not isinstance(position, dict):
+        return False
+
+    expires_at = _parse_datetime(
+        position.get("expires_at")
+    )
+
+    if expires_at is None:
+        return False
+
+    return expires_at <= as_of
 
 
 def _safe_float(value):
@@ -313,7 +360,21 @@ def get_live_overnight_risk(
 
     results = []
 
+    as_of = _utc_now()
+
+    expired_position_count = 0
+    active_candidate_count = 0
+
     for position in positions:
+        if _position_is_expired(
+            position,
+            as_of=as_of,
+        ):
+            expired_position_count += 1
+            continue
+
+        active_candidate_count += 1
+
         fields = _extract_position_fields(
             position
         )
@@ -354,11 +415,23 @@ def get_live_overnight_risk(
         )
 
     if not results:
+        reason_code = (
+            "NO_ACTIVE_SPX_CONDOR"
+            if (
+                expired_position_count > 0
+                and active_candidate_count == 0
+            )
+            else "SUPPORTED_POSITION_UNAVAILABLE"
+        )
+
         return _unavailable(
-            "SUPPORTED_POSITION_UNAVAILABLE",
+            reason_code,
+            state="NO_POSITION",
             session=session,
             baseline=baseline,
             reference=reference,
+            expired_position_count=
+                expired_position_count,
         )
 
     # -------------------------------------------------
@@ -439,6 +512,9 @@ def get_live_overnight_risk(
 
         "position_count":
             len(results),
+
+        "expired_position_count":
+            expired_position_count,
 
         "positions": results,
 
