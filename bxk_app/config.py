@@ -2,7 +2,18 @@ import os
 from dotenv import load_dotenv
 
 
-load_dotenv(override=True)
+BXK_ENV_PATH = (
+    os.getenv(
+        "BXK_ENV_PATH",
+        ".env",
+    ).strip()
+    or ".env"
+)
+
+load_dotenv(
+    dotenv_path=BXK_ENV_PATH,
+    override=True,
+)
 
 
 # ===============================

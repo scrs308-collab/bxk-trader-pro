@@ -12,7 +12,13 @@ from dotenv import dotenv_values
 from bxk_app import config
 
 
-ENV_PATH = Path(".env")
+ENV_PATH = Path(
+    os.getenv(
+        "BXK_ENV_PATH",
+        ".env",
+    ).strip()
+    or ".env"
+)
 
 PBKDF2_ALGORITHM = "sha256"
 PBKDF2_ITERATIONS = 600_000
