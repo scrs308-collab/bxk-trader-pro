@@ -153,10 +153,14 @@ def log_condor_stability(
         stability.get("expected_move_source", "")
     ).upper()
 
-    if expected_move_source != "VIX1D":
+    if expected_move_source not in {
+        "VIX1D",
+        "VIX",
+    }:
         return {
             "logged": False,
-            "reason": "VIX1D_UNAVAILABLE",
+            "reason":
+                "EXPECTED_MOVE_SOURCE_UNSUPPORTED",
         }
 
     current_time = now or datetime.now()

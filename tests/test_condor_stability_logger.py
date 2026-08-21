@@ -262,3 +262,49 @@ def test_logger_rejects_weekend_even_if_signal_claims_live(
         tmp_path /
         "2026-08-16.csv"
     ).exists()
+
+
+def test_logger_accepts_vix_fallback(
+    tmp_path,
+):
+    market = build_market_data(
+        signal_ready=True,
+        market_status="LIVE",
+        expected_move_source="VIX",
+    )
+
+    result = log_condor_stability(
+        market,
+        now=datetime(
+            2026,
+            8,
+            20,
+            10,
+            30,
+            0,
+        ),
+        log_dir=tmp_path,
+    )
+
+    assert result["logged"] is True
+
+    path = (
+        tmp_path
+        / "2026-08-20.csv"
+    )
+
+    rows = list(
+        csv.DictReader(
+            path.open(
+                newline="",
+                encoding="utf-8",
+            )
+        )
+    )
+
+    assert len(rows) == 1
+
+    assert (
+        rows[0]["expected_move_source"]
+        == "VIX"
+    )
