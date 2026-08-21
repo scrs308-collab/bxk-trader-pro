@@ -504,6 +504,119 @@ function renderMarketSummary(data) {
         }).join("")
       : "";
 
+  const overnightRisk =
+    data.overnight_risk ?? {};
+
+  const overnightSession =
+    overnightRisk.session ?? {};
+
+  const overnightReference =
+    overnightRisk.reference ?? {};
+
+  const overnightQuoteHealth =
+    overnightRisk.quote_health ?? {};
+
+  const overnightContract =
+    overnightRisk.es_contract ?? {};
+
+  const overnightPositions =
+    Array.isArray(overnightRisk.positions)
+      ? overnightRisk.positions
+      : [];
+
+  const overnightPositionRisk =
+    overnightPositions[0]?.risk ?? {};
+
+  const overnightState = String(
+    overnightRisk.state ||
+    "UNAVAILABLE",
+  ).toUpperCase();
+
+  const overnightSessionState = String(
+    overnightSession.state ||
+    "INACTIVE",
+  ).toUpperCase();
+
+  const overnightRecommendation = String(
+    overnightRisk.recommendation ||
+    "NONE",
+  ).toUpperCase();
+
+  const overnightStateColors = {
+    GREEN: "#22c55e",
+    YELLOW: "#eab308",
+    ORANGE: "#f97316",
+    RED: "#ef4444",
+    CRITICAL: "#dc2626",
+    INACTIVE: "#94a3b8",
+    NO_POSITION: "#94a3b8",
+    UNAVAILABLE: "#94a3b8",
+  };
+
+  const overnightStateColor =
+    overnightStateColors[overnightState] ||
+    "#94a3b8";
+
+  const overnightEstimatedSpx =
+    overnightReference.estimated_spx;
+
+  const overnightMoveNumber =
+    Number(overnightReference.es_move);
+
+  const overnightMoveText =
+    Number.isFinite(overnightMoveNumber)
+      ? `${
+          overnightMoveNumber >= 0
+            ? "+"
+            : ""
+        }${formatNumber(
+          overnightMoveNumber,
+          2
+        )} pts`
+      : "--";
+
+  const overnightRemainingCushion =
+    overnightPositionRisk.remaining_cushion;
+
+  const overnightThreatenedSide =
+    String(
+      overnightPositionRisk.threatened_side ||
+      "--",
+    ).toUpperCase();
+
+  const overnightQuoteHealthy =
+    overnightQuoteHealth.healthy === true;
+
+  const overnightQuoteLabel =
+    overnightQuoteHealthy
+      ? "HEALTHY"
+      : (
+          overnightQuoteHealth.reason_code ||
+          "--"
+        );
+
+  const overnightQuoteAge =
+    overnightQuoteHealth.quote_age_seconds;
+
+  let overnightStatusMessage =
+    "SPX GTH is inactive. Overnight monitoring is idle.";
+
+  if (
+    overnightSession.active === true &&
+    overnightRisk.available === true
+  ) {
+    overnightStatusMessage =
+      "Live GTH risk monitoring using the saved SPX / ES close anchor.";
+  } else if (
+    overnightSession.active === true
+  ) {
+    overnightStatusMessage =
+      `Overnight Guard unavailable: ${
+        overnightRisk.reason_code ||
+        "UNKNOWN"
+      }.`;
+  }
+
   let riskStatusLabel = "LEARNING";
 
   if (riskStatus === "AVAILABLE") {
@@ -897,6 +1010,192 @@ function renderMarketSummary(data) {
             </div>
           `
       }
+    </div>
+
+    <div class="market-summary-outlook">
+      <div class="card-label">
+        Overnight Risk Guard
+      </div>
+
+      <div class="market-summary-permission">
+        <span
+          style="
+            color: ${overnightStateColor};
+            font-weight: 800;
+          "
+        >
+          &#9679; ${overnightState}
+        </span>
+
+        <span
+          style="
+            color: #94a3b8;
+            font-weight: 700;
+            margin-left: 12px;
+          "
+        >
+          ${overnightSessionState}
+        </span>
+      </div>
+
+      <div class="market-summary-recommendation">
+        ${overnightStatusMessage}
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>Estimated SPX</span>
+          <strong>
+            ${
+              overnightEstimatedSpx != null
+                ? formatNumber(
+                    overnightEstimatedSpx,
+                    2
+                  )
+                : "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Overnight Move</span>
+          <strong>
+            ${overnightMoveText}
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Threatened Side</span>
+          <strong>
+            ${overnightThreatenedSide}
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Remaining Cushion</span>
+          <strong>
+            ${
+              overnightRemainingCushion != null
+                ? `${formatNumber(
+                    overnightRemainingCushion,
+                    2
+                  )} pts`
+                : "--"
+            }
+          </strong>
+        </div>
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>Short Strike</span>
+          <strong>
+            ${
+              overnightPositionRisk.short_strike ??
+              "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Long Strike</span>
+          <strong>
+            ${
+              overnightPositionRisk.long_strike ??
+              "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>ES Contract</span>
+          <strong>
+            ${
+              overnightContract.symbol ||
+              "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Quote Health</span>
+          <strong>
+            ${overnightQuoteLabel}
+          </strong>
+        </div>
+      </div>
+
+      <div
+        class="market-summary-grid"
+        style="margin-top: 14px;"
+      >
+        <div class="market-summary-metric">
+          <span>Recommendation</span>
+          <strong>
+            ${overnightRecommendation}
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Quote Age</span>
+          <strong>
+            ${
+              overnightQuoteAge != null
+                ? `${formatNumber(
+                    overnightQuoteAge,
+                    1
+                  )} sec`
+                : "--"
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Active Positions</span>
+          <strong>
+            ${
+              overnightRisk.position_count ??
+              0
+            }
+          </strong>
+        </div>
+
+        <div class="market-summary-metric">
+          <span>Expired Ignored</span>
+          <strong>
+            ${
+              overnightRisk.expired_position_count ??
+              0
+            }
+          </strong>
+        </div>
+      </div>
+
+      <div
+        class="market-summary-recommendation"
+        style="
+          margin-top: 14px;
+          font-weight: 800;
+        "
+      >
+        ${
+          overnightRisk.observation_only === true
+            ? "OBSERVATION ONLY"
+            : "MONITORING"
+        }
+        &nbsp;&middot;&nbsp;
+        EXECUTION ${
+          overnightRisk.execution_authorized === true
+            ? "AUTHORIZED"
+            : "DISABLED"
+        }
+      </div>
     </div>
 
     <div class="market-summary-outlook">

@@ -140,6 +140,51 @@ async function fetchRecentCondorRisk() {
 }
 
 
+async function fetchOvernightRisk() {
+  try {
+    const response = await fetch(
+      `/api/overnight-risk?_=${Date.now()}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Overnight risk error ${response.status}`,
+      );
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error(
+      "Overnight risk fetch failed:",
+      error,
+    );
+
+    /*
+     * Overnight monitoring must fail soft.
+     * A GTH-data problem must never take down
+     * the normal BXK dashboard.
+     */
+    return {
+      available: false,
+      observation_only: true,
+      execution_authorized: false,
+      state: "UNAVAILABLE",
+      recommendation: "NONE",
+      reason_code:
+        "OVERNIGHT_RISK_FETCH_FAILED",
+      session: {
+        active: false,
+        state: "UNKNOWN",
+      },
+    };
+  }
+}
+
+
 async function fetchRecommendation() {
   try {
     const response = await fetch(
@@ -157,13 +202,20 @@ async function fetchRecommendation() {
 
     const data = await response.json();
 
-    const recentCondorRisk =
-      await fetchRecentCondorRisk();
+    const [
+      recentCondorRisk,
+      overnightRisk,
+    ] = await Promise.all([
+      fetchRecentCondorRisk(),
+      fetchOvernightRisk(),
+    ]);
 
     const dashboardData = {
       ...data,
       recent_condor_risk:
         recentCondorRisk,
+      overnight_risk:
+        overnightRisk,
     };
 
     updateDashboard(
