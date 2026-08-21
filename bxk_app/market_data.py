@@ -1,4 +1,8 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+EASTERN_TIME = ZoneInfo("America/New_York")
 
 
 class MarketData:
@@ -23,7 +27,7 @@ class MarketData:
         self.qqq = {}
 
     def market_status(self):
-        now = datetime.now()
+        now = datetime.now(EASTERN_TIME)
 
         if now.weekday() >= 5:
             return "CLOSED"
@@ -90,7 +94,7 @@ class MarketData:
             "condor_stability": self.condor_stability,
             "condor_risk_profile": self.condor_risk_profile,
             "market_status": self.market_status(),
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "timestamp": datetime.now(EASTERN_TIME).isoformat(timespec="seconds"),
         }
 
     def get_header(self):
@@ -138,7 +142,7 @@ class MarketData:
                 "pop": 84,
             },
             "market_status": self.market_status(),
-            "server_time": datetime.now().strftime("%I:%M:%S %p"),
+            "server_time": datetime.now(EASTERN_TIME).strftime("%I:%M:%S %p"),
             "account": self.account,
             "positions": self.positions,
             "qqq": self.qqq,

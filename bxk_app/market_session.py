@@ -1,4 +1,8 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+EASTERN_TIME = ZoneInfo("America/New_York")
 
 
 MARKET_OPEN_MINUTE = 9 * 60 + 30
@@ -21,7 +25,14 @@ def get_market_session_phase(now=None):
     elsewhere in BXK.
     """
 
-    current = now or datetime.now()
+    if now is None:
+        current = datetime.now(EASTERN_TIME)
+    elif now.tzinfo is not None:
+        current = now.astimezone(EASTERN_TIME)
+    else:
+        # Naive injected values are treated as Eastern for compatibility
+        # with existing callers and deterministic unit tests.
+        current = now
 
     if current.weekday() >= 5:
         return {
