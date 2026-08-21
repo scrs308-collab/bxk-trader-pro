@@ -34,3 +34,4 @@ logs/
 
 # Condor Stability market history
 data/condor_stability/
+data/
