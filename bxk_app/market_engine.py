@@ -1,6 +1,8 @@
 import logging
 from datetime import date
+from functools import wraps
 from math import sqrt
+from threading import RLock
 
 from bxk_app.condor_stability import (
     calculate_condor_stability_metrics,
@@ -29,6 +31,17 @@ from bxk_app.services.overnight_baseline_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+_market_update_lock = RLock()
+
+
+def _serialized_market_update(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with _market_update_lock:
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 def calculate_expected_move(spx_price: float, vix1d_value: float) -> float:
@@ -69,6 +82,7 @@ def get_quote_price(quote):
     
 class MarketEngine:
 
+    @_serialized_market_update
     def update(
         self,
         spx=None,

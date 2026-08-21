@@ -1,4 +1,7 @@
-﻿from fastapi import FastAPI
+﻿import asyncio
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -6,11 +9,37 @@ from bxk_app.auth_middleware import (
     enforce_bxk_authentication,
 )
 from bxk_app.routes import router
+from bxk_app.services.market_heartbeat_service import (
+    run_market_heartbeat,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    heartbeat_task = asyncio.create_task(
+        run_market_heartbeat(),
+        name="bxk-market-heartbeat",
+    )
+
+    app.state.market_heartbeat_task = (
+        heartbeat_task
+    )
+
+    try:
+        yield
+    finally:
+        heartbeat_task.cancel()
+
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
     title="BXK Trader Pro",
     version="6.1",
+    lifespan=lifespan,
 )
 
 

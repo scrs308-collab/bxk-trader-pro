@@ -2,16 +2,39 @@ import os
 
 from fastapi import APIRouter
 
+from bxk_app.services.market_heartbeat_service import (
+    get_market_heartbeat_status,
+)
+
 
 router = APIRouter(tags=["Health"])
 
 
 @router.get("/health")
-@router.get("/api/health")
 def health():
+    """
+    Lightweight process liveness endpoint.
+
+    This intentionally remains independent of market-data
+    health so a temporary broker outage does not cause the
+    hosting platform to restart a healthy BXK process.
+    """
     return {
         "status": "OK",
         "app": "BXK Trader Pro",
+    }
+
+
+@router.get("/api/health")
+def api_health():
+    """
+    Detailed authenticated runtime health.
+    """
+    return {
+        "status": "OK",
+        "app": "BXK Trader Pro",
+        "market_heartbeat":
+            get_market_heartbeat_status(),
     }
 
 
