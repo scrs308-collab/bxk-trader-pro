@@ -1,8 +1,6 @@
 from datetime import datetime
 
-from bxk_app.market_engine import MarketEngine
 from bxk_app.market_data import market_data
-from bxk_app.opportunity_engine import build_opportunity
 from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import rank_strategies
 from bxk_app.trade_builder import build_best_trade
@@ -41,17 +39,12 @@ def get_recommendation():
     fields such as trend and VIX state.
     """
 
-    # Refresh live market information.
-    try:
-        MarketEngine().update()
-    except Exception as error:
-        pass
-
-    # Older market-condition model.
-    # Retained for descriptive fields and fallback behavior.
-    market = run_trade_quality()
-
-    # Build the actual live trade.
+    # build_best_trade() performs the authoritative live
+    # market refresh through refresh_live_trade_context().
+    #
+    # Do not refresh MarketEngine separately here. That caused
+    # /api/recommend to perform two full broker refreshes for
+    # one request and could leave the endpoint blocked.
     try:
         best_trade_result = build_best_trade(
             wing_width=25,
@@ -64,6 +57,10 @@ def get_recommendation():
             "best_trade": None,
             "message": str(error),
         }
+
+    # Evaluate market conditions only after the authoritative
+    # live refresh so scoring uses the current shared snapshot.
+    market = run_trade_quality()
 
     # build_best_trade() normally returns a wrapper dictionary
     # containing the analyzed trade under "best_trade".
@@ -274,9 +271,38 @@ def get_recommendation():
         }
 
     else:
-        opportunity = build_opportunity(
-            market
-        )
+        # The canonical live trade builder already evaluated
+        # the current market and found no approved trade.
+        #
+        # Fail closed here. Do not invoke the legacy
+        # build_opportunity() scanner, which performs another
+        # exhaustive set of live option-chain requests.
+        snapshot = market_data.get_snapshot()
+
+        opportunity = {
+            "strategy": "WAIT",
+            "source": "CANONICAL_NO_TRADE",
+            "spx_price": snapshot.get("price"),
+            "expected_move": snapshot.get(
+                "expected_move"
+            ),
+            "sell_put": None,
+            "sell_call": None,
+            "buy_put": None,
+            "buy_call": None,
+            "target_credit": None,
+            "pop": None,
+            "risk_level": canonical_regime,
+            "trade_score": trade_score,
+            "confidence": trade_quality_label,
+            "max_risk": None,
+            "expected_profit": None,
+            "reasons": safe_market_value(
+                market,
+                "reasons",
+                [],
+            ),
+        }
 
     strengths = safe_market_value(
         best_trade,
