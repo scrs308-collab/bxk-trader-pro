@@ -2,6 +2,10 @@ import os
 
 from fastapi import APIRouter
 
+from bxk_app.database import (
+    database_health_status,
+)
+
 from bxk_app.services.market_heartbeat_service import (
     get_market_heartbeat_status,
 )
@@ -64,3 +68,14 @@ def test_environment():
             os.getenv("TT_REFRESH_TOKEN")
         ),
     }
+
+
+@router.get("/api/health/database")
+def database_health():
+    """
+    Authenticated database diagnostic.
+
+    Reports connectivity and migration status without
+    exposing database credentials or connection details.
+    """
+    return database_health_status()

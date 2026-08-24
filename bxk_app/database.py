@@ -75,3 +75,72 @@ def get_db():
         yield session
     finally:
         session.close()
+
+
+def database_health_status() -> dict:
+    """Return safe database connectivity/schema status."""
+
+    if not database_configured():
+        return {
+            "configured": False,
+            "connected": False,
+            "dialect": None,
+            "schema_revision": None,
+            "users_table_present": False,
+        }
+
+    try:
+        from sqlalchemy import inspect, text
+        from sqlalchemy.exc import SQLAlchemyError
+
+        engine = get_engine()
+
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+
+            inspector = inspect(connection)
+
+            users_table_present = (
+                inspector.has_table("users")
+            )
+
+            schema_revision = None
+
+            try:
+                result = connection.execute(
+                    text(
+                        "SELECT version_num "
+                        "FROM alembic_version "
+                        "LIMIT 1"
+                    )
+                ).scalar_one_or_none()
+
+                schema_revision = (
+                    str(result)
+                    if result is not None
+                    else None
+                )
+            except SQLAlchemyError:
+                # Database may be reachable before its
+                # first migration has been applied.
+                schema_revision = None
+
+        return {
+            "configured": True,
+            "connected": True,
+            "dialect": engine.dialect.name,
+            "schema_revision": schema_revision,
+            "users_table_present":
+                users_table_present,
+        }
+
+    except Exception:
+        # Never expose connection strings, passwords,
+        # hostnames, or raw database errors.
+        return {
+            "configured": True,
+            "connected": False,
+            "dialect": None,
+            "schema_revision": None,
+            "users_table_present": False,
+        }
