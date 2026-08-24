@@ -10,10 +10,13 @@ from bxk_app.services.auth_service import (
 
 PUBLIC_PATHS = {
     "/login",
+    "/forgot-password",
+    "/application-access",
     "/health",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/status",
+    "/api/auth/forgot-password",
 }
 
 

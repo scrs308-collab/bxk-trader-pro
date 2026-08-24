@@ -121,6 +121,23 @@
     #status.error {
       color: #fca5a5;
     }
+
+    .login-links {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 18px;
+      font-size: 13px;
+    }
+
+    .login-links a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    .login-links a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 
@@ -165,6 +182,16 @@
         SIGN IN
       </button>
     </form>
+
+    <div class="login-links">
+      <a href="/forgot-password">
+        Forgot Password?
+      </a>
+
+      <a href="/application-access">
+        Create New Account
+      </a>
+    </div>
 
     <div id="status"></div>
   </main>

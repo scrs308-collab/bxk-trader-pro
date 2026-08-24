@@ -3,16 +3,162 @@ import hashlib
 import hmac
 import json
 import secrets
+import threading
 import time
 
 from bxk_app import config
 from bxk_app.services.system_settings_service import (
+    hash_app_password,
     verify_app_password,
 )
 
 
 SESSION_COOKIE_NAME = "bxk_session"
 SESSION_VERSION = 1
+
+_TEMP_PASSWORD_LOCK = threading.Lock()
+_TEMP_PASSWORD = {
+    "username": None,
+    "password_hash": None,
+    "expires_at": 0.0,
+}
+
+
+def clear_temporary_password():
+    with _TEMP_PASSWORD_LOCK:
+        _TEMP_PASSWORD.update(
+            {
+                "username": None,
+                "password_hash": None,
+                "expires_at": 0.0,
+            }
+        )
+
+
+def issue_temporary_password(
+    username: str,
+    *,
+    ttl_seconds: int = 900,
+    now: float | None = None,
+):
+    configured_username = str(
+        config.BXK_APP_USERNAME or ""
+    ).strip()
+
+    supplied_username = str(
+        username or ""
+    ).strip()
+
+    if (
+        not configured_username
+        or not hmac.compare_digest(
+            supplied_username.encode("utf-8"),
+            configured_username.encode("utf-8"),
+        )
+    ):
+        return None
+
+    alphabet = (
+        "ABCDEFGHJKLMNPQRSTUVWXYZ"
+        "abcdefghijkmnopqrstuvwxyz"
+        "23456789"
+    )
+
+    temporary_password = "".join(
+        secrets.choice(alphabet)
+        for _ in range(16)
+    )
+
+    issued_at = (
+        time.time()
+        if now is None
+        else float(now)
+    )
+
+    with _TEMP_PASSWORD_LOCK:
+        _TEMP_PASSWORD.update(
+            {
+                "username": configured_username,
+                "password_hash":
+                    hash_app_password(
+                        temporary_password
+                    ),
+                "expires_at":
+                    issued_at + int(ttl_seconds),
+            }
+        )
+
+    return temporary_password
+
+
+def _verify_temporary_password(
+    username: str,
+    password: str,
+    *,
+    now: float | None = None,
+) -> bool:
+    current_time = (
+        time.time()
+        if now is None
+        else float(now)
+    )
+
+    with _TEMP_PASSWORD_LOCK:
+        stored_username = str(
+            _TEMP_PASSWORD.get("username") or ""
+        )
+        stored_hash = str(
+            _TEMP_PASSWORD.get(
+                "password_hash"
+            ) or ""
+        )
+        expires_at = float(
+            _TEMP_PASSWORD.get(
+                "expires_at"
+            ) or 0.0
+        )
+
+        if (
+            not stored_username
+            or not stored_hash
+            or expires_at <= current_time
+        ):
+            if expires_at and expires_at <= current_time:
+                _TEMP_PASSWORD.update(
+                    {
+                        "username": None,
+                        "password_hash": None,
+                        "expires_at": 0.0,
+                    }
+                )
+            return False
+
+        username_valid = hmac.compare_digest(
+            str(username or "").encode("utf-8"),
+            stored_username.encode("utf-8"),
+        )
+
+        password_valid = verify_app_password(
+            str(password or ""),
+            stored_hash,
+        )
+
+        if not (
+            username_valid
+            and password_valid
+        ):
+            return False
+
+        # One-time credential: consume immediately.
+        _TEMP_PASSWORD.update(
+            {
+                "username": None,
+                "password_hash": None,
+                "expires_at": 0.0,
+            }
+        )
+
+        return True
 
 
 def _b64encode(data: bytes) -> str:
@@ -106,9 +252,15 @@ def verify_credentials(
         configured_username.encode("utf-8"),
     )
 
-    return bool(
+    if (
         username_valid
         and password_valid
+    ):
+        return True
+
+    return _verify_temporary_password(
+        supplied_username,
+        supplied_password,
     )
 
 

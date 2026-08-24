@@ -70,6 +70,20 @@ def login_page():
     )
 
 
+@app.get("/forgot-password")
+def forgot_password_page():
+    return FileResponse(
+        "static/forgot-password.html"
+    )
+
+
+@app.get("/application-access")
+def application_access_page():
+    return FileResponse(
+        "static/application-access.html"
+    )
+
+
 @app.get("/")
 def home():
     return FileResponse(
