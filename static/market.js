@@ -533,9 +533,15 @@ function renderMarketSummary(data) {
   ).toUpperCase();
 
   const overnightSessionState = String(
+    overnightSession.monitoring_state ||
     overnightSession.state ||
     "INACTIVE",
   ).toUpperCase();
+
+  const overnightSessionLabel =
+    overnightSessionState === "ES_ONLY"
+      ? "ES-ONLY"
+      : overnightSessionState;
 
   const overnightRecommendation = String(
     overnightRisk.recommendation ||
@@ -602,6 +608,20 @@ function renderMarketSummary(data) {
     "SPX GTH is inactive. Overnight monitoring is idle.";
 
   if (
+    overnightSessionState === "ES_ONLY" &&
+    overnightRisk.available === true
+  ) {
+    overnightStatusMessage =
+      "ES futures monitoring active. SPX GTH opens at 8:15 PM ET.";
+  } else if (
+    overnightSessionState === "ES_ONLY"
+  ) {
+    overnightStatusMessage =
+      `ES futures monitoring active, but Overnight Guard unavailable: ${
+        overnightRisk.reason_code ||
+        "UNKNOWN"
+      }.`;
+  } else if (
     overnightSession.active === true &&
     overnightRisk.available === true
   ) {
@@ -1034,7 +1054,7 @@ function renderMarketSummary(data) {
             margin-left: 12px;
           "
         >
-          ${overnightSessionState}
+          ${overnightSessionLabel}
         </span>
       </div>
 

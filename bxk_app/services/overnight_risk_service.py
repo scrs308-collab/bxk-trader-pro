@@ -143,15 +143,26 @@ def get_live_overnight_risk(
     """
 
     # -------------------------------------------------
-    # Session gate first.
+    # Overnight monitoring session gate.
     #
-    # Outside GTH there is no reason to require,
-    # load, or validate an overnight baseline.
+    # SPX GTH begins at 8:15 PM ET, but ES futures
+    # begin trading at 6:00 PM ET.  The Overnight
+    # Risk Guard must therefore monitor ES during
+    # the ES-only window without authorizing any
+    # execution.
+    #
+    # Fall back to the historical "active" field so
+    # older callers/tests remain fail-closed.
     # -------------------------------------------------
 
     session = get_spx_gth_session()
 
-    if not session.get("active", False):
+    monitoring_active = session.get(
+        "overnight_monitoring_active",
+        session.get("active", False),
+    )
+
+    if not monitoring_active:
         return _unavailable(
             "SPX_GTH_INACTIVE",
             state="INACTIVE",
@@ -400,7 +411,14 @@ def get_live_overnight_risk(
                     "reference_source"
                 ]
             ),
-            market_status="GTH",
+            market_status=session.get(
+                "monitoring_state",
+                (
+                    "GTH"
+                    if session.get("active", False)
+                    else "ES_ONLY"
+                ),
+            ),
             dte=fields["dte"],
             timestamp=datetime.now().isoformat(
                 timespec="seconds"

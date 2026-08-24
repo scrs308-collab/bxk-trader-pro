@@ -83,3 +83,57 @@ def test_friday_evening_is_not_gth():
     )
 
     assert result["active"] is False
+
+
+def test_sunday_before_es_open_is_not_monitoring():
+    result = get_spx_gth_session(
+        et(2026, 8, 23, 17, 59)
+    )
+
+    assert result["active"] is False
+
+    assert (
+        result["overnight_monitoring_active"]
+        is False
+    )
+
+    assert (
+        result["monitoring_state"]
+        == "INACTIVE"
+    )
+
+
+def test_sunday_es_only_window_is_monitoring():
+    result = get_spx_gth_session(
+        et(2026, 8, 23, 19, 0)
+    )
+
+    assert result["active"] is False
+
+    assert (
+        result["overnight_monitoring_active"]
+        is True
+    )
+
+    assert (
+        result["monitoring_state"]
+        == "ES_ONLY"
+    )
+
+
+def test_sunday_gth_promotes_monitoring_state():
+    result = get_spx_gth_session(
+        et(2026, 8, 23, 20, 15)
+    )
+
+    assert result["active"] is True
+
+    assert (
+        result["overnight_monitoring_active"]
+        is True
+    )
+
+    assert (
+        result["monitoring_state"]
+        == "GTH"
+    )

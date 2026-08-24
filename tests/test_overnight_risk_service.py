@@ -674,3 +674,52 @@ def test_expired_0dte_position_is_excluded_from_overnight_rollup(
         result["execution_authorized"]
         is False
     )
+
+
+def test_es_only_window_continues_overnight_monitoring(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "get_spx_gth_session",
+        lambda: {
+            "active": False,
+            "state": "INACTIVE",
+            "reason_code":
+                "SPX_GTH_INACTIVE",
+            "overnight_monitoring_active":
+                True,
+            "monitoring_state":
+                "ES_ONLY",
+            "eastern_time":
+                "2026-08-23T19:00:00-04:00",
+        },
+    )
+
+    monkeypatch.setattr(
+        overnight_risk_service,
+        "load_overnight_baseline",
+        lambda: None,
+    )
+
+    result = (
+        overnight_risk_service
+        .get_live_overnight_risk()
+    )
+
+    # Reaching the baseline gate proves the service
+    # did NOT exit merely because SPX GTH was closed.
+    assert (
+        result["reason_code"]
+        == "OVERNIGHT_BASELINE_UNAVAILABLE"
+    )
+
+    assert (
+        result["session"]["monitoring_state"]
+        == "ES_ONLY"
+    )
+
+    assert (
+        result["execution_authorized"]
+        is False
+    )
