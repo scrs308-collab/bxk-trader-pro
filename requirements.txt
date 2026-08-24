@@ -4,3 +4,6 @@ requests
 python-dotenv
 pydantic
 tastytrade
+SQLAlchemy
+psycopg[binary]
+alembic
