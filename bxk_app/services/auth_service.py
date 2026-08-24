@@ -5,6 +5,7 @@ import json
 import secrets
 import threading
 import time
+import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -23,6 +24,7 @@ from bxk_app.services.system_settings_service import (
 
 SESSION_COOKIE_NAME = "bxk_session"
 SESSION_VERSION = 1
+DATABASE_SESSION_VERSION = 2
 
 _TEMP_PASSWORD_LOCK = threading.Lock()
 _TEMP_PASSWORD = {
@@ -369,6 +371,63 @@ def verify_credentials(
     )
 
 
+
+def authenticate_credentials(
+    username: str,
+    password: str,
+) -> dict:
+    """
+    Authenticate database users first while preserving
+    the legacy OWNER credential as a migration fallback.
+    """
+    database_result = (
+        authenticate_database_credentials(
+            username,
+            password,
+        )
+    )
+
+    if database_result["authenticated"]:
+        return {
+            **database_result,
+            "auth_source": "DATABASE",
+        }
+
+    # An explicitly disabled database user must never
+    # fall through to legacy authentication.
+    if database_result["reason"] == "USER_INACTIVE":
+        return {
+            **database_result,
+            "auth_source": None,
+        }
+
+    # Temporary OWNER passwords still live in the
+    # legacy auth path during this migration phase.
+    if verify_credentials(
+        username,
+        password,
+    ):
+        return {
+            "authenticated": True,
+            "database_available":
+                database_result[
+                    "database_available"
+                ],
+            "reason": "AUTHENTICATED",
+            "user_id": None,
+            "username": str(
+                config.BXK_APP_USERNAME or ""
+            ),
+            "role": "OWNER",
+            "must_change_password": False,
+            "auth_source": "CONFIG",
+        }
+
+    return {
+        **database_result,
+        "auth_source": None,
+    }
+
 def _sign_payload(
     encoded_payload: str,
     secret: str,
@@ -435,6 +494,66 @@ def create_session_token(
     )
 
 
+
+def create_database_session_token(
+    user_id: str,
+    *,
+    now: int | None = None,
+) -> str:
+    secret = str(
+        config.BXK_SESSION_SECRET or ""
+    ).strip()
+
+    if not secret:
+        raise ValueError(
+            "BXK session secret is not configured."
+        )
+
+    subject = str(user_id or "").strip()
+
+    if not subject:
+        raise ValueError(
+            "Database user ID is required."
+        )
+
+    issued_at = int(
+        time.time()
+        if now is None
+        else now
+    )
+
+    expires_at = (
+        issued_at
+        + int(config.BXK_SESSION_TTL_SECONDS)
+    )
+
+    payload = {
+        "v": DATABASE_SESSION_VERSION,
+        "sub": subject,
+        "iat": issued_at,
+        "exp": expires_at,
+        "nonce": secrets.token_urlsafe(12),
+    }
+
+    payload_bytes = json.dumps(
+        payload,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+    encoded_payload = _b64encode(
+        payload_bytes
+    )
+
+    signature = _sign_payload(
+        encoded_payload,
+        secret,
+    )
+
+    return (
+        f"{encoded_payload}.{signature}"
+    )
+
 def verify_session_token(
     token: str,
     *,
@@ -469,14 +588,8 @@ def verify_session_token(
             ).decode("utf-8")
         )
 
-        if (
+        version = int(
             payload.get("v")
-            != SESSION_VERSION
-        ):
-            return None
-
-        username = str(
-            payload.get("sub") or ""
         )
 
         issued_at = int(
@@ -493,9 +606,6 @@ def verify_session_token(
             else now
         )
 
-        if not username:
-            return None
-
         if issued_at > current_time + 60:
             return None
 
@@ -505,21 +615,78 @@ def verify_session_token(
         if expires_at <= issued_at:
             return None
 
-        configured_username = str(
-            config.BXK_APP_USERNAME or ""
-        )
+        # Legacy config-based OWNER session.
+        if version == SESSION_VERSION:
+            username = str(
+                payload.get("sub") or ""
+            )
 
-        if not hmac.compare_digest(
-            username.encode("utf-8"),
-            configured_username.encode("utf-8"),
-        ):
-            return None
+            if not username:
+                return None
 
-        return {
-            "username": username,
-            "issued_at": issued_at,
-            "expires_at": expires_at,
-        }
+            configured_username = str(
+                config.BXK_APP_USERNAME or ""
+            )
+
+            if not hmac.compare_digest(
+                username.encode("utf-8"),
+                configured_username.encode("utf-8"),
+            ):
+                return None
+
+            return {
+                "user_id": None,
+                "username": username,
+                "role": "OWNER",
+                "must_change_password": False,
+                "auth_source": "CONFIG",
+                "issued_at": issued_at,
+                "expires_at": expires_at,
+            }
+
+        # Database-backed multi-user session.
+        if version == DATABASE_SESSION_VERSION:
+            user_id = str(
+                payload.get("sub") or ""
+            ).strip()
+
+            if not user_id:
+                return None
+
+            if not database_configured():
+                return None
+
+            user_uuid = uuid.UUID(user_id)
+
+            session_factory = (
+                get_session_factory()
+            )
+
+            with session_factory() as session:
+                user = session.get(
+                    User,
+                    user_uuid,
+                )
+
+                if (
+                    user is None
+                    or not user.is_active
+                ):
+                    return None
+
+                return {
+                    "user_id": str(user.id),
+                    "username": user.username,
+                    "role": user.role.value,
+                    "must_change_password": bool(
+                        user.must_change_password
+                    ),
+                    "auth_source": "DATABASE",
+                    "issued_at": issued_at,
+                    "expires_at": expires_at,
+                }
+
+        return None
 
     except (
         ValueError,
@@ -528,5 +695,7 @@ def verify_session_token(
         json.JSONDecodeError,
         UnicodeDecodeError,
         base64.binascii.Error,
+        SQLAlchemyError,
+        RuntimeError,
     ):
         return None

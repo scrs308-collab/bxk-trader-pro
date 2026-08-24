@@ -15,7 +15,9 @@ from bxk_app import config
 from bxk_app.services.auth_service import (
     SESSION_COOKIE_NAME,
     auth_configuration_status,
+    authenticate_credentials,
     clear_temporary_password,
+    create_database_session_token,
     create_session_token,
     issue_temporary_password,
     verify_credentials,
@@ -167,8 +169,31 @@ def auth_status(request: Request):
     return {
         **configuration,
         "authenticated": bool(session),
+        "user_id": (
+            session.get("user_id")
+            if session
+            else None
+        ),
         "username": (
             session["username"]
+            if session
+            else None
+        ),
+        "role": (
+            session.get("role")
+            if session
+            else None
+        ),
+        "must_change_password": (
+            session.get(
+                "must_change_password",
+                False,
+            )
+            if session
+            else False
+        ),
+        "auth_source": (
+            session.get("auth_source")
             if session
             else None
         ),
@@ -193,18 +218,28 @@ def login(
             ),
         )
 
-    if not verify_credentials(
+    authentication = authenticate_credentials(
         credentials.username,
         credentials.password,
-    ):
+    )
+
+    if not authentication["authenticated"]:
         raise HTTPException(
             status_code=401,
             detail="Invalid username or password.",
         )
 
-    token = create_session_token(
-        credentials.username
-    )
+    if (
+        authentication["auth_source"]
+        == "DATABASE"
+    ):
+        token = create_database_session_token(
+            authentication["user_id"]
+        )
+    else:
+        token = create_session_token(
+            authentication["username"]
+        )
 
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
@@ -222,7 +257,15 @@ def login(
 
     return {
         "authenticated": True,
-        "username": credentials.username,
+        "user_id": authentication["user_id"],
+        "username": authentication["username"],
+        "role": authentication["role"],
+        "must_change_password":
+            authentication[
+                "must_change_password"
+            ],
+        "auth_source":
+            authentication["auth_source"],
         "auth_enabled": bool(
             config.BXK_AUTH_ENABLED
         ),
