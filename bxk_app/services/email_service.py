@@ -1,7 +1,34 @@
+import json
 import os
-import smtplib
-import ssl
-from email.message import EmailMessage
+import urllib.error
+import urllib.request
+
+
+RESEND_API_URL = (
+    "https://api.resend.com/emails"
+)
+
+
+def _resend_api_key():
+    # Preferred dedicated variable.
+    key = str(
+        os.getenv(
+            "BXK_RESEND_API_KEY",
+            "",
+        )
+    ).strip()
+
+    if key:
+        return key
+
+    # Backward-compatible with the SMTP
+    # configuration already stored in Railway.
+    return str(
+        os.getenv(
+            "BXK_SMTP_PASSWORD",
+            "",
+        )
+    ).strip()
 
 
 def send_temporary_password_email(
@@ -10,49 +37,35 @@ def send_temporary_password_email(
     *,
     expires_minutes: int = 15,
 ):
-    host = str(
-        os.getenv("BXK_SMTP_HOST", "")
-    ).strip()
-
-    port = int(
-        os.getenv("BXK_SMTP_PORT", "587")
-    )
-
-    username = str(
-        os.getenv("BXK_SMTP_USERNAME", "")
-    ).strip()
-
-    password = str(
-        os.getenv("BXK_SMTP_PASSWORD", "")
-    )
+    api_key = _resend_api_key()
 
     from_address = str(
         os.getenv(
             "BXK_SMTP_FROM",
-            username,
+            "security@bxktraderpro.com",
         )
     ).strip()
 
-    mode = str(
-        os.getenv(
-            "BXK_SMTP_MODE",
-            "starttls",
-        )
-    ).strip().lower()
+    recipient = str(
+        recipient or ""
+    ).strip()
 
-    if not host or not from_address:
+    if not api_key:
         raise RuntimeError(
-            "BXK outbound email is not configured."
+            "Resend API key is not configured."
         )
 
-    message = EmailMessage()
-    message["Subject"] = (
-        "BXK Trader Pro temporary password"
-    )
-    message["From"] = from_address
-    message["To"] = recipient
+    if not from_address:
+        raise RuntimeError(
+            "BXK sender address is not configured."
+        )
 
-    message.set_content(
+    if not recipient:
+        raise RuntimeError(
+            "BXK recipient address is missing."
+        )
+
+    text = (
         "A password reset was requested for "
         "BXK Trader Pro.\n\n"
         f"Temporary password: "
@@ -67,40 +80,63 @@ def send_temporary_password_email(
         "you may ignore this email."
     )
 
-    context = ssl.create_default_context()
+    payload = {
+        "from": (
+            "BXK Trader Pro Security "
+            f"<{from_address}>"
+        ),
+        "to": [recipient],
+        "subject": (
+            "BXK Trader Pro temporary password"
+        ),
+        "text": text,
+    }
 
-    if mode == "ssl":
-        with smtplib.SMTP_SSL(
-            host,
-            port,
-            context=context,
+    request = urllib.request.Request(
+        RESEND_API_URL,
+        data=json.dumps(
+            payload
+        ).encode("utf-8"),
+        headers={
+            "Authorization":
+                f"Bearer {api_key}",
+            "Content-Type":
+                "application/json",
+            "User-Agent":
+                "BXK-Trader-Pro/6.1",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(
+            request,
             timeout=15,
-        ) as client:
-            if username:
-                client.login(
-                    username,
-                    password,
+        ) as response:
+            status = int(
+                getattr(
+                    response,
+                    "status",
+                    200,
                 )
-            client.send_message(message)
-
-        return True
-
-    with smtplib.SMTP(
-        host,
-        port,
-        timeout=15,
-    ) as client:
-        if mode == "starttls":
-            client.starttls(
-                context=context
             )
 
-        if username:
-            client.login(
-                username,
-                password,
-            )
+            if not 200 <= status < 300:
+                raise RuntimeError(
+                    "Resend API rejected "
+                    f"email with HTTP {status}."
+                )
 
-        client.send_message(message)
+            return True
 
-    return True
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            "Resend API rejected the "
+            f"email with HTTP {exc.code}."
+        ) from exc
+
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            "Unable to reach the "
+            "Resend HTTPS API."
+        ) from exc
