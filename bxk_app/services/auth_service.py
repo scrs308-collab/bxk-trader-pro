@@ -6,7 +6,15 @@ import secrets
 import threading
 import time
 
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
+
 from bxk_app import config
+from bxk_app.database import (
+    database_configured,
+    get_session_factory,
+)
+from bxk_app.db_models.user import User
 from bxk_app.services.system_settings_service import (
     hash_app_password,
     verify_app_password,
@@ -215,6 +223,103 @@ def auth_configuration_status():
         ),
     }
 
+
+
+def authenticate_database_credentials(
+    username: str,
+    password: str,
+) -> dict:
+    """
+    Authenticate one PostgreSQL user.
+
+    This function is intentionally independent of the
+    current config-based login path during migration.
+    """
+    supplied_username = str(
+        username or ""
+    ).strip()
+
+    supplied_password = str(
+        password or ""
+    )
+
+    base_result = {
+        "authenticated": False,
+        "database_available": False,
+        "reason": None,
+        "user_id": None,
+        "username": None,
+        "role": None,
+        "must_change_password": False,
+    }
+
+    if not database_configured():
+        return {
+            **base_result,
+            "reason": "DATABASE_NOT_CONFIGURED",
+        }
+
+    if not supplied_username:
+        return {
+            **base_result,
+            "database_available": True,
+            "reason": "USER_NOT_FOUND",
+        }
+
+    try:
+        session_factory = get_session_factory()
+
+        with session_factory() as session:
+            user = session.scalar(
+                select(User).where(
+                    func.lower(User.username)
+                    == supplied_username.casefold()
+                )
+            )
+
+            if user is None:
+                return {
+                    **base_result,
+                    "database_available": True,
+                    "reason": "USER_NOT_FOUND",
+                }
+
+            password_valid = verify_app_password(
+                supplied_password,
+                str(user.password_hash or ""),
+            )
+
+            if not password_valid:
+                return {
+                    **base_result,
+                    "database_available": True,
+                    "reason": "INVALID_PASSWORD",
+                }
+
+            if not user.is_active:
+                return {
+                    **base_result,
+                    "database_available": True,
+                    "reason": "USER_INACTIVE",
+                }
+
+            return {
+                "authenticated": True,
+                "database_available": True,
+                "reason": "AUTHENTICATED",
+                "user_id": str(user.id),
+                "username": user.username,
+                "role": user.role.value,
+                "must_change_password": bool(
+                    user.must_change_password
+                ),
+            }
+
+    except (SQLAlchemyError, RuntimeError):
+        return {
+            **base_result,
+            "reason": "DATABASE_UNAVAILABLE",
+        }
 
 def verify_credentials(
     username: str,
