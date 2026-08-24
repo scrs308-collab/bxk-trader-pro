@@ -1580,7 +1580,7 @@ function renderOrderPreview({
         if (confirmButton) {
           confirmButton.disabled = false;
           confirmButton.textContent =
-            "BXK AUTO";
+            "SUBMIT LIVE ORDER";
         }
 
         return;
@@ -1764,6 +1764,41 @@ function renderOrderPreview({
   confirmButton?.addEventListener(
     "click",
     async () => {
+      const liveConfirmed = window.confirm(
+        [
+          "SUBMIT REAL ORDER TO TASTYTRADE?",
+          "",
+          `${quantity} ${
+            quantity === 1
+              ? "contract"
+              : "contracts"
+          }`,
+          `${order.strategy || "BXK trade"}`,
+          `Limit credit: ${formatMoney(
+            limitPrice,
+            2,
+          )}`,
+          `Maximum risk: ${formatMoney(
+            maxRisk,
+            0,
+          )}`,
+          "",
+          "This uses REAL MONEY.",
+        ].join("\n"),
+      );
+
+      if (!liveConfirmed) {
+        setBrokerMessage(
+          "Live order submission canceled. No order was sent.",
+        );
+
+        confirmButton.disabled = false;
+        confirmButton.textContent =
+          "SUBMIT LIVE ORDER";
+
+        return;
+      }
+
       confirmButton.disabled = true;
       confirmButton.textContent =
         "SUBMITTING...";
@@ -1895,25 +1930,30 @@ function renderOrderPreview({
           "ORDER BLOCKED";
       } catch (error) {
         console.error(
-          "BXK order submission failed:",
+          "BXK order submission response was not confirmed:",
           error,
         );
 
         updateReadinessCard(
           submissionReadiness,
           {
-            state: "pending",
-            icon: "X",
-            detail: "Submission failed",
+            state: "failed",
+            icon: "!",
+            detail:
+              "VERIFY TASTYTRADE - DO NOT RETRY",
           },
         );
 
         setBrokerMessage(
-          "Unable to complete BXK order submission.",
+          "BXK lost confirmation of the live submission. " +
+          "The order MAY have reached Tastytrade. " +
+          "Verify the broker account before taking any action. " +
+          "DO NOT RETRY.",
         );
 
+        confirmButton.disabled = true;
         confirmButton.textContent =
-          "SUBMISSION FAILED";
+          "VERIFY TASTYTRADE";
       }
     },
   );
