@@ -1,4 +1,5 @@
 import os
+import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -7,6 +8,11 @@ from bxk_app import config
 from bxk_app.db_models.user import (
     User,
     UserRole,
+)
+
+from bxk_app.services.system_settings_service import (
+    hash_app_password,
+    verify_app_password,
 )
 
 
@@ -112,4 +118,82 @@ def bootstrap_owner_user(
         "created": True,
         "existing": False,
         "user_id": str(owner.id),
+    }
+
+def change_user_password(
+    session: Session,
+    *,
+    user_id: str,
+    current_password: str,
+    new_password: str,
+) -> dict:
+    """
+    Change a database user's password and clear
+    the forced-password-change flag.
+    """
+
+    try:
+        parsed_user_id = uuid.UUID(
+            str(user_id or "")
+        )
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            "Invalid user ID."
+        ) from exc
+
+    user = session.get(
+        User,
+        parsed_user_id,
+    )
+
+    if user is None:
+        raise LookupError(
+            "User not found."
+        )
+
+    if not user.is_active:
+        raise ValueError(
+            "User account is inactive."
+        )
+
+    current_value = str(
+        current_password or ""
+    )
+
+    new_value = str(
+        new_password or ""
+    )
+
+    if not verify_app_password(
+        current_value,
+        str(user.password_hash or ""),
+    ):
+        raise ValueError(
+            "Current password is incorrect."
+        )
+
+    if verify_app_password(
+        new_value,
+        str(user.password_hash or ""),
+    ):
+        raise ValueError(
+            "New password must be different "
+            "from the current password."
+        )
+
+    user.password_hash = hash_app_password(
+        new_value
+    )
+
+    user.must_change_password = False
+
+    session.commit()
+    session.refresh(user)
+
+    return {
+        "user_id": str(user.id),
+        "username": user.username,
+        "must_change_password": bool(
+            user.must_change_password
+        ),
     }

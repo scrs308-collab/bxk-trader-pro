@@ -8,6 +8,14 @@ from bxk_app.services.auth_service import (
 )
 
 
+PASSWORD_CHANGE_ALLOWED_PATHS = {
+    "/change-password",
+    "/api/auth/change-password",
+    "/api/auth/logout",
+    "/api/auth/status",
+}
+
+
 PUBLIC_PATHS = {
     "/login",
     "/forgot-password",
@@ -44,6 +52,31 @@ async def enforce_bxk_authentication(
 
     if session:
         request.state.bxk_user = session
+
+        if (
+            session.get(
+                "must_change_password",
+                False,
+            )
+            and path
+            not in PASSWORD_CHANGE_ALLOWED_PATHS
+        ):
+            if path.startswith("/api/"):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail":
+                            "Password change required.",
+                        "code":
+                            "PASSWORD_CHANGE_REQUIRED",
+                    },
+                )
+
+            return RedirectResponse(
+                url="/change-password",
+                status_code=303,
+            )
+
         return await call_next(request)
 
     if path.startswith("/api/"):

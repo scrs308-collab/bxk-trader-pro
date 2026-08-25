@@ -5,13 +5,16 @@ import time
 
 from fastapi import (
     APIRouter,
+    Depends,
     HTTPException,
     Request,
     Response,
 )
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.orm import Session
 
 from bxk_app import config
+from bxk_app.database import get_db
 from bxk_app.services.auth_service import (
     SESSION_COOKIE_NAME,
     auth_configuration_status,
@@ -26,6 +29,10 @@ from bxk_app.services.auth_service import (
 
 from bxk_app.services.email_service import (
     send_temporary_password_email,
+)
+
+from bxk_app.services.user_service import (
+    change_user_password,
 )
 
 
@@ -48,6 +55,15 @@ class ForgotPasswordRequest(BaseModel):
     )
 
     identity: str
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    current_password: str
+    new_password: str
 
 
 class LoginRequest(BaseModel):
@@ -274,6 +290,77 @@ def login(
         ),
     }
 
+
+
+
+@router.post("/change-password")
+def change_password(
+    request_data: ChangePasswordRequest,
+    request: Request,
+    session: Session = Depends(
+        get_db
+    ),
+):
+    authenticated_user = getattr(
+        request.state,
+        "bxk_user",
+        None,
+    )
+
+    if not isinstance(
+        authenticated_user,
+        dict,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="BXK authentication required.",
+        )
+
+    if (
+        authenticated_user.get("auth_source")
+        != "DATABASE"
+        or not authenticated_user.get(
+            "user_id"
+        )
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Password changes require a "
+                "database-backed BXK account."
+            ),
+        )
+
+    try:
+        result = change_user_password(
+            session,
+            user_id=authenticated_user[
+                "user_id"
+            ],
+            current_password=(
+                request_data.current_password
+            ),
+            new_password=(
+                request_data.new_password
+            ),
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "password_changed": True,
+        **result,
+    }
 
 @router.post("/logout")
 def logout(response: Response):
