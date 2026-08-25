@@ -84,6 +84,13 @@ def application_access_page():
     )
 
 
+@app.get("/change-password")
+def change_password_page():
+    return FileResponse(
+        "static/change-password.html"
+    )
+
+
 @app.get("/")
 def home():
     return FileResponse(

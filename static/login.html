@@ -260,7 +260,15 @@
             "password"
           ).value = "";
 
-          window.location.replace("/");
+          if (
+            data.must_change_password === true
+          ) {
+            window.location.replace(
+              "/change-password"
+            );
+          } else {
+            window.location.replace("/");
+          }
 
         } catch (error) {
           document.getElementById(

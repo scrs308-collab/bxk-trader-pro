@@ -1,3 +1,4 @@
+from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import (
@@ -349,3 +350,90 @@ def test_successful_change_clears_requirement(
     assert home.status_code == 200
 
     app.dependency_overrides.clear()
+
+def test_forced_change_user_can_open_change_password_page(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    add_forced_change_user(
+        factory
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = TestClient(app)
+
+    client.post(
+        "/api/auth/login",
+        json={
+            "username": "beta1",
+            "password": "Temporary123!",
+        },
+    )
+
+    response = client.get(
+        "/change-password",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "Change Password" in response.text
+
+    app.dependency_overrides.clear()
+
+
+def test_unauthenticated_change_password_page_redirects_to_login(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/change-password",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert (
+        response.headers["location"]
+        == "/login"
+    )
+
+    app.dependency_overrides.clear()
+
+
+def test_login_page_redirect_logic_handles_forced_change():
+    text = Path(
+        "static/login.html"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert "must_change_password" in text
+    assert "/change-password" in text
+
+
+def test_change_password_page_posts_to_auth_endpoint():
+    text = Path(
+        "static/change-password.html"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "/api/auth/change-password"
+        in text
+    )
+
+    assert "current_password" in text
+    assert "new_password" in text
