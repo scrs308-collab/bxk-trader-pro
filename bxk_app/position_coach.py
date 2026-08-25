@@ -178,6 +178,14 @@ def evaluate_position(
         position.get("max_profit")
     )
 
+
+    valuation_reliable = bool(
+        position.get(
+            "valuation_reliable",
+            True,
+        )
+    )
+
     dte = safe_int(
         position.get("dte")
     )
@@ -218,14 +226,22 @@ def evaluate_position(
     )
 
     profit_progress = (
-        pnl / max_profit * 100
-        if max_profit > 0
-        else pnl_percent
+        (
+            pnl / max_profit * 100
+            if max_profit > 0
+            else pnl_percent
+        )
+        if valuation_reliable
+        else 0.0
     )
 
     put_spread_value, call_spread_value = (
         get_spread_values(position)
     )
+
+    if not valuation_reliable:
+        put_spread_value = None
+        call_spread_value = None
 
     score = 0
     messages: list[str] = []
@@ -234,7 +250,16 @@ def evaluate_position(
     # PROFIT PROGRESS — 40 POINTS
     # ==================================================
 
-    if profit_progress >= 75:
+    if not valuation_reliable:
+        messages.append(
+            (
+                "Option quotes are temporarily unreliable. "
+                "Displayed P/L is an estimate and "
+                "P/L-based coaching is suspended."
+            )
+        )
+
+    elif profit_progress >= 75:
         score += 40
         messages.append(
             (
@@ -437,10 +462,16 @@ def evaluate_position(
 # PROFIT OVERRIDE
 # ==========================================
 
-    if profit_progress >= 75:
+    if (
+        valuation_reliable
+        and profit_progress >= 75
+    ):
         score = max(score, 90)
 
-    elif profit_progress >= 50:
+    elif (
+        valuation_reliable
+        and profit_progress >= 50
+    ):
         score = max(score, 80)
 
     # A profitable position that still has time and
@@ -448,7 +479,8 @@ def evaluate_position(
     # not be labeled Danger simply because profit capture
     # is still developing.
     structurally_healthy = (
-        profit_progress >= 0
+        valuation_reliable
+        and profit_progress >= 0
         and minimum_distance is not None
         and minimum_distance >= 20
         and dte >= 1
@@ -486,6 +518,15 @@ def evaluate_position(
         headline = "Short strike under pressure"
         risk_level = "HIGH"
 
+    elif not valuation_reliable:
+        recommendation = ACTION_MONITOR
+        headline = "Option quote quality unreliable"
+        risk_level = (
+            "HIGH"
+            if dte == 0
+            else "MODERATE"
+        )
+
     elif profit_progress >= 75:
         recommendation = ACTION_CLOSE
         headline = "Strong profit target achieved"
@@ -506,7 +547,10 @@ def evaluate_position(
         headline = "Expiration-day risk increasing"
         risk_level = "HIGH"
 
-    elif pnl < 0:
+    elif (
+        valuation_reliable
+        and pnl < 0
+    ):
         recommendation = ACTION_REVIEW
         headline = "Position needs review"
         risk_level = "MODERATE"

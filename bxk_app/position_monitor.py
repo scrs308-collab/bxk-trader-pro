@@ -18,6 +18,122 @@ OPTION_PATTERN = re.compile(
 
 MARKET_TIMEZONE = ZoneInfo("America/New_York")
 
+
+QUOTE_MAX_ABS_SPREAD = 0.50
+QUOTE_MAX_REL_SPREAD = 0.50
+QUOTE_CHEAP_ONE_SIDED_ASK = 0.15
+
+
+def assess_quote_quality(
+    bid: float,
+    ask: float,
+    current_price: float,
+) -> dict:
+    """
+    Determine whether an option quote is reliable enough
+    to drive position P/L and automated management rules.
+
+    A very cheap one-sided option is allowed as CAUTION
+    because its absolute valuation impact is small.
+    """
+
+    bid_value = safe_float(bid)
+    ask_value = safe_float(ask)
+    current_value = safe_float(current_price)
+
+    if ask_value <= 0:
+        return {
+            "quote_quality": "UNRELIABLE",
+            "quote_reliable": False,
+            "quote_spread": None,
+            "quote_spread_pct": None,
+            "quote_issue": "Missing usable ask quote.",
+        }
+
+    if bid_value < 0 or ask_value < bid_value:
+        return {
+            "quote_quality": "UNRELIABLE",
+            "quote_reliable": False,
+            "quote_spread": None,
+            "quote_spread_pct": None,
+            "quote_issue": "Crossed or invalid option market.",
+        }
+
+    if bid_value <= 0:
+        if ask_value <= QUOTE_CHEAP_ONE_SIDED_ASK:
+            return {
+                "quote_quality": "CAUTION",
+                "quote_reliable": True,
+                "quote_spread": round(
+                    ask_value,
+                    4,
+                ),
+                "quote_spread_pct": None,
+                "quote_issue": (
+                    "Cheap option has a one-sided market."
+                ),
+            }
+
+        return {
+            "quote_quality": "UNRELIABLE",
+            "quote_reliable": False,
+            "quote_spread": round(
+                ask_value,
+                4,
+            ),
+            "quote_spread_pct": None,
+            "quote_issue": "Option market is one-sided.",
+        }
+
+    spread = ask_value - bid_value
+
+    midpoint = (
+        (bid_value + ask_value) / 2
+        if bid_value > 0 and ask_value > 0
+        else current_value
+    )
+
+    relative_spread = (
+        spread / midpoint
+        if midpoint > 0
+        else None
+    )
+
+    reliable = (
+        spread <= QUOTE_MAX_ABS_SPREAD
+        or (
+            relative_spread is not None
+            and relative_spread
+            <= QUOTE_MAX_REL_SPREAD
+        )
+    )
+
+    return {
+        "quote_quality": (
+            "GOOD"
+            if reliable
+            else "UNRELIABLE"
+        ),
+        "quote_reliable": reliable,
+        "quote_spread": round(
+            spread,
+            4,
+        ),
+        "quote_spread_pct": (
+            round(
+                relative_spread * 100,
+                1,
+            )
+            if relative_spread is not None
+            else None
+        ),
+        "quote_issue": (
+            None
+            if reliable
+            else "Bid/ask spread is abnormally wide."
+        ),
+    }
+
 def safe_float(
     value: Any,
     default: float = 0.0,
@@ -275,6 +391,20 @@ def build_iron_condor_summary(
             )
         )
 
+        bid = safe_float(
+            position.get("bid")
+        )
+
+        ask = safe_float(
+            position.get("ask")
+        )
+
+        quote_quality = assess_quote_quality(
+            bid=bid,
+            ask=ask,
+            current_price=current_price,
+        )
+
         leg_pnl = calculate_leg_pnl(
             direction=direction,
             open_price=open_price,
@@ -291,6 +421,9 @@ def build_iron_condor_summary(
             "multiplier": multiplier,
             "open_price": open_price,
             "current_price": current_price,
+            "bid": bid,
+            "ask": ask,
+            **quote_quality,
             "price_source": position.get(
                 "price_source",
                 "close-price",
@@ -372,6 +505,78 @@ def build_iron_condor_summary(
         leg["quantity"]
         for leg in parsed_legs
     )
+
+    unreliable_legs = [
+        leg
+        for leg in parsed_legs
+        if not leg.get(
+            "quote_reliable",
+            False,
+        )
+    ]
+
+    caution_legs = [
+        leg
+        for leg in parsed_legs
+        if (
+            leg.get("quote_quality")
+            == "CAUTION"
+        )
+    ]
+
+    def quote_leg_label(
+        leg: dict,
+    ) -> str:
+        option_name = (
+            "CALL"
+            if leg.get("option_type") == "C"
+            else "PUT"
+        )
+
+        return (
+            f'{leg.get("strike"):g} '
+            f'{option_name}'
+        )
+
+    unreliable_leg_labels = [
+        quote_leg_label(leg)
+        for leg in unreliable_legs
+    ]
+
+    caution_leg_labels = [
+        quote_leg_label(leg)
+        for leg in caution_legs
+    ]
+
+    valuation_reliable = not bool(
+        unreliable_legs
+    )
+
+    if unreliable_legs:
+        quote_quality = "UNRELIABLE"
+
+        valuation_warning = (
+            "Wide or incomplete option quotes detected "
+            "on "
+            + ", ".join(
+                unreliable_leg_labels
+            )
+            + ". P/L is an estimate and P/L-based "
+              "exit guidance is suspended."
+        )
+
+    elif caution_legs:
+        quote_quality = "CAUTION"
+
+        valuation_warning = (
+            "One or more low-value option legs have "
+            "thin quotes. Valuation remains usable "
+            "but should be monitored."
+        )
+
+    else:
+        quote_quality = "GOOD"
+        valuation_warning = None
 
     broker_open_pnl = sum(
         leg.get(
@@ -466,7 +671,11 @@ def build_iron_condor_summary(
 
     status, recommendation = (
         position_status(
-            pnl_percent=pnl_percent,
+            pnl_percent=(
+                pnl_percent
+                if valuation_reliable
+                else 0.0
+            ),
             put_distance=put_distance,
             call_distance=call_distance,
             dte=dte,
@@ -507,6 +716,17 @@ def build_iron_condor_summary(
             current_debit,
             2,
         ),
+        "quote_quality": quote_quality,
+        "valuation_reliable":
+            valuation_reliable,
+        "pnl_is_estimate":
+            not valuation_reliable,
+        "valuation_warning":
+            valuation_warning,
+        "unreliable_legs":
+            unreliable_leg_labels,
+        "caution_quote_legs":
+            caution_leg_labels,
         "pnl": round(
             broker_open_pnl,
             2,
@@ -646,5 +866,3 @@ def build_position_summaries(
                 summaries.append(summary)
 
     return summaries
-
-

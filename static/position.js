@@ -207,6 +207,30 @@ function renderPositionCard(position) {
     0,
   );
 
+  const valuationReliable =
+    position.valuation_reliable !== false;
+
+  const pnlIsEstimate =
+    position.pnl_is_estimate === true ||
+    !valuationReliable;
+
+  const quoteQuality = String(
+    position.quote_quality || "GOOD",
+  ).toUpperCase();
+
+  const unreliableLegs =
+    Array.isArray(position.unreliable_legs)
+      ? position.unreliable_legs
+      : [];
+
+  const valuationWarning =
+    position.valuation_warning ||
+    (
+      !valuationReliable
+        ? "Wide or incomplete option quotes detected. P/L-based exit guidance is suspended."
+        : ""
+    );
+
   const quantity = safeNumber(
     position.quantity,
     0,
@@ -233,7 +257,7 @@ function renderPositionCard(position) {
       : 0;
 
   const progress =
-    maxProfit > 0
+    valuationReliable && maxProfit > 0
       ? Math.max(
           0,
           Math.min(
@@ -242,6 +266,51 @@ function renderPositionCard(position) {
           ),
         )
       : 0;
+
+  const progressDisplay =
+    valuationReliable
+      ? `${formatNumber(progress, 1)}%`
+      : "--";
+
+  const pnlLabel =
+    pnlIsEstimate
+      ? "P/L ESTIMATE"
+      : "OPEN P/L";
+
+  const currentDebitLabel =
+    pnlIsEstimate
+      ? "Current Debit Estimate"
+      : "Current Debit";
+
+  const quoteWarningHtml =
+    !valuationReliable
+      ? `
+        <div class="position-v10-quote-warning">
+          <div class="position-v10-quote-warning-title">
+            ? P/L ESTIMATE UNRELIABLE
+          </div>
+
+          <div class="position-v10-quote-warning-text">
+            ${valuationWarning}
+          </div>
+
+          ${
+            unreliableLegs.length > 0
+              ? `
+                <div class="position-v10-quote-warning-legs">
+                  Affected:
+                  ${unreliableLegs.join(", ")}
+                </div>
+              `
+              : ""
+          }
+
+          <div class="position-v10-quote-warning-action">
+            Automated P/L exit guidance suspended.
+          </div>
+        </div>
+      `
+      : "";
 
   const pnlClass =
     getPositionStatusClass(pnl);
@@ -317,11 +386,13 @@ function renderPositionCard(position) {
         </div>
       </div>
 
+      ${quoteWarningHtml}
+
       <div class="position-v10-summary">
 
         <div class="position-v10-pnl ${pnlClass}">
           <div class="position-v10-label">
-            OPEN P/L
+            ${pnlLabel}
           </div>
 
           <div class="position-v10-pnl-value">
@@ -341,7 +412,7 @@ function renderPositionCard(position) {
             <span>PROFIT CAPTURED</span>
 
             <strong>
-              ${formatNumber(progress, 1)}%
+              ${progressDisplay}
             </strong>
           </div>
 
@@ -430,7 +501,7 @@ function renderPositionCard(position) {
           </div>
 
           <div class="position-v10-metric">
-            <span>Current Debit</span>
+            <span>${currentDebitLabel}</span>
             <strong>
               ${formatMoney(currentDebit)}
             </strong>
@@ -528,6 +599,17 @@ function renderPositionMonitor(
   const totalClass =
     getPositionStatusClass(total);
 
+  const hasUnreliableValuation =
+    positions.some(
+      (position) =>
+        position?.valuation_reliable === false,
+    );
+
+  const totalPnlLabel =
+    hasUnreliableValuation
+      ? "Total P/L Estimate"
+      : "Total Open P/L";
+
   const cards = positions
     .map(renderPositionCard)
     .join("");
@@ -547,8 +629,18 @@ function renderPositionMonitor(
 
       <div class="position-total-block ${totalClass}">
         <div class="position-label">
-          Total Open P/L
+          ${totalPnlLabel}
         </div>
+
+        ${
+          hasUnreliableValuation
+            ? `
+              <div class="position-total-estimate-note">
+                QUOTE QUALITY WARNING
+              </div>
+            `
+            : ""
+        }
 
         <div class="position-pnl-value-large">
           ${formatSignedMoney(total)}
