@@ -37,6 +37,10 @@ from bxk_app.routes.auth import (
     router as auth_router,
 )
 
+from bxk_app.routes.admin_users import (
+    router as admin_users_router,
+)
+
 router = APIRouter()
 
 router.include_router(health_router)
@@ -50,3 +54,4 @@ router.include_router(debug_router)
 router.include_router(order_router)
 router.include_router(system_settings_router)
 router.include_router(auth_router)
+router.include_router(admin_users_router)
