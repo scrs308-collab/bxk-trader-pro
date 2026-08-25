@@ -327,3 +327,53 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==================================================
+   POSITION QUOTE QUALITY GUARD
+   ================================================== */
+
+.position-v10-quote-warning {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(244, 176, 66, 0.45);
+  border-radius: 12px;
+  background: rgba(244, 176, 66, 0.09);
+}
+
+.position-v10-quote-warning-title {
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #f4b042;
+}
+
+.position-v10-quote-warning-text {
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.position-v10-quote-warning-legs {
+  margin-top: 7px;
+  color: var(--muted-text, #8d98a8);
+  font-size: 0.82rem;
+}
+
+.position-v10-quote-warning-action {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.position-total-estimate-note {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  color: #f4b042;
+}
+
+@media (max-width: 680px) {
+  .position-v10-quote-warning {
+    padding: 12px 13px;
+  }
+}
