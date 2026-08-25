@@ -340,3 +340,179 @@ def test_admin_api_rejects_owner_creation(
     )
 
     assert response.status_code == 422
+
+def test_owner_can_disable_beta_and_existing_session_dies(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner",
+        email="owner@example.com",
+        role=UserRole.OWNER,
+    )
+
+    beta_id = add_user(
+        factory,
+        username="beta1",
+        email="beta1@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    owner_client = client_with_user(
+        owner_id
+    )
+
+    beta_client = client_with_user(
+        beta_id
+    )
+
+    before = beta_client.get(
+        "/api/auth/status"
+    )
+
+    assert before.status_code == 200
+    assert (
+        before.json()["authenticated"]
+        is True
+    )
+
+    response = owner_client.patch(
+        f"/api/admin/users/{beta_id}/status",
+        json={
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 200
+
+    user = response.json()["user"]
+
+    assert user["id"] == beta_id
+    assert user["is_active"] is False
+    assert "password_hash" not in user
+
+    after = beta_client.get(
+        "/api/auth/status"
+    )
+
+    assert after.status_code == 200
+    assert (
+        after.json()["authenticated"]
+        is False
+    )
+
+
+def test_beta_cannot_change_user_status(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta1_id = add_user(
+        factory,
+        username="beta1",
+        email="beta1@example.com",
+        role=UserRole.BETA,
+    )
+
+    beta2_id = add_user(
+        factory,
+        username="beta2",
+        email="beta2@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        beta1_id
+    )
+
+    response = client.patch(
+        f"/api/admin/users/{beta2_id}/status",
+        json={
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_owner_cannot_disable_owner_account(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner",
+        email="owner@example.com",
+        role=UserRole.OWNER,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    response = client.patch(
+        f"/api/admin/users/{owner_id}/status",
+        json={
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 422
+
+    assert (
+        "OWNER accounts"
+        in response.json()["detail"]
+    )
+
+
+def test_admin_status_update_returns_404_for_missing_user(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner",
+        email="owner@example.com",
+        role=UserRole.OWNER,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    missing_id = str(
+        uuid.uuid4()
+    )
+
+    response = client.patch(
+        f"/api/admin/users/{missing_id}/status",
+        json={
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 404

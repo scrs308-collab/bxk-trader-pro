@@ -185,3 +185,63 @@ def create_user(
     session.refresh(user)
 
     return serialize_user(user)
+
+def set_user_active(
+    session: Session,
+    *,
+    user_id: str,
+    is_active: bool,
+) -> dict:
+    """
+    Enable or disable a non-OWNER user account.
+
+    OWNER accounts cannot be modified through this
+    administrative endpoint.
+    """
+
+    import uuid
+
+    try:
+        parsed_user_id = uuid.UUID(
+            str(user_id)
+        )
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            "Invalid user ID."
+        ) from exc
+
+    user = session.get(
+        User,
+        parsed_user_id,
+    )
+
+    if user is None:
+        raise LookupError(
+            "User not found."
+        )
+
+    role = (
+        user.role
+        if isinstance(
+            user.role,
+            UserRole,
+        )
+        else UserRole(
+            str(user.role)
+        )
+    )
+
+    if role == UserRole.OWNER:
+        raise ValueError(
+            "OWNER accounts cannot be "
+            "enabled or disabled here."
+        )
+
+    user.is_active = bool(
+        is_active
+    )
+
+    session.commit()
+    session.refresh(user)
+
+    return serialize_user(user)

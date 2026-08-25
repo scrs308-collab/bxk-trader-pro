@@ -13,6 +13,7 @@ from bxk_app.db_models.user import (
 from bxk_app.services.admin_user_service import (
     create_user,
     list_users,
+    set_user_active,
 )
 from bxk_app.services.system_settings_service import (
     verify_app_password,
@@ -197,3 +198,64 @@ def test_list_users_never_exposes_password_hash():
             "password_hash"
             not in users[0]
         )
+
+def test_beta_user_can_be_disabled_and_reenabled():
+    factory = make_session_factory()
+
+    with factory() as session:
+        created = create_user(
+            session,
+            username="beta1",
+            email="beta1@example.com",
+            role="BETA",
+            temporary_password="Temporary123!",
+        )
+
+        disabled = set_user_active(
+            session,
+            user_id=created["id"],
+            is_active=False,
+        )
+
+        assert disabled["is_active"] is False
+
+        enabled = set_user_active(
+            session,
+            user_id=created["id"],
+            is_active=True,
+        )
+
+        assert enabled["is_active"] is True
+
+
+def test_owner_account_cannot_be_disabled():
+    factory = make_session_factory()
+
+    from bxk_app.db_models.user import User
+    from bxk_app.services.system_settings_service import (
+        hash_app_password,
+    )
+
+    with factory() as session:
+        owner = User(
+            username="owner",
+            email="owner@example.com",
+            password_hash=hash_app_password(
+                "OwnerPassword123!"
+            ),
+            role=UserRole.OWNER,
+            is_active=True,
+        )
+
+        session.add(owner)
+        session.commit()
+
+        with pytest.raises(
+            ValueError,
+            match="OWNER accounts",
+        ):
+            set_user_active(
+                session,
+                user_id=str(owner.id),
+                is_active=False,
+            )
