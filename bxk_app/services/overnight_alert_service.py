@@ -17,7 +17,7 @@ from bxk_app.services.overnight_risk_service import (
     get_live_overnight_risk,
 )
 from bxk_app.services.sms_service import (
-    send_sms,
+    send_bxk_sms,
 )
 
 
@@ -442,7 +442,7 @@ def process_overnight_risk(
     payload,
     *,
     session_factory=None,
-    send_func=send_sms,
+    send_func=send_bxk_sms,
 ):
     factory = (
         session_factory

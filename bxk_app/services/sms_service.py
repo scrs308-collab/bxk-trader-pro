@@ -150,3 +150,68 @@ def send_sms(
             "Unable to reach Twilio "
             "SMS API."
         ) from exc
+
+
+
+def send_bxk_sms(
+    message: str,
+    *,
+    recipient: str | None = None,
+):
+    """
+    Send a BXK-generated SMS only after
+    verifying active recipient consent.
+
+    The lower-level send_sms() function remains
+    transport-only for diagnostics and isolated
+    infrastructure tests.
+    """
+    from bxk_app.services.sms_consent_service import (
+        has_active_sms_consent,
+        normalize_sms_phone,
+    )
+
+    raw_recipient = str(
+        recipient
+        or _environment_value(
+            "BXK_ALERT_PHONE"
+        )
+    ).strip()
+
+    if not raw_recipient:
+        raise RuntimeError(
+            "SMS configuration is incomplete: "
+            "BXK_ALERT_PHONE"
+        )
+
+    try:
+        normalized = normalize_sms_phone(
+            raw_recipient
+        )
+    except ValueError as exc:
+        raise RuntimeError(
+            "SMS recipient phone number "
+            "is invalid."
+        ) from exc
+
+    try:
+        consented = (
+            has_active_sms_consent(
+                normalized
+            )
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "SMS consent verification failed."
+        ) from exc
+
+    if not consented:
+        raise RuntimeError(
+            "SMS recipient has not provided "
+            "active consent."
+        )
+
+    return send_sms(
+        message,
+        recipient=normalized,
+    )

@@ -104,6 +104,13 @@ def application_access_page():
     )
 
 
+@app.get("/sms-opt-in")
+def sms_opt_in_page():
+    return FileResponse(
+        "static/sms-opt-in.html"
+    )
+
+
 @app.get("/privacy")
 def privacy_page():
     return FileResponse(

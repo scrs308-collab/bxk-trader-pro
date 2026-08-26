@@ -20,6 +20,7 @@ PUBLIC_PATHS = {
     "/login",
     "/forgot-password",
     "/application-access",
+    "/sms-opt-in",
     "/privacy",
     "/terms",
     "/health",
@@ -27,6 +28,7 @@ PUBLIC_PATHS = {
     "/api/auth/logout",
     "/api/auth/status",
     "/api/auth/forgot-password",
+    "/api/sms/opt-in",
 }
 
 

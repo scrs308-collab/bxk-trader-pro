@@ -1,11 +1,15 @@
 from bxk_app.db_models.overnight_alert_state import (
     OvernightAlertState,
 )
+from bxk_app.db_models.sms_consent import (
+    SmsConsent,
+)
 from bxk_app.db_models.user import User, UserRole
 
 
 __all__ = [
     "OvernightAlertState",
+    "SmsConsent",
     "User",
     "UserRole",
 ]

@@ -110,3 +110,80 @@ def test_sms_requires_configuration(
         send_sms(
             "BXK test"
         )
+
+
+
+def test_bxk_sms_blocks_without_consent(
+    monkeypatch,
+):
+    import bxk_app.services.sms_service as sms_service
+    import bxk_app.services.sms_consent_service as consent_service
+
+    monkeypatch.setenv(
+        "BXK_ALERT_PHONE",
+        "+15550000002",
+    )
+
+    monkeypatch.setattr(
+        consent_service,
+        "has_active_sms_consent",
+        lambda phone_number: False,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="active consent",
+    ):
+        sms_service.send_bxk_sms(
+            "BXK test"
+        )
+
+
+def test_bxk_sms_sends_after_consent(
+    monkeypatch,
+):
+    import bxk_app.services.sms_service as sms_service
+    import bxk_app.services.sms_consent_service as consent_service
+
+    monkeypatch.setenv(
+        "BXK_ALERT_PHONE",
+        "+15550000002",
+    )
+
+    monkeypatch.setattr(
+        consent_service,
+        "has_active_sms_consent",
+        lambda phone_number: True,
+    )
+
+    captured = {}
+
+    def fake_send(
+        message,
+        *,
+        recipient=None,
+    ):
+        captured["message"] = message
+        captured["recipient"] = recipient
+
+        return True
+
+    monkeypatch.setattr(
+        sms_service,
+        "send_sms",
+        fake_send,
+    )
+
+    assert sms_service.send_bxk_sms(
+        "BXK consented test"
+    ) is True
+
+    assert (
+        captured["recipient"]
+        == "+15550000002"
+    )
+
+    assert (
+        captured["message"]
+        == "BXK consented test"
+    )
