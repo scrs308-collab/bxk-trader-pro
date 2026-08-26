@@ -163,6 +163,49 @@ def _risk_is_alertable(payload):
     return True
 
 
+RESET_BASELINE_REASONS = {
+    "NO_OPEN_SPX_CONDOR",
+    "NO_ACTIVE_SPX_CONDOR",
+}
+
+
+def _should_reset_baseline(payload):
+    """
+    Reset the stored alert state only when the
+    overnight monitoring session has genuinely ended
+    or there is definitively no active SPX condor.
+
+    Temporary quote/reference/data failures must keep
+    the prior risk state so a worsening state after
+    recovery still generates an alert.
+    """
+    if not isinstance(payload, dict):
+        return False
+
+    session = (
+        payload.get("session")
+        if isinstance(
+            payload.get("session"),
+            dict,
+        )
+        else {}
+    )
+
+    if (
+        session.get(
+            "overnight_monitoring_active"
+        )
+        is False
+    ):
+        return True
+
+    reason_code = str(
+        payload.get("reason_code") or ""
+    ).strip().upper()
+
+    return reason_code in RESET_BASELINE_REASONS
+
+
 def _should_alert(
     previous_state,
     current_state,
@@ -462,18 +505,34 @@ def process_overnight_risk(
         )
 
         if current_state is None:
-            state.state = None
-            state.reason_code = (
-                reason_code
-            )
+            if _should_reset_baseline(
+                payload
+            ):
+                state.state = None
+                state.reason_code = (
+                    reason_code
+                )
 
-            session.commit()
+                session.commit()
 
+                return {
+                    "action": "IDLE",
+                    "previous_state":
+                        previous_state,
+                    "current_state": None,
+                    "alert_sent": False,
+                }
+
+            # Temporary data/quote/reference failure.
+            # Preserve the last known risk state so
+            # a worsening state after recovery is not
+            # silently treated as a new baseline.
             return {
-                "action": "IDLE",
+                "action": "UNAVAILABLE",
                 "previous_state":
                     previous_state,
-                "current_state": None,
+                "current_state":
+                    previous_state,
                 "alert_sent": False,
             }
 

@@ -264,3 +264,44 @@ def test_failed_sms_is_retried():
 
     assert result["action"] == "ALERTED"
     assert len(sent) == 1
+
+
+def test_temporary_unavailable_preserves_baseline_and_next_worsening_alerts():
+    factory = make_factory()
+    sent = []
+
+    process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    unavailable = payload(
+        None,
+        available=False,
+        active=True,
+    )
+    unavailable["reason_code"] = (
+        "OVERNIGHT_REFERENCE_UNAVAILABLE"
+    )
+
+    result = process_overnight_risk(
+        unavailable,
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "UNAVAILABLE"
+    assert read_state(factory).state == "GREEN"
+    assert sent == []
+
+    result = process_overnight_risk(
+        payload("YELLOW"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "ALERTED"
+    assert read_state(factory).state == "YELLOW"
+    assert len(sent) == 1
+    assert "GREEN -> YELLOW" in sent[0]
