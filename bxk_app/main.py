@@ -104,6 +104,20 @@ def application_access_page():
     )
 
 
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(
+        "static/privacy.html"
+    )
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse(
+        "static/terms.html"
+    )
+
+
 @app.get("/change-password")
 def change_password_page():
     return FileResponse(

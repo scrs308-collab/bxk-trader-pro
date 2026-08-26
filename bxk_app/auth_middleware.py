@@ -20,6 +20,8 @@ PUBLIC_PATHS = {
     "/login",
     "/forgot-password",
     "/application-access",
+    "/privacy",
+    "/terms",
     "/health",
     "/api/auth/login",
     "/api/auth/logout",
