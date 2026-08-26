@@ -297,3 +297,187 @@ def test_owner_live_market_keeps_account_mode(
         ]
         is True
     )
+
+
+def test_beta_can_still_use_order_preview(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_preview",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._build_current_order",
+        lambda *args, **kwargs: (
+            None,
+            None,
+        ),
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.get(
+        "/api/order-preview"
+    )
+
+    assert response.status_code == 200
+
+    assert (
+        response.json()["status"]
+        == "NO_TRADE"
+    )
+
+
+def test_beta_cannot_run_order_validate(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_validate",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def forbidden_body(*args, **kwargs):
+        raise AssertionError(
+            "order_validate body executed "
+            "for BETA user"
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._build_current_order",
+        forbidden_body,
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.get(
+        "/api/order-validate"
+    )
+
+    assert response.status_code == 403
+
+
+def test_beta_cannot_run_order_dry_run(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_dryrun",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def forbidden_body():
+        raise AssertionError(
+            "order_dry_run body executed "
+            "for BETA user"
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._execution_session_gate",
+        forbidden_body,
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.post(
+        "/api/order-dry-run"
+    )
+
+    assert response.status_code == 403
+
+
+def test_beta_cannot_run_order_submit(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_submit",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def forbidden_preflight(*args, **kwargs):
+        raise AssertionError(
+            "order_submit reached broker "
+            "preflight for BETA user"
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order.order_dry_run",
+        forbidden_preflight,
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.post(
+        "/api/order-submit?confirm_live=true"
+    )
+
+    assert response.status_code == 403
+
+
+def test_owner_can_reach_order_validate(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner_validate",
+        role=UserRole.OWNER,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._build_current_order",
+        lambda *args, **kwargs: (
+            None,
+            None,
+        ),
+    )
+
+    client = client_with_user(owner_id)
+
+    response = client.get(
+        "/api/order-validate"
+    )
+
+    assert response.status_code == 200
+
+    assert (
+        response.json()["status"]
+        == "BLOCKED"
+    )

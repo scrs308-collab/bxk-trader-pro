@@ -4,8 +4,11 @@ import threading
 import time
 from datetime import date, datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.config import (
     BXK_LIVE_TRADING_ENABLED,
@@ -643,7 +646,14 @@ def order_preview(
     }
 
 
-@router.get("/order-validate")
+@router.get(
+    "/order-validate",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def order_validate(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
@@ -1421,7 +1431,14 @@ def _execution_session_gate() -> dict:
     }
 
 
-@router.post("/order-dry-run")
+@router.post(
+    "/order-dry-run",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def order_dry_run(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
@@ -1714,7 +1731,14 @@ def order_dry_run(
         "dry_run": dry_run,
     }
 
-@router.post("/order-submit")
+@router.post(
+    "/order-submit",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def order_submit(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
