@@ -37,3 +37,36 @@ def test_public_legal_pages_bypass_auth(
         assert "text/html" in response.headers[
             "content-type"
         ]
+
+
+
+def test_login_exposes_public_legal_links():
+    client = TestClient(app)
+
+    response = client.get(
+        "/login",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert 'href="/privacy"' in response.text
+    assert 'href="/terms"' in response.text
+
+
+def test_privacy_contains_mobile_nonsharing_disclosure():
+    client = TestClient(app)
+
+    response = client.get(
+        "/privacy",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert (
+        "No mobile information will be shared"
+        in response.text
+    )
+    assert (
+        "marketing or promotional purposes"
+        in response.text
+    )
