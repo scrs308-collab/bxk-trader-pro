@@ -1,3 +1,4 @@
+import { hasOwnerAccess } from "./access-control.js?v=1";
 import { BEST_TRADE_URL } from "./config.js";
 import {
   el,
@@ -1958,6 +1959,26 @@ function renderOrderPreview({
     },
   );
 
+  if (!hasOwnerAccess()) {
+    if (confirmButton) {
+      confirmButton.disabled = true;
+      confirmButton.textContent =
+        "OWNER EXECUTION ONLY";
+    }
+
+    setBrokerMessage(
+      "Informational trade preview only. " +
+      "Broker validation and order execution " +
+      "are restricted to the OWNER account.",
+    );
+
+    overlay
+      .querySelector("#closeOrderPreview")
+      ?.focus();
+
+    return;
+  }
+
   runBrokerPreflight();
 
   overlay
@@ -1992,4 +2013,4 @@ export function initializeTradeBuilder() {
       }
     },
   );
-}
+}\n

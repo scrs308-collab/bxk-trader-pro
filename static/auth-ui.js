@@ -46,24 +46,28 @@ export async function initializeAuthUi() {
         );
 
         if (!response.ok) {
-            return;
+            return null;
         }
 
         const data = await response.json();
 
         if (data.enabled && !data.authenticated) {
             window.location.replace("/login");
-            return;
+            return data;
         }
 
         if (data.enabled && data.authenticated) {
             createAuthControl(data.username);
         }
 
+        return data;
+
     } catch (error) {
         console.error(
             "BXK auth UI initialization failed:",
             error
         );
+
+        return null;
     }
-}
+}\n

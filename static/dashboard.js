@@ -1,4 +1,9 @@
-import { initializeAuthUi } from "./auth-ui.js?v=1";
+import { initializeAuthUi } from "./auth-ui.js?v=2";
+
+import {
+  hasOwnerAccess,
+  setAccessContext,
+} from "./access-control.js?v=1";
 console.log("BXK Trader Pro Dashboard - V10");
 
 import {
@@ -25,7 +30,7 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=12";
+} from "./best-trade.js?v=13";
 
 import {
   loadPositions,
@@ -212,7 +217,17 @@ async function fetchRecommendation() {
       overnightRisk,
     ] = await Promise.all([
       fetchRecentCondorRisk(),
-      fetchOvernightRisk(),
+      hasOwnerAccess()
+        ? fetchOvernightRisk()
+        : Promise.resolve({
+            available: false,
+            state: "UNAVAILABLE",
+            reason_code:
+              "OWNER_ACCESS_REQUIRED",
+            positions: [],
+            position_count: 0,
+            execution_authorized: false,
+          }),
     ]);
 
     const dashboardData = {
@@ -1476,11 +1491,20 @@ async function refreshDashboard() {
     if (underlying === "SPX") {
       await fetchRecommendation();
 
-      await Promise.allSettled([
+      const refreshTasks = [
         fetchLiveMarketSummary(),
         loadBestTrade(),
-        loadPositions(),
-      ]);
+      ];
+
+      if (hasOwnerAccess()) {
+        refreshTasks.push(
+          loadPositions(),
+        );
+      }
+
+      await Promise.allSettled(
+        refreshTasks
+      );
 
       return;
     }
@@ -1489,10 +1513,19 @@ async function refreshDashboard() {
      * Non-SPX mode deliberately avoids running the
      * SPX Best Trade / recommendation engines.
      */
-    await Promise.allSettled([
+    const refreshTasks = [
       fetchLiveMarketSummary(),
-      loadPositions(),
-    ]);
+    ];
+
+    if (hasOwnerAccess()) {
+      refreshTasks.push(
+        loadPositions(),
+      );
+    }
+
+    await Promise.allSettled(
+      refreshTasks
+    );
 
   } finally {
     dashboardRefreshInProgress = false;
@@ -1523,7 +1556,6 @@ document.addEventListener(
 );
 
 updateClock();
-startDashboardRefresh();
 
 setInterval(
   updateClock,
@@ -1568,15 +1600,18 @@ function initializeDashboardTabs() {
   });
 }
 
-initializeTradeBuilder();
-initializeDashboardTabs();
+function applyOwnerVisibility() {
+  const ownerAccess =
+    hasOwnerAccess();
 
-
-initializeSystemSettings();
-
-initializeAdminUsers();
-
-initializeAuthUi();
+  document
+    .querySelectorAll(
+      '[data-owner-only="true"]',
+    )
+    .forEach((element) => {
+      element.hidden = !ownerAccess;
+    });
+}
 
 
 function initializeUnderlyingSelector() {
@@ -1602,14 +1637,37 @@ function initializeUnderlyingSelector() {
 }
 
 
+async function initializeDashboardApplication() {
+  const authStatus =
+    await initializeAuthUi();
+
+  setAccessContext(
+    authStatus
+  );
+
+  applyOwnerVisibility();
+
+  initializeTradeBuilder();
+  initializeDashboardTabs();
+  initializeUnderlyingSelector();
+
+  if (hasOwnerAccess()) {
+    initializeSystemSettings();
+    initializeAdminUsers();
+  }
+
+  startDashboardRefresh();
+}
+
+
 if (document.readyState === "loading") {
   document.addEventListener(
     "DOMContentLoaded",
-    initializeUnderlyingSelector,
+    initializeDashboardApplication,
     {
       once: true,
     },
   );
 } else {
-  initializeUnderlyingSelector();
-}
+  initializeDashboardApplication();
+}\n
