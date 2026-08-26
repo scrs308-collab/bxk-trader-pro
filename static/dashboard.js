@@ -1,4 +1,4 @@
-import { initializeAuthUi } from "./auth-ui.js?v=2";
+import { initializeAuthUi } from "./auth-ui.js?v=3";
 
 import {
   hasOwnerAccess,
@@ -30,7 +30,7 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=13";
+} from "./best-trade.js?v=14";
 
 import {
   loadPositions,
@@ -1670,4 +1670,4 @@ if (document.readyState === "loading") {
   );
 } else {
   initializeDashboardApplication();
-}\n
+}

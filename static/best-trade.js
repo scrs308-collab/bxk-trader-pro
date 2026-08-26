@@ -2013,4 +2013,4 @@ export function initializeTradeBuilder() {
       }
     },
   );
-}\n
+}

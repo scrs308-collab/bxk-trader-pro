@@ -70,4 +70,4 @@ export async function initializeAuthUi() {
 
         return null;
     }
-}\n
+}
