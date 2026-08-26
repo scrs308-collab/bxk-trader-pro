@@ -1,4 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+)
+
+from bxk_app.authorization import (
+    has_owner_access,
+    require_owner_or_auth_disabled,
+)
 
 from bxk_app.services.overnight_risk_service import (
     get_live_overnight_risk,
@@ -26,7 +36,14 @@ router = APIRouter(
 )
 
 
-@router.get("/refresh-market")
+@router.get(
+    "/refresh-market",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def refresh_market():
     return refresh_market_data()
 
@@ -45,9 +62,32 @@ def live_market(
             "underlying: SPX or QQQ"
         ),
     ),
+    include_account_context: bool = Depends(
+        has_owner_access
+    ),
 ):
     try:
-        return get_live_market(underlying)
+        # FastAPI resolves this dependency to a bool
+        # for real HTTP requests.
+        #
+        # Existing direct Python callers receive the
+        # Depends object, so preserve historical OWNER
+        # behavior for those legacy test calls.
+        owner_context = (
+            include_account_context
+            if isinstance(
+                include_account_context,
+                bool,
+            )
+            else True
+        )
+
+        return get_live_market(
+            underlying,
+            include_account_context=(
+                owner_context
+            ),
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
@@ -117,7 +157,14 @@ def underlying_analysis(
         ) from exc
 
 
-@router.get("/overnight-risk")
+@router.get(
+    "/overnight-risk",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def overnight_risk(
     prior_spx_close: float | None = Query(
         None,

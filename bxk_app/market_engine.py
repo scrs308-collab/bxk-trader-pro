@@ -91,6 +91,7 @@ class MarketEngine:
         account=None,
         positions=None,
         qqq=None,
+        include_account_context=True,
     ):
         """
         Fetch live Tastytrade data when values are not supplied,
@@ -111,11 +112,12 @@ class MarketEngine:
         if qqq is None:
             qqq = broker.get_quote("QQQ")
 
-        if account is None:
-            account = broker.get_account_summary()
+        if include_account_context:
+            if account is None:
+                account = broker.get_account_summary()
 
-        if positions is None:
-            positions = broker.get_position_summary()
+            if positions is None:
+                positions = broker.get_position_summary()
 
         spx_price = get_quote_price(spx)
         vix_value = get_quote_price(vix)
@@ -226,8 +228,10 @@ class MarketEngine:
             condor_risk_profile=condor_risk_profile,
         )
 
-        market_data.account = account or {}
-        market_data.positions = positions or []
+        if include_account_context:
+            market_data.account = account or {}
+            market_data.positions = positions or []
+
         market_data.qqq = qqq or {}
 
         # Observation logging must never interfere with
@@ -253,7 +257,11 @@ class MarketEngine:
                 "Overnight baseline capture failed"
             )
 
-        return market_data.get_header()
+        return market_data.get_header(
+            include_account_context=(
+                include_account_context
+            )
+        )
 
 
 market_engine = MarketEngine()

@@ -97,7 +97,11 @@ class MarketData:
             "timestamp": datetime.now(EASTERN_TIME).isoformat(timespec="seconds"),
         }
 
-    def get_header(self):
+    def get_header(
+        self,
+        *,
+        include_account_context: bool = True,
+    ):
         spx_value = float(self.spx) if self.spx != "--" else None
         expected_move_value = float(self.expected_move) if self.expected_move != "--" else None
 
@@ -143,8 +147,16 @@ class MarketData:
             },
             "market_status": self.market_status(),
             "server_time": datetime.now(EASTERN_TIME).strftime("%I:%M:%S %p"),
-            "account": self.account,
-            "positions": self.positions,
+            "account": (
+                self.account
+                if include_account_context
+                else {}
+            ),
+            "positions": (
+                self.positions
+                if include_account_context
+                else []
+            ),
             "qqq": self.qqq,
 
         }

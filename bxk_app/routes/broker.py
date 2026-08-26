@@ -1,4 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 
 from bxk_app.services.broker_service import (
     get_account_summary,
@@ -14,6 +18,11 @@ from bxk_app.services.broker_service import (
 router = APIRouter(
     prefix="/api",
     tags=["Broker"],
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
 )
 
 

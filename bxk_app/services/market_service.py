@@ -169,12 +169,29 @@ def _quote_number(
     return None
 
 
-def get_live_market(underlying: str = "SPX"):
+def get_live_market(
+    underlying: str = "SPX",
+    *,
+    include_account_context: bool = True,
+):
     config = get_underlying_config(underlying)
 
     # Continue using the existing market engine so SPX behavior remains
     # unchanged and the normal SPX/VIX/VIX1D/QQQ refresh still occurs.
-    payload = dict(market_engine.update())
+    if include_account_context:
+        # Preserve historical OWNER/local behavior
+        # and the existing zero-argument call shape.
+        payload = dict(
+            market_engine.update()
+        )
+    else:
+        # Non-OWNER requests must never fetch
+        # global brokerage account context.
+        payload = dict(
+            market_engine.update(
+                include_account_context=False
+            )
+        )
 
     if config.symbol == "SPX":
         payload["underlying"] = "SPX"

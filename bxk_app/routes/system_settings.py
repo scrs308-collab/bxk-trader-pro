@@ -1,5 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
+
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 
 from bxk_app.services.system_settings_service import (
     get_system_settings,
@@ -10,6 +14,11 @@ from bxk_app.services.system_settings_service import (
 router = APIRouter(
     prefix="/api",
     tags=["System Settings"],
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
 )
 
 
