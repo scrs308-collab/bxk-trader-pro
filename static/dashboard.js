@@ -35,6 +35,11 @@ import {
   initializeSystemSettings,
 } from "./system-settings.js?v=1";
 
+
+import {
+  initializeAdminUsers,
+} from "./admin-users.js?v=1";
+
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;
 let backendOffline = false;
@@ -1568,6 +1573,8 @@ initializeDashboardTabs();
 
 
 initializeSystemSettings();
+
+initializeAdminUsers();
 
 initializeAuthUi();
 

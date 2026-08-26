@@ -5678,3 +5678,190 @@ body[data-theme="light"]
 .underlying-load-button:hover {
   background: rgba(70, 120, 180, 0.26);
 }
+
+/* ==================================================
+   BXK USER ADMINISTRATION
+   ================================================== */
+
+.bxk-admin-users-intro {
+  margin-bottom: 18px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.bxk-admin-users-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 0.8fr)
+    minmax(360px, 1.4fr);
+  gap: 18px;
+}
+
+.bxk-admin-users-section {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.bxk-admin-users-heading {
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.bxk-admin-users-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.bxk-admin-users-field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.bxk-admin-users-field input,
+.bxk-admin-users-field select {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.bxk-admin-password-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.bxk-admin-users-button {
+  padding: 9px 12px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: transparent;
+  color: #e5e7eb;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bxk-admin-users-button.primary {
+  border-color: #3b82f6;
+  background: #2563eb;
+}
+
+.bxk-admin-users-button.secondary {
+  border-color: #64748b;
+}
+
+.bxk-admin-users-button.danger {
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.bxk-admin-users-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bxk-admin-users-note {
+  margin: -4px 0 14px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.bxk-admin-user-row {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1.4fr)
+    minmax(180px, 1fr)
+    auto;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.bxk-admin-user-row:first-child {
+  border-top: none;
+}
+
+.bxk-admin-user-identity {
+  min-width: 0;
+}
+
+.bxk-admin-user-identity strong,
+.bxk-admin-user-identity span {
+  display: block;
+}
+
+.bxk-admin-user-identity span {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.bxk-admin-user-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bxk-admin-role,
+.bxk-admin-status,
+.bxk-admin-password-status,
+.bxk-admin-owner-protected {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.12);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.bxk-admin-status.active {
+  color: #86efac;
+}
+
+.bxk-admin-status.disabled {
+  color: #fca5a5;
+}
+
+.bxk-admin-owner-protected {
+  color: #94a3b8;
+}
+
+.bxk-admin-users-message {
+  min-height: 20px;
+  margin-top: 14px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.bxk-admin-users-message.success {
+  color: #86efac;
+}
+
+.bxk-admin-users-message.error {
+  color: #fca5a5;
+}
+
+@media (max-width: 900px) {
+  .bxk-admin-users-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bxk-admin-user-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bxk-admin-user-action {
+    justify-self: start;
+  }
+}
