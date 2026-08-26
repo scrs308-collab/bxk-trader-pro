@@ -12,6 +12,9 @@ from bxk_app.routes import router
 from bxk_app.services.market_heartbeat_service import (
     run_market_heartbeat,
 )
+from bxk_app.services.overnight_alert_service import (
+    run_overnight_alert_monitor,
+)
 
 
 @asynccontextmanager
@@ -25,10 +28,27 @@ async def lifespan(app: FastAPI):
         heartbeat_task
     )
 
+    overnight_alert_task = (
+        asyncio.create_task(
+            run_overnight_alert_monitor(),
+            name="bxk-overnight-sms-alerts",
+        )
+    )
+
+    app.state.overnight_alert_task = (
+        overnight_alert_task
+    )
+
     try:
         yield
     finally:
+        overnight_alert_task.cancel()
         heartbeat_task.cancel()
+
+        try:
+            await overnight_alert_task
+        except asyncio.CancelledError:
+            pass
 
         try:
             await heartbeat_task
