@@ -44,8 +44,7 @@ def payload(
             if state != "GREEN"
             else "HOLD"
         ),
-        "reason_code":
-            f"TEST_{state}",
+        "reason_code": f"TEST_{state}",
         "position_count": (
             1 if available else 0
         ),
@@ -61,8 +60,7 @@ def payload(
                 },
                 "risk": {
                     "state": state,
-                    "threatened_side":
-                        "PUT",
+                    "threatened_side": "PUT",
                 },
             }
         ],
@@ -112,7 +110,30 @@ def test_same_state_is_not_repeated():
     assert sent == []
 
 
-def test_worsening_states_send_alerts():
+def test_yellow_and_orange_do_not_send_sms():
+    factory = make_factory()
+    sent = []
+
+    for state in [
+        "GREEN",
+        "YELLOW",
+        "ORANGE",
+    ]:
+        process_overnight_risk(
+            payload(state),
+            session_factory=factory,
+            send_func=sent.append,
+        )
+
+    assert sent == []
+    assert read_state(factory).state == "ORANGE"
+    assert (
+        read_state(factory).last_alerted_state
+        is None
+    )
+
+
+def test_orange_to_red_sends_sms():
     factory = make_factory()
     sent = []
 
@@ -128,11 +149,92 @@ def test_worsening_states_send_alerts():
             send_func=sent.append,
         )
 
-    assert len(sent) == 3
+    assert len(sent) == 1
+    assert "ORANGE -> RED" in sent[0]
+    assert (
+        read_state(factory).last_alerted_state
+        == "RED"
+    )
 
-    assert "GREEN -> YELLOW" in sent[0]
-    assert "YELLOW -> ORANGE" in sent[1]
-    assert "ORANGE -> RED" in sent[2]
+
+def test_direct_green_to_red_sends_sms():
+    factory = make_factory()
+    sent = []
+
+    process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    result = process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "ALERTED"
+    assert len(sent) == 1
+    assert "GREEN -> RED" in sent[0]
+
+
+def test_red_threshold_chatter_does_not_repeat_sms():
+    factory = make_factory()
+    sent = []
+
+    process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    process_overnight_risk(
+        payload("ORANGE"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    result = process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "STATE_UPDATED"
+    assert len(sent) == 1
+
+
+def test_critical_sends_one_additional_sms():
+    factory = make_factory()
+    sent = []
+
+    process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    process_overnight_risk(
+        payload("CRITICAL"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert len(sent) == 2
+    assert "GREEN -> RED" in sent[0]
+    assert "RED -> CRITICAL" in sent[1]
 
 
 def test_intermediate_recovery_does_not_text():
@@ -159,20 +261,30 @@ def test_intermediate_recovery_does_not_text():
         send_func=sent.append,
     )
 
-    assert (
-        result["action"]
-        == "STATE_UPDATED"
-    )
-
+    assert result["action"] == "STATE_UPDATED"
     assert sent == []
 
 
-def test_return_to_green_sends_recovery():
+def test_full_green_recovery_sends_one_sms():
     factory = make_factory()
     sent = []
 
     process_overnight_risk(
-        payload("YELLOW"),
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    sent.clear()
+
+    process_overnight_risk(
+        payload("ORANGE"),
         session_factory=factory,
         send_func=sent.append,
     )
@@ -191,7 +303,27 @@ def test_return_to_green_sends_recovery():
     )
 
 
-def test_inactive_monitoring_resets_baseline():
+def test_yellow_to_green_does_not_send_recovery():
+    factory = make_factory()
+    sent = []
+
+    process_overnight_risk(
+        payload("YELLOW"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    result = process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "STATE_UPDATED"
+    assert sent == []
+
+
+def test_session_reset_rearms_red_alert():
     factory = make_factory()
     sent = []
 
@@ -201,9 +333,17 @@ def test_inactive_monitoring_resets_baseline():
         send_func=sent.append,
     )
 
+    process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert len(sent) == 1
+
     result = process_overnight_risk(
         payload(
-            "YELLOW",
+            "GREEN",
             active=False,
         ),
         session_factory=factory,
@@ -211,9 +351,19 @@ def test_inactive_monitoring_resets_baseline():
     )
 
     assert result["action"] == "IDLE"
-    assert read_state(factory).state is None
+
+    stored = read_state(factory)
+
+    assert stored.state is None
+    assert stored.last_alerted_state is None
 
     sent.clear()
+
+    process_overnight_risk(
+        payload("GREEN"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
 
     result = process_overnight_risk(
         payload("RED"),
@@ -221,11 +371,11 @@ def test_inactive_monitoring_resets_baseline():
         send_func=sent.append,
     )
 
-    assert result["action"] == "BASELINE"
-    assert sent == []
+    assert result["action"] == "ALERTED"
+    assert len(sent) == 1
 
 
-def test_failed_sms_is_retried():
+def test_failed_red_sms_is_retried():
     factory = make_factory()
 
     process_overnight_risk(
@@ -241,7 +391,7 @@ def test_failed_sms_is_retried():
 
     try:
         process_overnight_risk(
-            payload("YELLOW"),
+            payload("RED"),
             session_factory=factory,
             send_func=fail,
         )
@@ -257,7 +407,7 @@ def test_failed_sms_is_retried():
     sent = []
 
     result = process_overnight_risk(
-        payload("YELLOW"),
+        payload("RED"),
         session_factory=factory,
         send_func=sent.append,
     )
@@ -266,7 +416,7 @@ def test_failed_sms_is_retried():
     assert len(sent) == 1
 
 
-def test_temporary_unavailable_preserves_baseline_and_next_worsening_alerts():
+def test_temporary_unavailable_preserves_red_alert():
     factory = make_factory()
     sent = []
 
@@ -281,6 +431,7 @@ def test_temporary_unavailable_preserves_baseline_and_next_worsening_alerts():
         available=False,
         active=True,
     )
+
     unavailable["reason_code"] = (
         "OVERNIGHT_REFERENCE_UNAVAILABLE"
     )
@@ -296,12 +447,11 @@ def test_temporary_unavailable_preserves_baseline_and_next_worsening_alerts():
     assert sent == []
 
     result = process_overnight_risk(
-        payload("YELLOW"),
+        payload("RED"),
         session_factory=factory,
         send_func=sent.append,
     )
 
     assert result["action"] == "ALERTED"
-    assert read_state(factory).state == "YELLOW"
+    assert read_state(factory).state == "RED"
     assert len(sent) == 1
-    assert "GREEN -> YELLOW" in sent[0]

@@ -209,13 +209,31 @@ def _should_reset_baseline(payload):
 def _should_alert(
     previous_state,
     current_state,
+    last_alerted_state=None,
 ):
+    """
+    Overnight SMS policy:
+
+    GREEN, YELLOW, and ORANGE are dashboard-only.
+
+    Send SMS when:
+    - risk first reaches RED
+    - risk escalates to CRITICAL
+    - a serious alert later recovers fully to GREEN
+
+    Suppress repeat RED alerts during threshold chatter.
+    """
+
     previous = _normalized_state(
         previous_state
     )
 
     current = _normalized_state(
         current_state
+    )
+
+    last_alerted = _normalized_state(
+        last_alerted_state
     )
 
     if (
@@ -225,19 +243,25 @@ def _should_alert(
     ):
         return False
 
+    if current == "CRITICAL":
+        return last_alerted != "CRITICAL"
+
+    if current == "RED":
+        return last_alerted not in {
+            "RED",
+            "CRITICAL",
+        }
+
     if (
-        STATE_RANK[current]
-        > STATE_RANK[previous]
+        current == "GREEN"
+        and last_alerted in {
+            "RED",
+            "CRITICAL",
+        }
     ):
         return True
 
-    # Recovery texts are useful, but avoid
-    # sending every intermediate de-escalation.
-    return (
-        current == "GREEN"
-        and previous != "GREEN"
-    )
-
+    return False
 
 def _first_position(payload):
     positions = payload.get(
@@ -512,6 +536,8 @@ def process_overnight_risk(
                 state.reason_code = (
                     reason_code
                 )
+                state.last_alerted_state = None
+                state.last_alerted_at = None
 
                 session.commit()
 
@@ -578,6 +604,7 @@ def process_overnight_risk(
             _should_alert(
                 previous_state,
                 current_state,
+                state.last_alerted_state,
             )
         )
 
