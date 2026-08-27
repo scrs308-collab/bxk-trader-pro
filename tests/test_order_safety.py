@@ -2273,3 +2273,238 @@ def test_working_order_lookup_failure_blocks_submission(
         result["live_submission_enabled"]
         is False
     )
+
+
+
+def _vertical_test_order(
+    *,
+    strategy,
+    option_type,
+    short_strike,
+    long_strike,
+):
+    return {
+        "strategy": strategy,
+        "symbol": "SPX",
+        "expiration": "2099-12-31",
+        "dte": 1,
+        "quantity": 1,
+        "order_type": "LIMIT",
+        "time_in_force": "DAY",
+        "limit_price": 3.20,
+        "max_risk": 2180.0,
+        "legs": [
+            {
+                "action": "SELL",
+                "option_type":
+                    option_type,
+                "strike":
+                    short_strike,
+                "symbol":
+                    "TEST-SHORT",
+            },
+            {
+                "action": "BUY",
+                "option_type":
+                    option_type,
+                "strike":
+                    long_strike,
+                "symbol":
+                    "TEST-LONG",
+            },
+        ],
+    }
+
+
+def test_bull_put_credit_spread_passes_structure_validation():
+    order = _vertical_test_order(
+        strategy=(
+            "Bull Put Credit Spread"
+        ),
+        option_type="PUT",
+        short_strike=7670,
+        long_strike=7645,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    assert errors == []
+
+    failed = [
+        check
+        for check in checks
+        if not check["passed"]
+    ]
+
+    assert failed == []
+
+
+def test_bear_call_credit_spread_passes_structure_validation():
+    order = _vertical_test_order(
+        strategy=(
+            "Bear Call Credit Spread"
+        ),
+        option_type="CALL",
+        short_strike=7735,
+        long_strike=7760,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    assert errors == []
+
+    failed = [
+        check
+        for check in checks
+        if not check["passed"]
+    ]
+
+    assert failed == []
+
+
+def test_bull_put_wrong_strike_order_is_blocked():
+    order = _vertical_test_order(
+        strategy=(
+            "Bull Put Credit Spread"
+        ),
+        option_type="PUT",
+        short_strike=7645,
+        long_strike=7670,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    assert errors
+
+    strike_check = next(
+        check
+        for check in checks
+        if check["name"]
+        == "strike_order"
+    )
+
+    assert (
+        strike_check["passed"]
+        is False
+    )
+
+
+def test_bear_call_wrong_strike_order_is_blocked():
+    order = _vertical_test_order(
+        strategy=(
+            "Bear Call Credit Spread"
+        ),
+        option_type="CALL",
+        short_strike=7760,
+        long_strike=7735,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    assert errors
+
+    strike_check = next(
+        check
+        for check in checks
+        if check["name"]
+        == "strike_order"
+    )
+
+    assert (
+        strike_check["passed"]
+        is False
+    )
+
+
+def test_vertical_wrong_option_type_is_blocked():
+    order = _vertical_test_order(
+        strategy=(
+            "Bull Put Credit Spread"
+        ),
+        option_type="CALL",
+        short_strike=7670,
+        long_strike=7645,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    direction_check = next(
+        check
+        for check in checks
+        if check["name"]
+        == "leg_directions"
+    )
+
+    assert errors
+    assert (
+        direction_check["passed"]
+        is False
+    )
+
+
+def test_debit_strategy_remains_blocked():
+    order = _vertical_test_order(
+        strategy=(
+            "Debit Call Spread"
+        ),
+        option_type="CALL",
+        short_strike=7760,
+        long_strike=7735,
+    )
+
+    checks, errors = (
+        order_route._validate_order(
+            order,
+            requested_dte=1,
+            requested_wing_width=25,
+            requested_contracts=1,
+        )
+    )
+
+    strategy_check = next(
+        check
+        for check in checks
+        if check["name"]
+        == "strategy"
+    )
+
+    assert errors
+    assert (
+        strategy_check["passed"]
+        is False
+    )

@@ -363,11 +363,38 @@ def _validate_order(
         .replace(" ", "_")
     )
 
+    is_iron_condor = (
+        "iron_condor" in strategy_key
+    )
+
+    is_bull_put = (
+        "bull_put" in strategy_key
+        or "put_credit_spread" in strategy_key
+    )
+
+    is_bear_call = (
+        "bear_call" in strategy_key
+        or "call_credit_spread" in strategy_key
+    )
+
+    supported_strategy = (
+        is_iron_condor
+        or is_bull_put
+        or is_bear_call
+    )
+
     check(
         "strategy",
-        "iron_condor" in strategy_key,
-        "Strategy verified as iron condor.",
-        "Strategy must be an iron condor.",
+        supported_strategy,
+        (
+            "Strategy verified as an approved "
+            "defined-risk credit structure."
+        ),
+        (
+            "Strategy must be an Iron Condor, "
+            "Bull Put Credit Spread, or "
+            "Bear Call Credit Spread."
+        ),
     )
 
     check(
@@ -386,28 +413,75 @@ def _validate_order(
         "Contract quantity is invalid or changed.",
     )
 
-    check(
-        "leg_count",
-        len(legs) == 4,
-        "Four-leg iron condor structure verified.",
-        "Iron condor must contain exactly four legs.",
+    expected_leg_count = (
+        4 if is_iron_condor else 2
     )
 
-    expected_legs = [
-        ("SELL", "PUT"),
-        ("BUY", "PUT"),
-        ("SELL", "CALL"),
-        ("BUY", "CALL"),
-    ]
+    check(
+        "leg_count",
+        (
+            supported_strategy
+            and len(legs) == expected_leg_count
+        ),
+        (
+            f"{expected_leg_count}-leg "
+            "strategy structure verified."
+        ),
+        (
+            "Order contains an invalid number "
+            "of option legs for the strategy."
+        ),
+    )
 
-    if len(legs) == 4:
+    expected_legs = []
+
+    if is_iron_condor:
+        expected_legs = [
+            ("SELL", "PUT"),
+            ("BUY", "PUT"),
+            ("SELL", "CALL"),
+            ("BUY", "CALL"),
+        ]
+
+    elif is_bull_put:
+        expected_legs = [
+            ("SELL", "PUT"),
+            ("BUY", "PUT"),
+        ]
+
+    elif is_bear_call:
+        expected_legs = [
+            ("SELL", "CALL"),
+            ("BUY", "CALL"),
+        ]
+
+    structure_length_valid = (
+        supported_strategy
+        and len(legs) == len(expected_legs)
+    )
+
+    if structure_length_valid:
         directions_valid = all(
-            str(leg.get("action", "")).upper() == action
-            and str(
-                leg.get("option_type", "")
-            ).upper() == option_type
+            (
+                str(
+                    leg.get("action", "")
+                ).upper()
+                == action
+            )
+            and (
+                str(
+                    leg.get(
+                        "option_type",
+                        "",
+                    )
+                ).upper()
+                == option_type
+            )
             for leg, (action, option_type)
-            in zip(legs, expected_legs)
+            in zip(
+                legs,
+                expected_legs,
+            )
         )
 
         symbols_present = all(
@@ -416,23 +490,75 @@ def _validate_order(
         )
 
         strikes = [
-            _number(leg.get("strike"), -1)
+            _number(
+                leg.get("strike"),
+                -1,
+            )
             for leg in legs
         ]
 
-        strike_order_valid = (
-            strikes[0] > strikes[1] > 0
-            and strikes[3] > strikes[2] > 0
-            and strikes[0] < strikes[2]
-        )
+        if is_iron_condor:
+            strike_order_valid = (
+                strikes[0] > strikes[1] > 0
+                and strikes[3] > strikes[2] > 0
+                and strikes[0] < strikes[2]
+            )
 
-        put_width = strikes[0] - strikes[1]
-        call_width = strikes[3] - strikes[2]
+            put_width = (
+                strikes[0]
+                - strikes[1]
+            )
 
-        width_valid = (
-            put_width == requested_wing_width
-            and call_width == requested_wing_width
-        )
+            call_width = (
+                strikes[3]
+                - strikes[2]
+            )
+
+            width_valid = (
+                put_width
+                == requested_wing_width
+                and call_width
+                == requested_wing_width
+            )
+
+        elif is_bull_put:
+            strike_order_valid = (
+                strikes[0]
+                > strikes[1]
+                > 0
+            )
+
+            spread_width = (
+                strikes[0]
+                - strikes[1]
+            )
+
+            width_valid = (
+                spread_width
+                == requested_wing_width
+            )
+
+        elif is_bear_call:
+            strike_order_valid = (
+                strikes[1]
+                > strikes[0]
+                > 0
+            )
+
+            spread_width = (
+                strikes[1]
+                - strikes[0]
+            )
+
+            width_valid = (
+                spread_width
+                == requested_wing_width
+            )
+
+        else:
+            strike_order_valid = False
+            width_valid = False
+
     else:
         directions_valid = False
         symbols_present = False
@@ -442,29 +568,49 @@ def _validate_order(
     check(
         "leg_directions",
         directions_valid,
-        "Option leg directions and types verified.",
-        "Option leg directions or types are invalid.",
+        (
+            "Option leg directions and "
+            "types verified."
+        ),
+        (
+            "Option leg directions or "
+            "types are invalid."
+        ),
     )
 
     check(
         "option_symbols",
         symbols_present,
         "All option symbols are present.",
-        "One or more option symbols are missing.",
+        (
+            "One or more option symbols "
+            "are missing."
+        ),
     )
 
     check(
         "strike_order",
         strike_order_valid,
-        "Iron-condor strike order verified.",
-        "Iron-condor strikes are not ordered correctly.",
+        (
+            "Strategy strike order verified."
+        ),
+        (
+            "Strategy strikes are not "
+            "ordered correctly."
+        ),
     )
 
     check(
         "wing_width",
         width_valid,
-        "Wing widths match the request.",
-        "Actual wing widths do not match the request.",
+        (
+            "Spread width matches "
+            "the request."
+        ),
+        (
+            "Actual spread width does "
+            "not match the request."
+        ),
     )
 
     expiration_valid = False
