@@ -2,7 +2,9 @@ from datetime import datetime
 
 from bxk_app.market_data import market_data
 from bxk_app.scoring import run_trade_quality
-from bxk_app.strategy_ranker import rank_strategies
+from bxk_app.strategy_ranker import (
+    rank_strategies_v2,
+)
 from bxk_app.trade_builder import build_best_trade
 from bxk_app.services.execution_service import validate_trade
 
@@ -213,10 +215,17 @@ def get_recommendation():
         "UNKNOWN",
     )
 
-    strategies = rank_strategies(
+    # Strategy Ranker V2 is observation-only.
+    # It affects the dashboard Strategy Playbook only.
+    # Scanner/order selection remains on the legacy
+    # rank_strategies() path until V2 is validated.
+    strategies = rank_strategies_v2(
         trade_score,
-        market_trend,
         market_vix_state,
+        current_price=market_data.spx,
+        condor_stability=(
+            market_data.condor_stability
+        ),
     )
 
     # Keep the old opportunity object for dashboard

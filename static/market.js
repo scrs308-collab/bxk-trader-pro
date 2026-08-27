@@ -1666,7 +1666,7 @@ function renderStrategyPlaybook(data) {
     <span class="assessment-fill"></span>
 
     <strong class="assessment-points">
-      +${points}
+      ${(points > 0 ? "+" : "") + points}
     </strong>
 
   </div>
