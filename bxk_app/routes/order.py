@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 import secrets
 import threading
 import time
@@ -50,6 +52,104 @@ _MAX_ORDER_DTE = 10
 _ORDER_REVIEW_TTL_SECONDS = 180
 _ORDER_REVIEW_LOCKS = {}
 _ORDER_REVIEW_LOCKS_GUARD = threading.Lock()
+_ORDER_SUBMISSION_RESERVATIONS = {}
+_ORDER_SUBMISSION_RESERVATIONS_GUARD = threading.Lock()
+_ORDER_SUBMISSION_RESERVATION_SECONDS = 60
+
+
+def _order_fingerprint(order: dict) -> str:
+    """Create a stable, non-sensitive identity for an order."""
+
+    material = {
+        "strategy": order.get("strategy"),
+        "symbol": order.get("symbol"),
+        "expiration": order.get("expiration"),
+        "quantity": order.get("quantity"),
+        "limit_price": order.get("limit_price"),
+        "legs": [
+            {
+                "action": leg.get("action"),
+                "symbol": leg.get("symbol"),
+                "quantity": leg.get("quantity"),
+            }
+            for leg in (order.get("legs") or [])
+        ],
+    }
+    serialized = json.dumps(
+        material,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(
+        serialized.encode("utf-8")
+    ).hexdigest()
+
+
+def _reserve_order_submission(order: dict) -> bool:
+    now = time.monotonic()
+    fingerprint = _order_fingerprint(order)
+
+    with _ORDER_SUBMISSION_RESERVATIONS_GUARD:
+        expired = [
+            key
+            for key, expires_at
+            in _ORDER_SUBMISSION_RESERVATIONS.items()
+            if now >= expires_at
+        ]
+        for key in expired:
+            _ORDER_SUBMISSION_RESERVATIONS.pop(
+                key,
+                None,
+            )
+
+        if fingerprint in _ORDER_SUBMISSION_RESERVATIONS:
+            return False
+
+        _ORDER_SUBMISSION_RESERVATIONS[fingerprint] = (
+            now + _ORDER_SUBMISSION_RESERVATION_SECONDS
+        )
+        return True
+
+
+def _release_order_submission(order: dict):
+    with _ORDER_SUBMISSION_RESERVATIONS_GUARD:
+        _ORDER_SUBMISSION_RESERVATIONS.pop(
+            _order_fingerprint(order),
+            None,
+        )
+
+
+def _order_reconciliation(order: dict) -> dict:
+    status = str(order.get("status") or "").strip()
+
+    return {
+        "order_id": order.get("id"),
+        "broker_status": status or None,
+        "filled_quantity": order.get(
+            "filled-quantity"
+        ),
+        "remaining_quantity": order.get(
+            "remaining-quantity"
+        ),
+        "average_fill_price": (
+            order.get("average-fill-price")
+            or order.get("average-price")
+            or order.get("fill-price")
+        ),
+        "updated_at": (
+            order.get("updated-at")
+            or order.get("received-at")
+        ),
+        "terminal": status.upper() in {
+            "FILLED",
+            "CANCELLED",
+            "CANCELED",
+            "REJECTED",
+            "REMOVED",
+            "EXPIRED",
+        },
+    }
 
 
 def _review_lock_error(
@@ -1877,6 +1977,80 @@ def order_dry_run(
         "dry_run": dry_run,
     }
 
+@router.get(
+    "/order-status",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
+def order_status(
+    order_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9-]+$",
+    ),
+):
+    """Independently reconcile one Tastytrade order."""
+
+    account_number = broker.get_first_account_number()
+
+    if not account_number:
+        return {
+            "status": "RECONCILIATION_FAILED",
+            "message": (
+                "Tastytrade account verification failed."
+            ),
+            "errors": [
+                broker.last_error
+                or "No Tastytrade account available."
+            ],
+        }
+
+    broker_order = broker.get_order(
+        order_id,
+        account_number=account_number,
+    )
+
+    if broker_order is None:
+        return {
+            "status": "RECONCILIATION_PENDING",
+            "order_id": order_id,
+            "message": (
+                "Tastytrade has not returned the order "
+                "for independent verification yet."
+            ),
+            "errors": [
+                broker.last_error
+                or "Order reconciliation failed."
+            ],
+        }
+
+    broker_order_id = str(
+        broker_order.get("id") or ""
+    ).strip()
+
+    if broker_order_id != str(order_id).strip():
+        return {
+            "status": "RECONCILIATION_FAILED",
+            "order_id": order_id,
+            "message": (
+                "Tastytrade returned a different order ID."
+            ),
+            "errors": ["Broker order ID mismatch."],
+        }
+
+    return {
+        "status": "RECONCILED",
+        "message": (
+            "Order independently verified with Tastytrade."
+        ),
+        **_order_reconciliation(broker_order),
+    }
+
+
 @router.post(
     "/order-submit",
     dependencies=[
@@ -2159,6 +2333,23 @@ def order_submit(
 
     order = locked_order
 
+    if not _reserve_order_submission(order):
+        return {
+            "status": "BLOCKED",
+            "reason_code":
+                "DUPLICATE_SUBMISSION_IN_PROGRESS",
+            "live_submission_enabled": False,
+            "message": (
+                "An identical order was submitted or is "
+                "still being reconciled. Do not retry."
+            ),
+            "errors": [
+                "Duplicate order reservation is active."
+            ],
+            "trade": preflight.get("trade"),
+            "order": order,
+        }
+
     audit_error = _write_execution_audit(
         "SUBMISSION_ATTEMPT",
         status="PENDING",
@@ -2168,6 +2359,7 @@ def order_submit(
     )
 
     if audit_error:
+        _release_order_submission(order)
         return {
             "status": "BLOCKED",
             "reason_code":
@@ -2331,6 +2523,30 @@ def order_submit(
         else "***"
     )
 
+    reconciled_order = broker.get_order(
+        order_id,
+        account_number=account_number,
+    )
+    reconciliation_error = broker.last_error
+    reconciliation = (
+        {
+            "status": "RECONCILED",
+            **_order_reconciliation(
+                reconciled_order
+            ),
+        }
+        if (
+            isinstance(reconciled_order, dict)
+            and str(reconciled_order.get("id") or "")
+            == str(order_id)
+        )
+        else {
+            "status": "RECONCILIATION_PENDING",
+            "order_id": order_id,
+            "error": reconciliation_error,
+        }
+    )
+
     return {
         "status": "SUBMITTED",
         "live_submission_enabled": True,
@@ -2342,6 +2558,7 @@ def order_submit(
         "broker_status": submitted_order.get(
             "status"
         ),
+        "reconciliation": reconciliation,
         "trade": preflight.get("trade"),
         "order": order,
         "broker_order": submitted_order,

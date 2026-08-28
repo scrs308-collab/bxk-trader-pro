@@ -13,6 +13,17 @@ def test_unconfirmed_submission_requires_broker_verification():
     )
     assert '"VERIFY TASTYTRADE"' in source
 
+
+def test_submitted_order_is_reconciled_without_resubmission():
+    source = Path(
+        "static/best-trade.js"
+    ).read_text(encoding="utf-8")
+
+    assert "/api/order-status?order_id=" in source
+    assert "reconcileSubmittedOrder" in source
+    assert "ORDER SENT - VERIFYING" in source
+    assert "ORDER FILLED" in source
+
 def test_broker_preflight_displays_specific_error():
     source = Path(
         "static/best-trade.js"

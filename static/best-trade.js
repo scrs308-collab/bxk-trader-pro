@@ -1762,6 +1762,92 @@ function renderOrderPreview({
     }
   };
 
+  const reconcileSubmittedOrder = async (
+    orderId,
+    initialReconciliation,
+  ) => {
+    let reconciliation = initialReconciliation;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (reconciliation?.status === "RECONCILED") {
+        const status =
+          reconciliation.broker_status || "Verified";
+        const fillQuantity =
+          reconciliation.filled_quantity;
+        const fillPrice =
+          reconciliation.average_fill_price;
+        const fillDetail = [
+          fillQuantity
+            ? `${fillQuantity} filled`
+            : null,
+          fillPrice
+            ? `at ${formatMoney(fillPrice, 2)}`
+            : null,
+        ].filter(Boolean).join(" ");
+
+        updateReadinessCard(
+          submissionReadiness,
+          {
+            state: "ready",
+            icon: "OK",
+            detail: fillDetail
+              ? `${status} - ${fillDetail}`
+              : `${status} - Order ${orderId}`,
+          },
+        );
+
+        setBrokerMessage(
+          fillDetail
+            ? `Tastytrade independently verified order ${orderId}: ${status}, ${fillDetail}.`
+            : `Tastytrade independently verified order ${orderId}: ${status}.`,
+        );
+
+        confirmButton.textContent =
+          status.toUpperCase() === "FILLED"
+            ? "ORDER FILLED"
+            : "ORDER VERIFIED";
+        return;
+      }
+
+      if (attempt > 0 || !reconciliation) {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 1500);
+        });
+      }
+
+      try {
+        const response = await fetch(
+          `/api/order-status?order_id=${encodeURIComponent(orderId)}`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        if (response.ok) {
+          reconciliation = await response.json();
+        }
+      } catch (error) {
+        console.warn(
+          "BXK order reconciliation pending:",
+          error,
+        );
+      }
+    }
+
+    updateReadinessCard(
+      submissionReadiness,
+      {
+        state: "pending",
+        icon: "...",
+        detail: `Order ${orderId} sent - verify broker`,
+      },
+    );
+    setBrokerMessage(
+      `Order ${orderId} was accepted, but independent status verification is still pending. Check Tastytrade before taking another action.`,
+    );
+    confirmButton.textContent = "VERIFY ORDER STATUS";
+  };
+
   confirmButton?.addEventListener(
     "click",
     async () => {
@@ -1895,7 +1981,7 @@ function renderOrderPreview({
               icon: "OK",
               detail:
                 result.order_id
-                  ? `Order ${result.order_id}`
+                  ? `Verifying order ${result.order_id}`
                   : "Submitted",
             },
           );
@@ -1906,7 +1992,14 @@ function renderOrderPreview({
           );
 
           confirmButton.textContent =
-            "ORDER SUBMITTED";
+            "ORDER SENT - VERIFYING";
+
+          if (result.order_id) {
+            await reconcileSubmittedOrder(
+              result.order_id,
+              result.reconciliation,
+            );
+          }
 
           return;
         }

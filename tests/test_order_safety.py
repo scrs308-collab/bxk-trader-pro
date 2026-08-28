@@ -1,8 +1,12 @@
 import pytest
 
 import bxk_app.routes.order as order_route
+
+
 @pytest.fixture(autouse=True)
 def no_working_orders(monkeypatch):
+    order_route._ORDER_SUBMISSION_RESERVATIONS.clear()
+
     def empty_live_orders(
         account_number=None,
     ):
@@ -14,6 +18,26 @@ def no_working_orders(monkeypatch):
         "get_live_orders",
         empty_live_orders,
     )
+
+    def reconciled_order(
+        order_id,
+        account_number=None,
+    ):
+        order_route.broker.last_error = None
+        return {
+            "id": order_id,
+            "status": "Received",
+        }
+
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_order",
+        reconciled_order,
+    )
+
+    yield
+
+    order_route._ORDER_SUBMISSION_RESERVATIONS.clear()
 
 
 def ready_preflight():
@@ -48,6 +72,45 @@ def call_submit(
         confirm_live=confirm_live,
         review_id=review_id,
     )
+
+
+def test_order_status_returns_fill_reconciliation(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_first_account_number",
+        lambda: "TEST1234",
+    )
+    monkeypatch.setattr(
+        order_route.broker,
+        "get_order",
+        lambda order_id, account_number=None: {
+            "id": order_id,
+            "status": "Filled",
+            "filled-quantity": "1",
+            "remaining-quantity": "0",
+            "average-fill-price": "3.25",
+            "updated-at": "2026-08-28T14:30:00Z",
+        },
+    )
+
+    result = order_route.order_status("ORDER-77")
+
+    assert result["status"] == "RECONCILED"
+    assert result["order_id"] == "ORDER-77"
+    assert result["broker_status"] == "Filled"
+    assert result["filled_quantity"] == "1"
+    assert result["remaining_quantity"] == "0"
+    assert result["average_fill_price"] == "3.25"
+    assert result["terminal"] is True
+
+
+def test_identical_submission_reservation_blocks_duplicate():
+    order = ready_preflight()["order"]
+
+    assert order_route._reserve_order_submission(order) is True
+    assert order_route._reserve_order_submission(order) is False
 
 
 def test_submit_requires_explicit_confirmation(

@@ -316,6 +316,70 @@ class TastytradeBroker(BrokerBase):
     # Live Orders
     # ---------------------------------------------------------
 
+    def get_order(
+        self,
+        order_id,
+        account_number=None,
+    ):
+        """Fetch one order directly from Tastytrade."""
+
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No account number available"
+            )
+            return None
+
+        clean_order_id = str(order_id or "").strip()
+
+        if (
+            not clean_order_id
+            or not all(
+                character.isalnum()
+                or character == "-"
+                for character in clean_order_id
+            )
+        ):
+            self.last_error = "Order ID is invalid."
+            return None
+
+        response = self._request(
+            "GET",
+            (
+                f"/accounts/{account_number}"
+                f"/orders/{clean_order_id}"
+            ),
+        )
+
+        if response is None:
+            return None
+
+        try:
+            payload = response.json()
+            order = (payload.get("data") or {}).get(
+                "order"
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            self.last_error = (
+                "Invalid Tastytrade order response: "
+                f"{exc}"
+            )
+            return None
+
+        if not isinstance(order, dict):
+            self.last_error = (
+                "Tastytrade did not return order data."
+            )
+            return None
+
+        self.last_error = None
+        return order
+
     def get_live_orders(
         self,
         account_number=None,

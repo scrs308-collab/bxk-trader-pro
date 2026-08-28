@@ -1,3 +1,5 @@
+import pytest
+
 from bxk_app.brokers.tastytrade import (
     TastytradeBroker,
 )
@@ -9,6 +11,69 @@ class FakeResponse:
 
     def json(self):
         return self.payload
+
+
+def test_get_order_fetches_exact_order(monkeypatch):
+    broker = TastytradeBroker()
+    request = {}
+
+    def fake_request(
+        method,
+        path,
+        *,
+        params=None,
+        json_body=None,
+    ):
+        request.update({
+            "method": method,
+            "path": path,
+        })
+        return FakeResponse({
+            "data": {
+                "order": {
+                    "id": "ORDER-77",
+                    "status": "Filled",
+                },
+            },
+        })
+
+    monkeypatch.setattr(
+        broker,
+        "_request",
+        fake_request,
+    )
+
+    order = broker.get_order(
+        "ORDER-77",
+        account_number="TEST7178",
+    )
+
+    assert order["id"] == "ORDER-77"
+    assert order["status"] == "Filled"
+    assert request == {
+        "method": "GET",
+        "path": (
+            "/accounts/TEST7178/orders/ORDER-77"
+        ),
+    }
+
+
+def test_get_order_rejects_path_characters(monkeypatch):
+    broker = TastytradeBroker()
+
+    monkeypatch.setattr(
+        broker,
+        "_request",
+        lambda *args, **kwargs: pytest.fail(
+            "Unsafe order ID reached the broker request."
+        ),
+    )
+
+    assert broker.get_order(
+        "../orders/live",
+        account_number="TEST7178",
+    ) is None
+    assert broker.last_error == "Order ID is invalid."
 
 
 def test_get_live_orders_reads_all_pages(
