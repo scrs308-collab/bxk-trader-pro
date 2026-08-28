@@ -4,6 +4,67 @@ from bxk_app.market_engine import market_engine
 from bxk_app.position_monitor import (
     build_position_summaries,
 )
+from bxk_app.services.execution_audit import (
+    read_recent_submitted_orders,
+)
+
+
+def _leg_symbols(item: dict) -> frozenset[str]:
+    return frozenset(
+        str(leg.get("symbol") or "").strip()
+        for leg in (item.get("legs") or [])
+        if str(leg.get("symbol") or "").strip()
+    )
+
+
+def link_positions_to_submissions(
+    summaries: list[dict],
+    submissions: list[dict],
+) -> list[dict]:
+    """Link open positions to exact audited broker orders."""
+
+    available_submissions = list(submissions or [])
+    linked = []
+
+    for summary in summaries or []:
+        enriched = dict(summary)
+        position_symbols = _leg_symbols(summary)
+        match_index = None
+
+        if len(position_symbols) == 4:
+            for index, submission in enumerate(
+                available_submissions
+            ):
+                order = submission.get("order") or {}
+
+                if _leg_symbols(order) == position_symbols:
+                    match_index = index
+                    break
+
+        if match_index is not None:
+            submission = available_submissions.pop(
+                match_index
+            )
+            order = submission.get("order") or {}
+            enriched.update({
+                "broker_linked": True,
+                "broker_order_id": submission.get(
+                    "order_id"
+                ),
+                "submitted_at": submission.get(
+                    "timestamp_utc"
+                ),
+                "submitted_limit_credit": order.get(
+                    "limit_price",
+                    order.get("credit"),
+                ),
+            })
+        else:
+            enriched["broker_linked"] = False
+
+        linked.append(enriched)
+
+    return linked
 
 
 def get_position_monitor():
@@ -94,6 +155,11 @@ def get_position_monitor():
                 positions=positions,
                 spx_price=spx_price,
             )
+        )
+
+        summaries = link_positions_to_submissions(
+            summaries,
+            read_recent_submitted_orders(),
         )
 
         if not summaries:

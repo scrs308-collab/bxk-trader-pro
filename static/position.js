@@ -364,6 +364,19 @@ function renderPositionCard(position) {
       ? "EXPIRES TODAY"
       : `${position.dte ?? "--"} DTE`;
 
+  const brokerOrderId = String(
+    position.broker_order_id || "",
+  ).trim();
+
+  const brokerLinkHtml =
+    position.broker_linked === true && brokerOrderId
+      ? `
+        <div class="position-source live">
+          TASTYTRADE ORDER ${brokerOrderId}
+        </div>
+      `
+      : "";
+
   return `
     <div class="position-monitor-card position-v10-card">
 
@@ -434,6 +447,8 @@ function renderPositionCard(position) {
         <div class="position-source ${sourceClass}">
           ${sourceLabel}
         </div>
+
+        ${brokerLinkHtml}
 
       </div>
 

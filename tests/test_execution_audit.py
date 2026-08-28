@@ -152,3 +152,62 @@ def test_audit_requires_event(
         match="Audit event is required",
     ):
         audit.write_order_audit("")
+
+
+def test_reads_recent_confirmed_submissions(
+    monkeypatch,
+    tmp_path,
+):
+    audit_file = tmp_path / "order-audit.jsonl"
+    monkeypatch.setattr(
+        audit,
+        "BXK_ORDER_AUDIT_FILE",
+        str(audit_file),
+    )
+
+    order = {
+        "strategy": "SPX Iron Condor",
+        "limit_price": 2.74,
+        "legs": [
+            {
+                "action": "SELL",
+                "symbol": f"SPXW TEST {index}",
+            }
+            for index in range(4)
+        ],
+    }
+
+    audit.write_order_audit(
+        "submission_attempt",
+        order=order,
+    )
+    audit.write_order_audit(
+        "submitted",
+        order_id="ORDER-77",
+        broker_status="Received",
+        order=order,
+    )
+
+    records = audit.read_recent_submitted_orders()
+
+    assert len(records) == 1
+    assert records[0]["order_id"] == "ORDER-77"
+    assert records[0]["order"]["limit_price"] == 2.74
+
+
+def test_recent_submission_reader_ignores_bad_lines(
+    monkeypatch,
+    tmp_path,
+):
+    audit_file = tmp_path / "order-audit.jsonl"
+    audit_file.write_text(
+        "not-json\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        audit,
+        "BXK_ORDER_AUDIT_FILE",
+        str(audit_file),
+    )
+
+    assert audit.read_recent_submitted_orders() == []

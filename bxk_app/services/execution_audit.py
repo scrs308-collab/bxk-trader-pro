@@ -8,6 +8,8 @@ from bxk_app.config import BXK_ORDER_AUDIT_FILE
 
 
 _AUDIT_LOCK = threading.Lock()
+_MAX_AUDIT_READ_BYTES = 5_000_000
+_MAX_SUBMITTED_ORDERS = 100
 
 
 def _masked_account(account):
@@ -156,3 +158,73 @@ def write_order_audit(
             os.fsync(audit_file.fileno())
 
     return record
+
+
+def read_recent_submitted_orders(
+    limit: int = _MAX_SUBMITTED_ORDERS,
+) -> list[dict]:
+    """Read recent confirmed submissions for position linking."""
+
+    try:
+        clean_limit = max(
+            1,
+            min(int(limit), _MAX_SUBMITTED_ORDERS),
+        )
+    except (TypeError, ValueError):
+        clean_limit = _MAX_SUBMITTED_ORDERS
+
+    audit_path = Path(BXK_ORDER_AUDIT_FILE)
+
+    if not audit_path.is_file():
+        return []
+
+    try:
+        if audit_path.stat().st_size > _MAX_AUDIT_READ_BYTES:
+            return []
+
+        with _AUDIT_LOCK:
+            lines = audit_path.read_text(
+                encoding="utf-8",
+            ).splitlines()
+    except OSError:
+        return []
+
+    submitted = []
+    seen_order_ids = set()
+
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        if record.get("event") != "SUBMITTED":
+            continue
+
+        order_id = str(
+            record.get("order_id") or ""
+        ).strip()
+        order = record.get("order")
+
+        if (
+            not order_id
+            or order_id in seen_order_ids
+            or not isinstance(order, dict)
+        ):
+            continue
+
+        legs = order.get("legs")
+
+        if not isinstance(legs, list) or not legs:
+            continue
+
+        seen_order_ids.add(order_id)
+        submitted.append(record)
+
+        if len(submitted) >= clean_limit:
+            break
+
+    return submitted
