@@ -38,7 +38,7 @@ import {
 
 import {
   initializeSystemSettings,
-} from "./system-settings.js?v=1";
+} from "./system-settings.js?v=2";
 
 
 import {
