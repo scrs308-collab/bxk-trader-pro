@@ -455,3 +455,23 @@ def test_temporary_unavailable_preserves_red_alert():
     assert result["action"] == "ALERTED"
     assert read_state(factory).state == "RED"
     assert len(sent) == 1
+
+def test_first_red_observation_sends_sms():
+    factory = make_factory()
+    sent = []
+
+    result = process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+    )
+
+    assert result["action"] == "ALERTED"
+    assert result["alert_sent"] is True
+    assert len(sent) == 1
+    assert "UNKNOWN -> RED" in sent[0]
+
+    stored = read_state(factory)
+
+    assert stored.state == "RED"
+    assert stored.last_alerted_state == "RED"
