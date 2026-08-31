@@ -503,11 +503,51 @@ def process_overnight_risk(
         if state is None:
             state = OvernightAlertState(
                 scope=ALERT_SCOPE,
-                state=current_state,
+                state=None,
                 reason_code=reason_code,
             )
 
             session.add(state)
+
+            if current_state in {
+                "RED",
+                "CRITICAL",
+            }:
+                message = build_overnight_sms(
+                    None,
+                    current_state,
+                    payload,
+                )
+
+                # Never silently baseline a dangerous
+                # first observation. Send before commit
+                # so a failed SMS remains retryable.
+                send_func(message)
+
+                state.state = current_state
+                state.reason_code = reason_code
+                state.last_alerted_state = (
+                    current_state
+                )
+                state.last_alerted_at = (
+                    datetime.now(
+                        EASTERN
+                    )
+                )
+
+                session.commit()
+
+                return {
+                    "action": "ALERTED",
+                    "previous_state": None,
+                    "current_state":
+                        current_state,
+                    "alert_sent": True,
+                }
+
+            state.state = current_state
+            state.reason_code = reason_code
+
             session.commit()
 
             return {
@@ -563,22 +603,46 @@ def process_overnight_risk(
             }
 
         if previous_state is None:
-            state.state = (
-                current_state
-            )
+            if current_state in {
+                "RED",
+                "CRITICAL",
+            }:
+                message = build_overnight_sms(
+                    None,
+                    current_state,
+                    payload,
+                )
 
-            state.reason_code = (
-                reason_code
-            )
+                send_func(message)
+
+                state.last_alerted_state = (
+                    current_state
+                )
+                state.last_alerted_at = (
+                    datetime.now(
+                        EASTERN
+                    )
+                )
+
+                action = "ALERTED"
+                alert_sent = True
+
+            else:
+                action = "BASELINE"
+                alert_sent = False
+
+            state.state = current_state
+            state.reason_code = reason_code
 
             session.commit()
 
             return {
-                "action": "BASELINE",
+                "action": action,
                 "previous_state": None,
                 "current_state":
                     current_state,
-                "alert_sent": False,
+                "alert_sent":
+                    alert_sent,
             }
 
         if (

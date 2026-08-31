@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +14,9 @@ from bxk_app.services.market_heartbeat_service import (
 )
 from bxk_app.services.overnight_alert_service import (
     run_overnight_alert_monitor,
+)
+from bxk_app.services.position_alert_service import (
+    run_daytime_alert_monitor,
 )
 
 
@@ -39,11 +42,26 @@ async def lifespan(app: FastAPI):
         overnight_alert_task
     )
 
+    daytime_alert_task = asyncio.create_task(
+        run_daytime_alert_monitor(),
+        name="bxk-daytime-sms-alerts",
+    )
+
+    app.state.daytime_alert_task = (
+        daytime_alert_task
+    )
+
     try:
         yield
     finally:
+        daytime_alert_task.cancel()
         overnight_alert_task.cancel()
         heartbeat_task.cancel()
+
+        try:
+            await daytime_alert_task
+        except asyncio.CancelledError:
+            pass
 
         try:
             await overnight_alert_task
