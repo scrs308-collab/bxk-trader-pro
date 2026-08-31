@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from bxk_app.authorization import (
@@ -8,6 +8,11 @@ from bxk_app.authorization import (
 from bxk_app.services.system_settings_service import (
     get_system_settings,
     update_system_settings,
+)
+
+from bxk_app.services.sms_diagnostics_service import (
+    get_sms_diagnostics,
+    send_test_sms,
 )
 
 
@@ -61,5 +66,48 @@ def save_system_settings(
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=422,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get("/sms-diagnostics")
+def sms_diagnostics(
+    request: Request,
+):
+    result = get_sms_diagnostics()
+
+    daytime_task = getattr(
+        request.app.state,
+        "daytime_alert_task",
+        None,
+    )
+
+    overnight_task = getattr(
+        request.app.state,
+        "overnight_alert_task",
+        None,
+    )
+
+    result["daytime_monitor_active"] = (
+        daytime_task is not None
+        and not daytime_task.done()
+    )
+
+    result["overnight_monitor_active"] = (
+        overnight_task is not None
+        and not overnight_task.done()
+    )
+
+    return result
+
+
+@router.post("/sms-test")
+def sms_test():
+    try:
+        return send_test_sms()
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
             detail=str(exc),
         ) from exc

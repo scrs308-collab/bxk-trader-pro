@@ -1,5 +1,7 @@
 const SETTINGS_URL = "/api/system-settings";
 const BROKER_TEST_URL = "/api/test-new-broker";
+const SMS_DIAGNOSTICS_URL = "/api/sms-diagnostics";
+const SMS_TEST_URL = "/api/sms-test";
 
 let currentSettings = null;
 let initialized = false;
@@ -362,6 +364,76 @@ function renderSettingsShell() {
         </div>
       </section>
 
+      <section class="bxk-settings-section">
+        <div class="bxk-settings-heading">
+          SMS Alert Diagnostics
+        </div>
+
+        <div class="bxk-settings-note">
+          Verifies the production alert engine,
+          consent record, Twilio transport, and both
+          risk-monitor background tasks.
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Alert Engine</span>
+          <strong id="bxkSmsEngineState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>SMS Transport</span>
+          <strong id="bxkSmsTransportState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Recipient Consent</span>
+          <strong id="bxkSmsConsentState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Recipient</span>
+          <strong id="bxkSmsRecipient">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Daytime Monitor</span>
+          <strong id="bxkDaytimeMonitorState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Overnight Monitor</span>
+          <strong id="bxkOvernightMonitorState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Daytime Risk</span>
+          <strong id="bxkDaytimeRiskState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Overnight Risk</span>
+          <strong id="bxkOvernightRiskState">--</strong>
+        </div>
+
+        <div class="bxk-settings-static-row">
+          <span>Last Successful Alert</span>
+          <strong id="bxkLastSmsAlert">--</strong>
+        </div>
+
+        <button
+          id="bxkTestSmsButton"
+          class="bxk-settings-button secondary"
+          type="button"
+        >
+          SEND TEST SMS
+        </button>
+
+        <div
+          id="bxkSmsTestResult"
+          class="bxk-settings-connection"
+        ></div>
+      </section>
+
     </div>
 
 
@@ -557,6 +629,259 @@ function applySettings(data) {
     }
   }
 }
+
+
+function applySmsBoolean(
+  id,
+  value,
+  goodText,
+  badText,
+) {
+  const element = byId(id);
+
+  if (!element) {
+    return;
+  }
+
+  element.textContent =
+    value ? goodText : badText;
+
+  element.className =
+    value
+      ? "system-good"
+      : "system-error";
+}
+
+
+function formatSmsAlertTime(value) {
+  if (!value) {
+    return "NONE RECORDED";
+  }
+
+  const date = new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return String(value);
+  }
+
+  return date.toLocaleString();
+}
+
+
+function applySmsDiagnostics(data) {
+  applySmsBoolean(
+    "bxkSmsEngineState",
+    data.alerts_enabled === true,
+    "ENABLED",
+    "DISABLED",
+  );
+
+  applySmsBoolean(
+    "bxkSmsTransportState",
+    data.transport_configured === true,
+    "READY",
+    "INCOMPLETE",
+  );
+
+  applySmsBoolean(
+    "bxkSmsConsentState",
+    data.consent_active === true,
+    "ACTIVE",
+    "MISSING",
+  );
+
+  applySmsBoolean(
+    "bxkDaytimeMonitorState",
+    data.daytime_monitor_active === true,
+    "ACTIVE",
+    "STOPPED",
+  );
+
+  applySmsBoolean(
+    "bxkOvernightMonitorState",
+    data.overnight_monitor_active === true,
+    "ACTIVE",
+    "STOPPED",
+  );
+
+  const recipient =
+    byId("bxkSmsRecipient");
+
+  if (recipient) {
+    recipient.textContent =
+      data.recipient_masked
+      || "NOT CONFIGURED";
+  }
+
+  const daytimeRisk =
+    byId("bxkDaytimeRiskState");
+
+  if (daytimeRisk) {
+    daytimeRisk.textContent =
+      data.daytime_worst_state
+      || "NONE";
+  }
+
+  const overnightRisk =
+    byId("bxkOvernightRiskState");
+
+  if (overnightRisk) {
+    overnightRisk.textContent =
+      data.overnight_state
+      || "NONE";
+  }
+
+  const lastAlert =
+    byId("bxkLastSmsAlert");
+
+  if (lastAlert) {
+    if (
+      data.last_successful_alert_at
+    ) {
+      const prefix = [
+        data.last_successful_alert_scope,
+        data.last_successful_alert_state,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      lastAlert.textContent =
+        `${prefix} ? ${
+          formatSmsAlertTime(
+            data.last_successful_alert_at
+          )
+        }`;
+    } else {
+      lastAlert.textContent =
+        "NONE RECORDED";
+    }
+  }
+}
+
+
+async function loadSmsDiagnostics() {
+  try {
+    const response = await fetch(
+      `${SMS_DIAGNOSTICS_URL}?_=${Date.now()}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail
+        || `HTTP ${response.status}`
+      );
+    }
+
+    applySmsDiagnostics(data);
+
+  } catch (error) {
+    console.error(
+      "SMS diagnostics load failed:",
+      error,
+    );
+
+    const result =
+      byId("bxkSmsTestResult");
+
+    if (result) {
+      result.textContent =
+        "Unable to load SMS diagnostics.";
+
+      result.className =
+        "bxk-settings-connection error";
+    }
+  }
+}
+
+
+async function sendSmsTest() {
+  const button =
+    byId("bxkTestSmsButton");
+
+  const result =
+    byId("bxkSmsTestResult");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      "SENDING...";
+  }
+
+  if (result) {
+    result.textContent =
+      "Sending production-path test SMS...";
+
+    result.className =
+      "bxk-settings-connection";
+  }
+
+  try {
+    const response = await fetch(
+      SMS_TEST_URL,
+      {
+        method: "POST",
+      },
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail
+        || `HTTP ${response.status}`
+      );
+    }
+
+    if (result) {
+      result.textContent =
+        `TEST SMS SENT TO ${
+          data.recipient_masked
+          || "CONFIGURED RECIPIENT"
+        }`;
+
+      result.className =
+        "bxk-settings-connection success";
+    }
+
+    await loadSmsDiagnostics();
+
+  } catch (error) {
+    console.error(
+      "SMS test failed:",
+      error,
+    );
+
+    if (result) {
+      result.textContent =
+        `TEST SMS FAILED: ${
+          error.message
+          || "Unknown error"
+        }`;
+
+      result.className =
+        "bxk-settings-connection error";
+    }
+
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "SEND TEST SMS";
+    }
+  }
+}
+
 
 
 async function loadSystemSettings() {
@@ -969,5 +1294,13 @@ export function initializeSystemSettings() {
     testBrokerConnection,
   );
 
+  byId(
+    "bxkTestSmsButton"
+  )?.addEventListener(
+    "click",
+    sendSmsTest,
+  );
+
   loadSystemSettings();
+  loadSmsDiagnostics();
 }
