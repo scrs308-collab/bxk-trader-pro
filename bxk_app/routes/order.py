@@ -22,6 +22,9 @@ from bxk_app.routes.scanner import get_best_trade
 from bxk_app.services.execution_audit import (
     write_order_audit,
 )
+from bxk_app.services.trade_journal_service import (
+    record_submitted_trade,
+)
 from bxk_app.services.order_builder import build_order
 
 def _write_execution_audit(
@@ -41,6 +44,29 @@ def _write_execution_audit(
         return str(exc)
 
     return None
+
+def _record_trade_journal_safely(
+    **details,
+):
+    """
+    Journal failure must never turn a confirmed
+    broker submission into an apparent order failure.
+    """
+    try:
+        return record_submitted_trade(
+            **details
+        )
+
+    except Exception as exc:
+        return {
+            "recorded": False,
+            "reason":
+                "JOURNAL_WRITE_FAILED",
+            "error":
+                type(exc).__name__,
+        }
+
+
 
 router = APIRouter(
     prefix="/api",
@@ -2066,6 +2092,9 @@ def order_submit(
     contracts: int = Query(1, ge=1, le=10),
     confirm_live: bool = Query(False),
     review_id: str | None = Query(None),
+    user_context: dict = Depends(
+        require_owner_or_auth_disabled
+    ),
 ):
     """
     Submit the current approved BXK order to Tastytrade.
@@ -2545,6 +2574,16 @@ def order_submit(
             "order_id": order_id,
             "error": reconciliation_error,
         }
+    )
+
+    _record_trade_journal_safely(
+        user_context=user_context,
+        broker_order_id=order_id,
+        broker_status=broker_status,
+        order=order,
+        trade=preflight.get("trade"),
+        broker_order=submitted_order,
+        reconciliation=reconciliation,
     )
 
     return {
