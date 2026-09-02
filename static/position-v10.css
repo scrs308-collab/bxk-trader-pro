@@ -949,3 +949,151 @@ body:not(.dark-mode)
   color: #66758a;
   opacity: 1;
 }
+
+
+/* =========================================================
+   STRONG LIGHT MODE CARRY EMPHASIS
+========================================================= */
+
+body:not(.dark-mode)
+.position-v10-carry {
+  background:
+    linear-gradient(
+      135deg,
+      #fff8dc 0%,
+      #fffdf2 55%,
+      #fff3c2 100%
+    );
+
+  border-color: #e2b62f;
+
+  box-shadow:
+    0 12px 28px rgba(194, 145, 18, 0.20),
+    0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+body:not(.dark-mode)
+.position-v10-carry::before {
+  width: 8px;
+}
+
+
+/* Metric tiles */
+
+body:not(.dark-mode)
+.position-v10-carry-metric {
+  background:
+    linear-gradient(
+      180deg,
+      #fffdf5 0%,
+      #fff7d9 100%
+    );
+
+  border-color: rgba(173, 130, 19, 0.28);
+
+  box-shadow:
+    0 3px 8px rgba(120, 90, 10, 0.08);
+}
+
+body:not(.dark-mode)
+.position-v10-carry-metric span {
+  color: #697386;
+  font-weight: 900;
+}
+
+body:not(.dark-mode)
+.position-v10-carry-metric strong {
+  color: #101828;
+}
+
+
+/* Provisional badge */
+
+body:not(.dark-mode)
+.position-v10-carry-heading strong {
+  color: #342600;
+
+  background: #fff2b2;
+
+  border-color: #d7aa28;
+
+  box-shadow:
+    0 2px 6px rgba(160, 115, 5, 0.12);
+}
+
+
+/* Recommendation bar */
+
+body:not(.dark-mode)
+.position-v10-carry-action {
+  background:
+    linear-gradient(
+      90deg,
+      #fff8db 0%,
+      #ffefad 100%
+    );
+
+  border-color: #d9aa24;
+
+  box-shadow:
+    0 3px 9px rgba(160, 115, 5, 0.10);
+}
+
+body:not(.dark-mode)
+.position-v10-carry-action span {
+  color: #5f6878;
+}
+
+
+/* Stronger text contrast */
+
+body:not(.dark-mode)
+.position-v10-carry-heading span,
+body:not(.dark-mode)
+.position-v10-carry-note {
+  color: #586579;
+}
+
+
+/* Make orange/red even more obvious */
+
+body:not(.dark-mode)
+.position-v10-carry.orange {
+  background:
+    linear-gradient(
+      135deg,
+      #fff0d8 0%,
+      #fff9ee 55%,
+      #ffe0ae 100%
+    );
+
+  border-color: #e88d18;
+}
+
+body:not(.dark-mode)
+.position-v10-carry.red,
+body:not(.dark-mode)
+.position-v10-carry.critical {
+  background:
+    linear-gradient(
+      135deg,
+      #ffe3e1 0%,
+      #fff5f4 55%,
+      #ffc9c5 100%
+    );
+
+  border-color: #df4b47;
+}
+
+body:not(.dark-mode)
+.position-v10-carry.green {
+  background:
+    linear-gradient(
+      135deg,
+      #e8fff1 0%,
+      #f7fffa 55%,
+      #d5f9e3 100%
+    );
+
+  border-color: #2cab6d;
+}
