@@ -2729,6 +2729,44 @@ def _journal_trade_row(
             _journal_iso(
                 journal.first_critical_at
             ),
+
+        # Overnight carry-risk learning.
+        "carry_evaluated_at":
+            _journal_iso(
+                journal.carry_evaluated_at
+            ),
+        "carry_state":
+            journal.carry_state,
+        "carry_decision":
+            journal.carry_decision,
+        "carry_threatened_side":
+            journal.carry_threatened_side,
+        "carry_short_cushion":
+            journal.carry_short_cushion,
+        "carry_expected_move":
+            journal.carry_expected_move,
+        "carry_expected_move_source":
+            journal.carry_expected_move_source,
+        "carry_cushion_ratio":
+            journal.carry_cushion_ratio,
+        "carry_vix1d":
+            journal.carry_vix1d,
+        "carry_vix":
+            journal.carry_vix,
+        "held_overnight":
+            journal.held_overnight,
+
+        # Next regular-session open outcome.
+        "next_open_evaluated_at":
+            _journal_iso(
+                journal.next_open_evaluated_at
+            ),
+        "next_open_spx":
+            journal.next_open_spx,
+        "next_open_gap_points":
+            journal.next_open_gap_points,
+        "next_open_short_breached":
+            journal.next_open_short_breached,
     }
 
 
@@ -3094,6 +3132,7 @@ def get_trade_journal_trades(
     *,
     user_context=None,
     limit=25,
+    include_open=False,
     session_factory=None,
 ):
     """
@@ -3162,14 +3201,53 @@ def get_trade_journal_trades(
         reverse=True,
     )
 
-    selected = terminal[
-        :clean_limit
-    ]
+    if include_open:
+        open_rows = [
+            journal
+            for journal in rows
+            if str(
+                journal.status
+                or ""
+            ).upper()
+            in {
+                "SUBMITTED",
+                "OPEN",
+            }
+        ]
+
+        combined = (
+            terminal
+            + open_rows
+        )
+
+        combined.sort(
+            key=lambda journal: (
+                _journal_iso(
+                    journal.closed_at
+                    or journal.opened_at
+                    or journal.submitted_at
+                    or journal.created_at
+                )
+                or ""
+            ),
+            reverse=True,
+        )
+
+        selected = combined[
+            :clean_limit
+        ]
+
+    else:
+        selected = terminal[
+            :clean_limit
+        ]
 
     return {
         "available": True,
         "count":
             len(selected),
+        "include_open":
+            bool(include_open),
         "trades": [
             _journal_trade_row(
                 journal
