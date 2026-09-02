@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -201,6 +202,126 @@ class TradeJournal(Base):
         str | None
     ] = mapped_column(
         String(32),
+        nullable=True,
+    )
+
+    # -------------------------------------------------
+    # Overnight carry-risk learning snapshot.
+    # -------------------------------------------------
+
+    carry_evaluated_at: Mapped[
+        object | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    carry_state: Mapped[
+        str | None
+    ] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+
+    carry_decision: Mapped[
+        str | None
+    ] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    carry_threatened_side: Mapped[
+        str | None
+    ] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
+    carry_short_cushion: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    carry_expected_move: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    carry_expected_move_source: Mapped[
+        str | None
+    ] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+
+    carry_cushion_ratio: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    carry_vix1d: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    carry_vix: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    carry_snapshot: Mapped[
+        dict | None
+    ] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    held_overnight: Mapped[
+        bool | None
+    ] = mapped_column(
+        Boolean,
+        nullable=True,
+    )
+
+    # -------------------------------------------------
+    # Next regular-session open outcome.
+    # -------------------------------------------------
+
+    next_open_evaluated_at: Mapped[
+        object | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    next_open_spx: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    next_open_gap_points: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    next_open_short_breached: Mapped[
+        bool | None
+    ] = mapped_column(
+        Boolean,
         nullable=True,
     )
 
