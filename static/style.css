@@ -5865,3 +5865,134 @@ body[data-theme="light"]
     justify-self: start;
   }
 }
+
+
+/* Trade Journal Performance */
+
+.journal-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.journal-subtitle {
+  margin-top: 5px;
+  font-size: 0.86rem;
+  opacity: 0.7;
+}
+
+.journal-refresh-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 9px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.journal-refresh-button:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.journal-performance-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(155px, 1fr)
+    );
+  gap: 12px;
+}
+
+.journal-stat {
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.journal-stat-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+}
+
+.journal-stat-value {
+  margin-top: 8px;
+  font-size: 1.28rem;
+  font-weight: 800;
+}
+
+.journal-stat-detail {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.journal-positive {
+  color: #51d88a;
+}
+
+.journal-negative {
+  color: #ff6b6b;
+}
+
+.journal-neutral {
+  opacity: 0.85;
+}
+
+.journal-loading {
+  padding: 18px 4px;
+  opacity: 0.7;
+}
+
+.journal-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.journal-trade-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.journal-trade-table th,
+.journal-trade-table td {
+  padding: 10px 9px;
+  text-align: left;
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.journal-trade-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+@media (max-width: 700px) {
+  .journal-header-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .journal-performance-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .journal-stat {
+    min-height: 88px;
+  }
+}

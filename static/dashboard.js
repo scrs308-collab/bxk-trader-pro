@@ -1567,6 +1567,653 @@ setInterval(
   1000,
 );
 
+
+
+const TRADE_JOURNAL_CACHE_MS =
+  60 * 1000;
+
+let tradeJournalPerformanceLoadedAt = 0;
+let tradeJournalPerformanceInFlight = null;
+
+
+function escapeJournalHtml(value) {
+  return String(
+    value ?? "",
+  )
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+function journalCurrency(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+
+  return number.toLocaleString(
+    "en-US",
+    {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    },
+  );
+}
+
+
+function journalNumber(
+  value,
+  digits = 2,
+) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+
+  return number.toLocaleString(
+    "en-US",
+    {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    },
+  );
+}
+
+
+function journalDateTime(value) {
+  if (!value) {
+    return "--";
+  }
+
+  const date = new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return String(value);
+  }
+
+  return date.toLocaleString();
+}
+
+
+function journalPnlClass(value) {
+  const number = Number(value);
+
+  if (number > 0.01) {
+    return "journal-positive";
+  }
+
+  if (number < -0.01) {
+    return "journal-negative";
+  }
+
+  return "journal-neutral";
+}
+
+
+function journalStatCard(
+  label,
+  value,
+  cssClass = "",
+  detail = "",
+) {
+  return `
+    <div class="journal-stat">
+      <div class="journal-stat-label">
+        ${escapeJournalHtml(label)}
+      </div>
+
+      <div class="journal-stat-value ${cssClass}">
+        ${escapeJournalHtml(value)}
+      </div>
+
+      ${
+        detail
+          ? `
+            <div class="journal-stat-detail">
+              ${escapeJournalHtml(detail)}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+
+function renderTradeJournalSummary(
+  summary,
+) {
+  const target =
+    document.getElementById(
+      "journalPerformanceSummary",
+    );
+
+  if (!target) {
+    return;
+  }
+
+  if (!summary?.available) {
+    target.innerHTML = `
+      <div class="journal-loading">
+        Journal reporting is unavailable.
+      </div>
+    `;
+    return;
+  }
+
+  const totalTrades =
+    Number(summary.total_trades || 0);
+
+  const wins =
+    Number(summary.wins || 0);
+
+  const losses =
+    Number(summary.losses || 0);
+
+  const scratches =
+    Number(summary.scratches || 0);
+
+  let profitFactor = "--";
+
+  if (
+    summary.profit_factor !== null
+    && summary.profit_factor !== undefined
+  ) {
+    profitFactor = journalNumber(
+      summary.profit_factor,
+      2,
+    );
+  } else if (
+    wins > 0
+    && losses === 0
+  ) {
+    profitFactor = "?";
+  }
+
+  const bestTrade =
+    summary.best_trade;
+
+  const worstTrade =
+    summary.worst_trade;
+
+  const threats =
+    summary.threat_counts || {};
+
+  const exits =
+    summary.exit_reasons || {};
+
+  const cards = [
+    journalStatCard(
+      "Completed Trades",
+      totalTrades,
+      "",
+      `${summary.open_trades || 0} currently open`,
+    ),
+
+    journalStatCard(
+      "Win Rate",
+      `${journalNumber(
+        summary.win_rate || 0,
+        1,
+      )}%`,
+      "",
+      `${wins} W / ${losses} L / ${scratches} scratch`,
+    ),
+
+    journalStatCard(
+      "Realized P/L",
+      journalCurrency(
+        summary.total_realized_pnl,
+      ),
+      journalPnlClass(
+        summary.total_realized_pnl,
+      ),
+    ),
+
+    journalStatCard(
+      "Average Trade",
+      journalCurrency(
+        summary.average_pnl,
+      ),
+      journalPnlClass(
+        summary.average_pnl,
+      ),
+    ),
+
+    journalStatCard(
+      "Profit Factor",
+      profitFactor,
+    ),
+
+    journalStatCard(
+      "Average Winner",
+      journalCurrency(
+        summary.average_winner,
+      ),
+      "journal-positive",
+    ),
+
+    journalStatCard(
+      "Average Loser",
+      journalCurrency(
+        summary.average_loser,
+      ),
+      Number(
+        summary.average_loser,
+      ) < 0
+        ? "journal-negative"
+        : "",
+    ),
+
+    journalStatCard(
+      "Best Trade",
+      bestTrade
+        ? journalCurrency(
+            bestTrade.realized_pnl,
+          )
+        : "--",
+      bestTrade
+        ? journalPnlClass(
+            bestTrade.realized_pnl,
+          )
+        : "",
+      bestTrade
+        ? journalDateTime(
+            bestTrade.closed_at,
+          )
+        : "",
+    ),
+
+    journalStatCard(
+      "Worst Trade",
+      worstTrade
+        ? journalCurrency(
+            worstTrade.realized_pnl,
+          )
+        : "--",
+      worstTrade
+        ? journalPnlClass(
+            worstTrade.realized_pnl,
+          )
+        : "",
+      worstTrade
+        ? journalDateTime(
+            worstTrade.closed_at,
+          )
+        : "",
+    ),
+
+    journalStatCard(
+      "Avg Min Cushion",
+      summary.average_min_short_cushion
+        === null
+        ? "--"
+        : `${
+            journalNumber(
+              summary.average_min_short_cushion,
+              1,
+            )
+          } pts`,
+    ),
+
+    journalStatCard(
+      "Risk Escalations",
+      `${threats.critical || 0} CRITICAL`,
+      Number(
+        threats.critical || 0,
+      ) > 0
+        ? "journal-negative"
+        : "",
+      `${threats.red || 0} RED / ${threats.orange || 0} ORANGE`,
+    ),
+
+    journalStatCard(
+      "Exit Mix",
+      `${exits.broker_close || 0} closed`,
+      "",
+      `${
+        exits.expired_worthless || 0
+      } expired / ${
+        exits.cash_settlement || 0
+      } settled`,
+    ),
+  ];
+
+  target.innerHTML =
+    cards.join("");
+}
+
+
+function renderTradeJournalTrades(
+  payload,
+) {
+  const target =
+    document.getElementById(
+      "journalRecentTrades",
+    );
+
+  if (!target) {
+    return;
+  }
+
+  const trades =
+    payload?.trades || [];
+
+  if (!payload?.available) {
+    target.innerHTML = `
+      <div class="journal-loading">
+        Journal history is unavailable.
+      </div>
+    `;
+    return;
+  }
+
+  if (!trades.length) {
+    target.innerHTML = `
+      <div class="journal-loading">
+        No completed journal trades yet.
+      </div>
+    `;
+    return;
+  }
+
+  const rows = trades.map(
+    (trade) => {
+      const strikes = [
+        trade.long_put,
+        trade.short_put,
+        trade.short_call,
+        trade.long_call,
+      ]
+        .filter(
+          (value) =>
+            value !== null
+            && value !== undefined,
+        )
+        .join(" / ");
+
+      return `
+        <tr>
+          <td>
+            ${escapeJournalHtml(
+              journalDateTime(
+                trade.closed_at,
+              ),
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.underlying || "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.strategy || "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.dte ?? "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.quantity ?? "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              strikes || "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              journalCurrency(
+                trade.entry_fill_credit,
+              ),
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              journalCurrency(
+                trade.exit_debit,
+              ),
+            )}
+          </td>
+
+          <td
+            class="${
+              journalPnlClass(
+                trade.realized_pnl,
+              )
+            }"
+          >
+            ${escapeJournalHtml(
+              journalCurrency(
+                trade.realized_pnl,
+              ),
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.outcome || "--",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.worst_threat_state
+              || "GREEN",
+            )}
+          </td>
+
+          <td>
+            ${escapeJournalHtml(
+              trade.exit_reason || "--",
+            )}
+          </td>
+        </tr>
+      `;
+    },
+  );
+
+  target.innerHTML = `
+    <div class="journal-table-wrap">
+      <table class="journal-trade-table">
+        <thead>
+          <tr>
+            <th>Closed</th>
+            <th>Symbol</th>
+            <th>Strategy</th>
+            <th>DTE</th>
+            <th>Qty</th>
+            <th>Strikes</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P/L</th>
+            <th>Result</th>
+            <th>Worst Risk</th>
+            <th>Exit Reason</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${rows.join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+
+async function loadTradeJournalPerformance(
+  force = false,
+) {
+  if (!hasOwnerAccess()) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (
+    !force
+    && tradeJournalPerformanceLoadedAt
+    && (
+      now
+      - tradeJournalPerformanceLoadedAt
+    ) < TRADE_JOURNAL_CACHE_MS
+  ) {
+    return;
+  }
+
+  if (tradeJournalPerformanceInFlight) {
+    return tradeJournalPerformanceInFlight;
+  }
+
+  const status =
+    document.getElementById(
+      "journalPerformanceStatus",
+    );
+
+  if (status) {
+    status.textContent =
+      "Loading journal performance...";
+  }
+
+  tradeJournalPerformanceInFlight =
+    (async () => {
+      try {
+        const [
+          summaryResponse,
+          tradesResponse,
+        ] = await Promise.all([
+          fetch(
+            `/api/trade-journal/summary?_=${Date.now()}`,
+            {
+              cache: "no-store",
+            },
+          ),
+
+          fetch(
+            `/api/trade-journal/trades?limit=25&_=${Date.now()}`,
+            {
+              cache: "no-store",
+            },
+          ),
+        ]);
+
+        if (!summaryResponse.ok) {
+          throw new Error(
+            `Summary HTTP ${
+              summaryResponse.status
+            }`,
+          );
+        }
+
+        if (!tradesResponse.ok) {
+          throw new Error(
+            `Trades HTTP ${
+              tradesResponse.status
+            }`,
+          );
+        }
+
+        const [
+          summary,
+          trades,
+        ] = await Promise.all([
+          summaryResponse.json(),
+          tradesResponse.json(),
+        ]);
+
+        renderTradeJournalSummary(
+          summary,
+        );
+
+        renderTradeJournalTrades(
+          trades,
+        );
+
+        tradeJournalPerformanceLoadedAt =
+          Date.now();
+
+        if (status) {
+          status.textContent =
+            `Updated ${
+              new Date().toLocaleTimeString()
+            }`;
+        }
+
+      } catch (error) {
+        console.error(
+          "Trade journal performance failed:",
+          error,
+        );
+
+        if (status) {
+          status.textContent =
+            "Performance data unavailable.";
+        }
+
+        const summaryTarget =
+          document.getElementById(
+            "journalPerformanceSummary",
+          );
+
+        if (summaryTarget) {
+          summaryTarget.innerHTML = `
+            <div class="journal-loading">
+              Unable to load journal performance.
+            </div>
+          `;
+        }
+      } finally {
+        tradeJournalPerformanceInFlight =
+          null;
+      }
+    })();
+
+  return tradeJournalPerformanceInFlight;
+}
+
+
+function initializeTradeJournalPerformanceControls() {
+  const refreshButton =
+    document.getElementById(
+      "journalRefreshButton",
+    );
+
+  if (refreshButton) {
+    refreshButton.addEventListener(
+      "click",
+      () => {
+        loadTradeJournalPerformance(
+          true,
+        );
+      },
+    );
+  }
+}
+
 function initializeDashboardTabs() {
   const tabs = document.querySelectorAll(
     ".dashboard-tab",
@@ -1596,6 +2243,13 @@ function initializeDashboardTabs() {
 
       tab.classList.add("active");
       targetPanel.classList.add("active");
+
+      if (
+        targetId === "performanceTab"
+        && hasOwnerAccess()
+      ) {
+        loadTradeJournalPerformance();
+      }
     });
   });
 }
@@ -1649,6 +2303,7 @@ async function initializeDashboardApplication() {
 
   initializeTradeBuilder();
   initializeDashboardTabs();
+  initializeTradeJournalPerformanceControls();
   initializeUnderlyingSelector();
 
   if (hasOwnerAccess()) {
