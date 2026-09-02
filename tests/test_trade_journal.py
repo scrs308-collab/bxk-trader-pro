@@ -1074,3 +1074,67 @@ def test_trade_row_includes_overnight_learning():
         row["next_open_short_breached"]
         is False
     )
+
+def test_trade_report_can_include_open_rows(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-REPORT-OPEN",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    default_result = (
+        service.get_trade_journal_trades(
+            limit=100,
+            session_factory=factory,
+        )
+    )
+
+    assert (
+        default_result["include_open"]
+        is False
+    )
+
+    assert not any(
+        row["broker_order_id"]
+        == "ORDER-REPORT-OPEN"
+        for row in default_result["trades"]
+    )
+
+    open_result = (
+        service.get_trade_journal_trades(
+            limit=100,
+            include_open=True,
+            session_factory=factory,
+        )
+    )
+
+    assert (
+        open_result["include_open"]
+        is True
+    )
+
+    row = next(
+        row
+        for row in open_result["trades"]
+        if row["broker_order_id"]
+        == "ORDER-REPORT-OPEN"
+    )
+
+    assert row["status"] in {
+        "SUBMITTED",
+        "OPEN",
+    }

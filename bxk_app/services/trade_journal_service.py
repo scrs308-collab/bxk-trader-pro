@@ -3132,6 +3132,7 @@ def get_trade_journal_trades(
     *,
     user_context=None,
     limit=25,
+    include_open=False,
     session_factory=None,
 ):
     """
@@ -3200,14 +3201,53 @@ def get_trade_journal_trades(
         reverse=True,
     )
 
-    selected = terminal[
-        :clean_limit
-    ]
+    if include_open:
+        open_rows = [
+            journal
+            for journal in rows
+            if str(
+                journal.status
+                or ""
+            ).upper()
+            in {
+                "SUBMITTED",
+                "OPEN",
+            }
+        ]
+
+        combined = (
+            terminal
+            + open_rows
+        )
+
+        combined.sort(
+            key=lambda journal: (
+                _journal_iso(
+                    journal.closed_at
+                    or journal.opened_at
+                    or journal.submitted_at
+                    or journal.created_at
+                )
+                or ""
+            ),
+            reverse=True,
+        )
+
+        selected = combined[
+            :clean_limit
+        ]
+
+    else:
+        selected = terminal[
+            :clean_limit
+        ]
 
     return {
         "available": True,
         "count":
             len(selected),
+        "include_open":
+            bool(include_open),
         "trades": [
             _journal_trade_row(
                 journal

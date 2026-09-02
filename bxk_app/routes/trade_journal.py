@@ -41,6 +41,7 @@ def trade_journal_summary(
 @router.get("/trades")
 def trade_journal_trades(
     limit: int = 25,
+    include_open: bool = False,
     user_context: dict = Depends(
         require_owner_or_auth_disabled
     ),
@@ -48,6 +49,7 @@ def trade_journal_trades(
     return get_trade_journal_trades(
         user_context=user_context,
         limit=limit,
+        include_open=include_open,
     )
 
 @router.post("/backfill")
