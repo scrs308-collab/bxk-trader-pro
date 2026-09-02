@@ -2729,6 +2729,44 @@ def _journal_trade_row(
             _journal_iso(
                 journal.first_critical_at
             ),
+
+        # Overnight carry-risk learning.
+        "carry_evaluated_at":
+            _journal_iso(
+                journal.carry_evaluated_at
+            ),
+        "carry_state":
+            journal.carry_state,
+        "carry_decision":
+            journal.carry_decision,
+        "carry_threatened_side":
+            journal.carry_threatened_side,
+        "carry_short_cushion":
+            journal.carry_short_cushion,
+        "carry_expected_move":
+            journal.carry_expected_move,
+        "carry_expected_move_source":
+            journal.carry_expected_move_source,
+        "carry_cushion_ratio":
+            journal.carry_cushion_ratio,
+        "carry_vix1d":
+            journal.carry_vix1d,
+        "carry_vix":
+            journal.carry_vix,
+        "held_overnight":
+            journal.held_overnight,
+
+        # Next regular-session open outcome.
+        "next_open_evaluated_at":
+            _journal_iso(
+                journal.next_open_evaluated_at
+            ),
+        "next_open_spx":
+            journal.next_open_spx,
+        "next_open_gap_points":
+            journal.next_open_gap_points,
+        "next_open_short_breached":
+            journal.next_open_short_breached,
     }
 
 

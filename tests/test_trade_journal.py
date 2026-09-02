@@ -1019,3 +1019,58 @@ def test_same_day_is_not_next_open(
         journal.next_open_short_breached
         is None
     )
+
+def test_trade_row_includes_overnight_learning():
+    class FakeJournal:
+        def __getattr__(self, name):
+            return None
+
+    journal = FakeJournal()
+
+    journal.id = "ROW-OVERNIGHT-1"
+
+    journal.carry_state = "RED"
+    journal.carry_decision = "DO_NOT_CARRY"
+    journal.carry_threatened_side = "CALL"
+    journal.carry_short_cushion = 27.04
+    journal.carry_expected_move = 78.98
+    journal.carry_expected_move_source = "VIX"
+    journal.carry_cushion_ratio = 0.342
+    journal.carry_vix1d = 0.0
+    journal.carry_vix = 16.34
+    journal.held_overnight = True
+
+    journal.next_open_spx = 7650.0
+    journal.next_open_gap_points = -22.96
+    journal.next_open_short_breached = False
+
+    row = service._journal_trade_row(
+        journal
+    )
+
+    assert row["carry_state"] == "RED"
+    assert (
+        row["carry_decision"]
+        == "DO_NOT_CARRY"
+    )
+    assert (
+        row["carry_threatened_side"]
+        == "CALL"
+    )
+    assert row["carry_short_cushion"] == 27.04
+    assert row["carry_expected_move"] == 78.98
+    assert (
+        row["carry_expected_move_source"]
+        == "VIX"
+    )
+    assert row["carry_cushion_ratio"] == 0.342
+    assert row["carry_vix1d"] == 0.0
+    assert row["carry_vix"] == 16.34
+    assert row["held_overnight"] is True
+
+    assert row["next_open_spx"] == 7650.0
+    assert row["next_open_gap_points"] == -22.96
+    assert (
+        row["next_open_short_breached"]
+        is False
+    )
