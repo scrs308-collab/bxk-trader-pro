@@ -380,6 +380,182 @@ class TastytradeBroker(BrokerBase):
         self.last_error = None
         return order
 
+
+    def get_orders(
+        self,
+        account_number=None,
+        *,
+        start_date=None,
+        end_date=None,
+        statuses=None,
+        underlying_symbol=None,
+    ):
+        """
+        Search account order history.
+
+        Read-only broker operation used for trade
+        journal reconciliation.
+        """
+
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No account number available"
+            )
+            return []
+
+        page_offset = 0
+        per_page = 100
+        orders = []
+
+        while True:
+            params = {
+                "per-page": per_page,
+                "page-offset": page_offset,
+                "sort": "Desc",
+            }
+
+            if start_date:
+                params["start-date"] = str(
+                    start_date
+                )
+
+            if end_date:
+                params["end-date"] = str(
+                    end_date
+                )
+
+            if underlying_symbol:
+                params["underlying-symbol"] = str(
+                    underlying_symbol
+                ).strip().upper()
+
+            if statuses:
+                if isinstance(
+                    statuses,
+                    (list, tuple, set),
+                ):
+                    clean_statuses = [
+                        str(value).strip()
+                        for value in statuses
+                        if str(value).strip()
+                    ]
+                else:
+                    clean_statuses = [
+                        str(statuses).strip()
+                    ]
+
+                if clean_statuses:
+                    params["status[]"] = (
+                        clean_statuses
+                    )
+
+            response = self._request(
+                "GET",
+                (
+                    f"/accounts/{account_number}"
+                    "/orders"
+                ),
+                params=params,
+            )
+
+            if response is None:
+                return []
+
+            try:
+                payload = response.json()
+                data = (
+                    payload.get("data")
+                    or {}
+                )
+
+                items = (
+                    data.get("items")
+                    or []
+                )
+
+                pagination = (
+                    payload.get("pagination")
+                    or {}
+                )
+
+            except (
+                AttributeError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                self.last_error = (
+                    "Invalid Tastytrade order-history "
+                    f"response: {exc}"
+                )
+                return []
+
+            if not isinstance(
+                items,
+                list,
+            ):
+                self.last_error = (
+                    "Invalid Tastytrade order-history "
+                    "items collection."
+                )
+                return []
+
+            orders.extend(
+                items
+            )
+
+            try:
+                total_pages = int(
+                    pagination.get(
+                        "total-pages",
+                        1,
+                    )
+                    or 1
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                self.last_error = (
+                    "Invalid Tastytrade order-history "
+                    "pagination."
+                )
+                return []
+
+            # A valid empty search may return
+            # total-pages == 0.
+            if total_pages == 0:
+                self.last_error = None
+                break
+
+            if (
+                total_pages < 0
+                or total_pages > 100
+            ):
+                self.last_error = (
+                    "Unsafe Tastytrade order-history "
+                    "pagination range."
+                )
+                return []
+
+            page_offset += 1
+
+            if (
+                page_offset
+                >= total_pages
+            ):
+                break
+
+        self.last_error = None
+
+        return orders
+
     def get_live_orders(
         self,
         account_number=None,

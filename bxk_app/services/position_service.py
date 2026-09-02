@@ -1,4 +1,11 @@
+import os
+import threading
+import time
+
 from bxk_app.broker_tastytrade import tastytrade_api
+from bxk_app.brokers.tastytrade import (
+    broker as order_broker,
+)
 from bxk_app.market_data import market_data
 from bxk_app.market_engine import market_engine
 from bxk_app.position_monitor import (
@@ -9,7 +16,104 @@ from bxk_app.services.execution_audit import (
 )
 from bxk_app.services.trade_journal_service import (
     observe_linked_positions,
+    reconcile_missing_trade_journals,
 )
+
+
+_DEFAULT_JOURNAL_RECONCILE_SECONDS = 60
+_MIN_JOURNAL_RECONCILE_SECONDS = 30
+_MAX_JOURNAL_RECONCILE_SECONDS = 3600
+
+_JOURNAL_RECONCILE_LOCK = threading.Lock()
+_JOURNAL_RECONCILE_NEXT_AT = 0.0
+
+
+def _journal_reconcile_interval_seconds():
+    raw = os.getenv(
+        "BXK_TRADE_JOURNAL_RECONCILE_SECONDS",
+        str(
+            _DEFAULT_JOURNAL_RECONCILE_SECONDS
+        ),
+    )
+
+    try:
+        value = int(raw)
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        value = (
+            _DEFAULT_JOURNAL_RECONCILE_SECONDS
+        )
+
+    return max(
+        _MIN_JOURNAL_RECONCILE_SECONDS,
+        min(
+            value,
+            _MAX_JOURNAL_RECONCILE_SECONDS,
+        ),
+    )
+
+
+def _reconcile_trade_journal_closures(
+    positions,
+    *,
+    broker_client=None,
+    now_monotonic=None,
+):
+    """
+    Throttled, failure-isolated closing-order check.
+
+    Position Monitor must remain healthy even if
+    order-history reconciliation fails.
+    """
+
+    global _JOURNAL_RECONCILE_NEXT_AT
+
+    now_value = (
+        time.monotonic()
+        if now_monotonic is None
+        else float(
+            now_monotonic
+        )
+    )
+
+    with _JOURNAL_RECONCILE_LOCK:
+        if (
+            now_value
+            < _JOURNAL_RECONCILE_NEXT_AT
+        ):
+            return {
+                "checked": False,
+                "reason": "THROTTLED",
+                "results": [],
+            }
+
+        _JOURNAL_RECONCILE_NEXT_AT = (
+            now_value
+            + _journal_reconcile_interval_seconds()
+        )
+
+    try:
+        return reconcile_missing_trade_journals(
+            positions,
+            broker_client=(
+                broker_client
+                or order_broker
+            ),
+        )
+
+    except Exception as exc:
+        return {
+            "checked": False,
+            "reason":
+                "JOURNAL_RECONCILIATION_FAILED",
+            "error":
+                type(exc).__name__,
+            "results": [],
+        }
+
 
 
 def _leg_symbols(item: dict) -> frozenset[str]:
@@ -87,6 +191,11 @@ def get_position_monitor():
         )
 
         if not positions:
+            if connected:
+                _reconcile_trade_journal_closures(
+                    []
+                )
+
             return {
                 "status": "EMPTY",
                 "connected": connected,
@@ -175,7 +284,15 @@ def get_position_monitor():
         except Exception:
             pass
 
+        _reconcile_trade_journal_closures(
+            summaries
+        )
+
         if not summaries:
+            _reconcile_trade_journal_closures(
+                []
+            )
+
             return {
                 "status": "UNSUPPORTED",
                 "connected": connected,

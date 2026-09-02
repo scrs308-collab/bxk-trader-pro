@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 
 from sqlalchemy import (
     Date,
@@ -222,6 +222,22 @@ class TradeJournal(Base):
         object | None
     ] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+
+    closing_broker_order_id: Mapped[
+        str | None
+    ] = mapped_column(
+        String(100),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    close_snapshot: Mapped[
+        dict | None
+    ] = mapped_column(
+        JSON,
         nullable=True,
     )
 
