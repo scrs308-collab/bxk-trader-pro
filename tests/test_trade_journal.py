@@ -826,3 +826,196 @@ def test_unavailable_carry_risk_not_recorded(
 
     assert journal.carry_evaluated_at is None
     assert journal.carry_state is None
+
+def test_records_next_open_outcome(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+    service.record_submitted_trade(
+        broker_order_id="ORDER-NEXT-1",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    service.record_overnight_carry_snapshot(
+        broker_order_id="ORDER-NEXT-1",
+        carry_risk={
+            "available": True,
+            "state": "RED",
+            "decision": "DO_NOT_CARRY",
+            "threatened_side": "CALL",
+            "short_cushion": 75,
+            "one_day_expected_move": 80,
+            "expected_move_source": "VIX",
+            "cushion_to_1d_em_ratio": 0.938,
+            "spx_close": 6575,
+            "baseline_trading_date":
+                "2026-09-01",
+        },
+        held_overnight=True,
+        session_factory=factory,
+    )
+
+    evaluated = datetime(
+        2026,
+        9,
+        2,
+        13,
+        31,
+        tzinfo=timezone.utc,
+    )
+
+    result = service.record_next_open_outcomes(
+        spx_open=6660,
+        trading_date="2026-09-02",
+        evaluated_at=evaluated,
+        session_factory=factory,
+    )
+
+    assert result["updated"] == 1
+
+    journal = _journal_for(
+        factory,
+        "ORDER-NEXT-1",
+    )
+
+    assert (
+        _utc(journal.next_open_evaluated_at)
+        == evaluated
+    )
+    assert journal.next_open_spx == 6660
+    assert journal.next_open_gap_points == 85
+    assert (
+        journal.next_open_short_breached
+        is True
+    )
+
+
+def test_next_open_nonbreach_recorded(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+    service.record_submitted_trade(
+        broker_order_id="ORDER-NEXT-2",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    service.record_overnight_carry_snapshot(
+        broker_order_id="ORDER-NEXT-2",
+        carry_risk={
+            "available": True,
+            "state": "GREEN",
+            "decision":
+                "CARRY_WITH_MONITORING",
+            "threatened_side": "PUT",
+            "short_cushion": 75,
+            "one_day_expected_move": 60,
+            "expected_move_source": "VIX1D",
+            "cushion_to_1d_em_ratio": 1.25,
+            "spx_close": 6575,
+            "baseline_trading_date":
+                "2026-09-01",
+        },
+        held_overnight=True,
+        session_factory=factory,
+    )
+
+    result = service.record_next_open_outcomes(
+        spx_open=6600,
+        trading_date="2026-09-02",
+        session_factory=factory,
+    )
+
+    assert result["updated"] == 1
+
+    journal = _journal_for(
+        factory,
+        "ORDER-NEXT-2",
+    )
+
+    assert journal.next_open_gap_points == 25
+    assert (
+        journal.next_open_short_breached
+        is False
+    )
+
+
+def test_same_day_is_not_next_open(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-NEXT-3",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    service.record_overnight_carry_snapshot(
+        broker_order_id="ORDER-NEXT-3",
+        carry_risk={
+            "available": True,
+            "state": "RED",
+            "decision": "DO_NOT_CARRY",
+            "threatened_side": "CALL",
+            "short_cushion": 25,
+            "one_day_expected_move": 80,
+            "expected_move_source": "VIX",
+            "cushion_to_1d_em_ratio": 0.312,
+            "spx_close": 6575,
+            "baseline_trading_date":
+                "2026-09-01",
+        },
+        held_overnight=True,
+        session_factory=factory,
+    )
+
+    result = service.record_next_open_outcomes(
+        spx_open=6580,
+        trading_date="2026-09-01",
+        session_factory=factory,
+    )
+
+    assert result["updated"] == 0
+
+    journal = _journal_for(
+        factory,
+        "ORDER-NEXT-3",
+    )
+
+    assert journal.next_open_spx is None
+    assert (
+        journal.next_open_short_breached
+        is None
+    )

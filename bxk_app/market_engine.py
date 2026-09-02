@@ -257,6 +257,38 @@ class MarketEngine:
                 "Overnight baseline capture failed"
             )
 
+        # Record the official next regular-session SPX
+        # open for overnight carry-learning rows.
+        #
+        # This is observational only and deliberately
+        # isolated from market analysis and execution.
+        try:
+            if (
+                session.get(
+                    "minutes_since_open"
+                )
+                is not None
+            ):
+                spx_session_open = (
+                    spx_quote.get("open")
+                )
+
+                if spx_session_open:
+                    from bxk_app.services.trade_journal_service import (
+                        record_next_open_outcomes,
+                    )
+
+                    record_next_open_outcomes(
+                        spx_open=spx_session_open,
+                        trading_date=(
+                            date.today().isoformat()
+                        ),
+                    )
+        except Exception:
+            logger.exception(
+                "Next-open journal learning failed"
+            )
+
         return market_data.get_header(
             include_account_context=(
                 include_account_context
