@@ -1672,6 +1672,26 @@ def reconcile_missing_trade_journals(
             in candidates
         ]
 
+        candidate_expirations = {
+            str(
+                journal.broker_order_id
+            ).strip():
+                journal.expiration
+            for journal
+            in candidates
+        }
+
+        candidate_symbols = {
+            str(
+                journal.broker_order_id
+            ).strip():
+                _journal_option_symbols(
+                    journal
+                )
+            for journal
+            in candidates
+        }
+
     account_number = (
         broker_client.
         get_first_account_number()
@@ -1718,6 +1738,92 @@ def reconcile_missing_trade_journals(
         and order.get("id")
     }
 
+    today = datetime.now(
+        timezone.utc
+    ).date()
+
+    expired_dates = [
+        expiration
+        for expiration
+        in candidate_expirations.values()
+        if (
+            expiration is not None
+            and expiration <= today
+        )
+    ]
+
+    transactions = []
+
+    transaction_reader = getattr(
+        broker_client,
+        "get_transactions",
+        None,
+    )
+
+    if (
+        expired_dates
+        and callable(
+            transaction_reader
+        )
+    ):
+        transactions = (
+            transaction_reader(
+                account_number=
+                    account_number,
+                start_date=(
+                    min(
+                        expired_dates
+                    )
+                    - timedelta(
+                        days=1
+                    )
+                ).isoformat(),
+                end_date=
+                    today.isoformat(),
+                instrument_type=
+                    "Equity Option",
+            )
+            or []
+        )
+
+    # Settlement transactions do not contain the
+    # originating order ID. If two unresolved journals
+    # own the same exact option symbol, automatic
+    # attribution is unsafe and is deliberately blocked.
+    symbol_owners = {}
+
+    for journal_id, symbols in (
+        candidate_symbols.items()
+    ):
+        expiration = (
+            candidate_expirations.get(
+                journal_id
+            )
+        )
+
+        if (
+            expiration is None
+            or expiration > today
+        ):
+            continue
+
+        for symbol in symbols:
+            symbol_owners.setdefault(
+                symbol,
+                set(),
+            ).add(
+                journal_id
+            )
+
+    ambiguous_journals = {
+        journal_id
+        for owners in (
+            symbol_owners.values()
+        )
+        if len(owners) > 1
+        for journal_id in owners
+    }
+
     results = []
     used_close_ids = set()
 
@@ -1760,13 +1866,85 @@ def reconcile_missing_trade_journals(
             ]
 
         if not matching:
-            results.append({
+            expiration = (
+                candidate_expirations.get(
+                    opening_order_id
+                )
+            )
+
+            settlement_result = None
+
+            if (
+                expiration is not None
+                and expiration <= today
+            ):
+                if (
+                    opening_order_id
+                    in ambiguous_journals
+                ):
+                    settlement_result = {
+                        "recorded": False,
+                        "reason":
+                            "AMBIGUOUS_SETTLEMENT_SYMBOLS",
+                    }
+
+                elif transactions:
+                    opening_order = (
+                        by_id.get(
+                            opening_order_id
+                        )
+                        or broker_client.get_order(
+                            opening_order_id,
+                            account_number=
+                                account_number,
+                        )
+                    )
+
+                    settlement_result = (
+                        finalize_expired_trade(
+                            broker_order_id=
+                                opening_order_id,
+                            transactions=
+                                transactions,
+                            opening_order=
+                                opening_order,
+                            session_factory=
+                                factory,
+                        )
+                    )
+
+                    if (
+                        settlement_result.get(
+                            "recorded"
+                        )
+                        and settlement_result.get(
+                            "status"
+                        )
+                        == "EXPIRED"
+                    ):
+                        results.append(
+                            settlement_result
+                        )
+                        continue
+
+            result = {
                 "broker_order_id":
                     opening_order_id,
                 "closed": False,
                 "reason":
                     "NO_CONFIRMED_CLOSE_ORDER",
-            })
+            }
+
+            if settlement_result:
+                result[
+                    "settlement_reason"
+                ] = settlement_result.get(
+                    "reason"
+                )
+
+            results.append(
+                result
+            )
             continue
 
         matching.sort(
@@ -1846,3 +2024,616 @@ def reconcile_missing_trade_journals(
         "results":
             results,
     }
+
+
+_SETTLEMENT_SUBTYPES = {
+    "CASH SETTLED ASSIGNMENT",
+    "CASH SETTLED EXERCISE",
+}
+
+_EXPIRATION_SUBTYPE = "EXPIRATION"
+
+
+def _transaction_date(
+    transaction,
+):
+    raw = str(
+        (transaction or {}).get(
+            "transaction-date"
+        )
+        or ""
+    ).strip()
+
+    if raw:
+        try:
+            return date.fromisoformat(
+                raw[:10]
+            )
+
+        except ValueError:
+            pass
+
+    executed_at = _datetime(
+        (transaction or {}).get(
+            "executed-at"
+        )
+    )
+
+    if executed_at is not None:
+        return executed_at.date()
+
+    return None
+
+
+def _transaction_timestamp(
+    transaction,
+):
+    return _datetime(
+        (transaction or {}).get(
+            "executed-at"
+        )
+    )
+
+
+def _journal_option_symbols(
+    journal,
+):
+    order = _entry_order_from_journal(
+        journal
+    )
+
+    symbols = []
+
+    for leg in (
+        order.get("legs")
+        or []
+    ):
+        if not isinstance(
+            leg,
+            dict,
+        ):
+            continue
+
+        symbol = str(
+            leg.get("symbol")
+            or ""
+        ).strip()
+
+        if symbol:
+            symbols.append(
+                symbol
+            )
+
+    return frozenset(
+        symbols
+    )
+
+
+def _settlement_signature(
+    transaction,
+):
+    """
+    Deduplicate identical transaction records without
+    assuming a transaction ID is always present.
+    """
+
+    return (
+        str(
+            transaction.get("id")
+            or ""
+        ).strip(),
+        str(
+            transaction.get("executed-at")
+            or ""
+        ).strip(),
+        str(
+            transaction.get(
+                "transaction-sub-type"
+            )
+            or ""
+        ).strip().upper(),
+        str(
+            transaction.get("symbol")
+            or ""
+        ).strip(),
+        str(
+            transaction.get("quantity")
+            or ""
+        ).strip(),
+        str(
+            transaction.get("value")
+            or ""
+        ).strip(),
+        str(
+            transaction.get(
+                "value-effect"
+            )
+            or ""
+        ).strip().upper(),
+    )
+
+
+def _expiration_settlement_evidence(
+    journal,
+    transactions,
+):
+    """
+    Resolve one SPXW journal from Tastytrade expiration
+    and cash-settlement transactions.
+
+    Every original option symbol must have terminal
+    evidence for exactly the journal quantity.
+    """
+
+    expiration = journal.expiration
+
+    if expiration is None:
+        return {
+            "complete": False,
+            "reason":
+                "EXPIRATION_DATE_MISSING",
+        }
+
+    symbols = (
+        _journal_option_symbols(
+            journal
+        )
+    )
+
+    if (
+        len(symbols) != 4
+        or not all(
+            symbol.upper().startswith(
+                "SPXW"
+            )
+            for symbol in symbols
+        )
+    ):
+        return {
+            "complete": False,
+            "reason":
+                "NOT_SUPPORTED_SPXW_CONDOR",
+        }
+
+    required_quantity = float(
+        journal.quantity
+        or 1
+    )
+
+    quantities = {
+        symbol: 0.0
+        for symbol in symbols
+    }
+
+    matched = []
+    seen = set()
+
+    settlement_dollars = 0.0
+    cash_settled = False
+    timestamps = []
+
+    for transaction in (
+        transactions
+        or []
+    ):
+        if not isinstance(
+            transaction,
+            dict,
+        ):
+            continue
+
+        symbol = str(
+            transaction.get("symbol")
+            or ""
+        ).strip()
+
+        if symbol not in symbols:
+            continue
+
+        if (
+            _transaction_date(
+                transaction
+            )
+            != expiration
+        ):
+            continue
+
+        transaction_type = str(
+            transaction.get(
+                "transaction-type"
+            )
+            or ""
+        ).strip().upper()
+
+        subtype = str(
+            transaction.get(
+                "transaction-sub-type"
+            )
+            or ""
+        ).strip().upper()
+
+        if (
+            transaction_type
+            != "RECEIVE DELIVER"
+        ):
+            continue
+
+        if (
+            subtype
+            != _EXPIRATION_SUBTYPE
+            and subtype
+            not in _SETTLEMENT_SUBTYPES
+        ):
+            # Plain Assignment / Exercise records are
+            # informational companions. The separate
+            # Cash Settled record contains the money.
+            continue
+
+        signature = (
+            _settlement_signature(
+                transaction
+            )
+        )
+
+        if signature in seen:
+            continue
+
+        seen.add(
+            signature
+        )
+
+        quantity = _number(
+            transaction.get(
+                "quantity"
+            )
+        )
+
+        if (
+            quantity is None
+            or quantity <= 0
+        ):
+            return {
+                "complete": False,
+                "reason":
+                    "INVALID_SETTLEMENT_QUANTITY",
+            }
+
+        quantities[
+            symbol
+        ] += quantity
+
+        timestamp = (
+            _transaction_timestamp(
+                transaction
+            )
+        )
+
+        if timestamp is not None:
+            timestamps.append(
+                timestamp
+            )
+
+        if subtype in _SETTLEMENT_SUBTYPES:
+            cash_settled = True
+
+            value = _number(
+                transaction.get(
+                    "value"
+                )
+            )
+
+            effect = str(
+                transaction.get(
+                    "value-effect"
+                )
+                or ""
+            ).strip().upper()
+
+            if (
+                value is None
+                or effect not in {
+                    "DEBIT",
+                    "CREDIT",
+                }
+            ):
+                return {
+                    "complete": False,
+                    "reason":
+                        "INVALID_CASH_SETTLEMENT_VALUE",
+                }
+
+            # Use value, not net-value. net-value
+            # includes settlement fees while the
+            # journal's trade P/L currently excludes
+            # commissions and fees.
+            if effect == "DEBIT":
+                settlement_dollars += abs(
+                    value
+                )
+
+            else:
+                settlement_dollars -= abs(
+                    value
+                )
+
+        matched.append(
+            transaction
+        )
+
+    incomplete = [
+        symbol
+        for symbol, quantity
+        in quantities.items()
+        if abs(
+            quantity
+            - required_quantity
+        ) > 0.000001
+    ]
+
+    if incomplete:
+        return {
+            "complete": False,
+            "reason":
+                "INCOMPLETE_SETTLEMENT_EVIDENCE",
+            "missing_or_mismatched_symbols":
+                incomplete,
+        }
+
+    if not matched:
+        return {
+            "complete": False,
+            "reason":
+                "NO_SETTLEMENT_EVIDENCE",
+        }
+
+    return {
+        "complete": True,
+        "cash_settled":
+            cash_settled,
+        "settlement_dollars":
+            round(
+                settlement_dollars,
+                2,
+            ),
+        "closed_at": (
+            max(timestamps)
+            if timestamps
+            else datetime.now(
+                timezone.utc
+            )
+        ),
+        "transactions":
+            matched,
+    }
+
+
+def finalize_expired_trade(
+    *,
+    broker_order_id,
+    transactions,
+    opening_order=None,
+    session_factory=None,
+):
+    """
+    Finalize an SPXW journal from complete Tastytrade
+    expiration/cash-settlement evidence.
+
+    No closing broker order is invented.
+    """
+
+    if not database_configured():
+        return {
+            "recorded": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+        }
+
+    clean_order_id = str(
+        broker_order_id
+        or ""
+    ).strip()
+
+    if not clean_order_id:
+        return {
+            "recorded": False,
+            "reason":
+                "BROKER_ORDER_ID_MISSING",
+        }
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    with factory() as session:
+        journal = session.execute(
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.broker_order_id
+                == clean_order_id
+            )
+            .with_for_update()
+        ).scalar_one_or_none()
+
+        if journal is None:
+            return {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_NOT_FOUND",
+            }
+
+        if journal.status == "CLOSED":
+            return {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_ALREADY_CLOSED",
+            }
+
+        if journal.status == "EXPIRED":
+            return {
+                "recorded": True,
+                "changed": False,
+                "status": "EXPIRED",
+                "realized_pnl":
+                    journal.realized_pnl,
+                "outcome":
+                    journal.outcome,
+            }
+
+        evidence = (
+            _expiration_settlement_evidence(
+                journal,
+                transactions,
+            )
+        )
+
+        if not evidence.get(
+            "complete"
+        ):
+            return {
+                "recorded": False,
+                "reason":
+                    evidence.get(
+                        "reason"
+                    ),
+                "details":
+                    evidence,
+            }
+
+        entry_credit = (
+            journal.entry_fill_credit
+        )
+
+        if (
+            entry_credit is None
+            and isinstance(
+                opening_order,
+                dict,
+            )
+        ):
+            entry_credit = (
+                _opening_fill_credit(
+                    opening_order
+                )
+            )
+
+            if entry_credit is not None:
+                journal.entry_fill_credit = (
+                    entry_credit
+                )
+
+        # Never substitute submitted limit credit for
+        # actual fill credit when calculating history.
+        if entry_credit is None:
+            return {
+                "recorded": False,
+                "reason":
+                    "ENTRY_FILL_UNAVAILABLE",
+            }
+
+        quantity = int(
+            journal.quantity
+            or 1
+        )
+
+        settlement_dollars = float(
+            evidence[
+                "settlement_dollars"
+            ]
+        )
+
+        exit_debit = round(
+            settlement_dollars
+            / (
+                100
+                * quantity
+            ),
+            6,
+        )
+
+        realized_pnl = round(
+            (
+                entry_credit
+                * 100
+                * quantity
+            )
+            - settlement_dollars,
+            2,
+        )
+
+        journal.status = "EXPIRED"
+
+        journal.broker_status = (
+            "SETTLED"
+            if evidence[
+                "cash_settled"
+            ]
+            else "EXPIRED"
+        )
+
+        # Expiration has no closing order ID.
+        journal.closing_broker_order_id = (
+            None
+        )
+
+        journal.exit_debit = (
+            exit_debit
+        )
+
+        journal.realized_pnl = (
+            realized_pnl
+        )
+
+        journal.closed_at = (
+            evidence[
+                "closed_at"
+            ]
+        )
+
+        journal.outcome = (
+            _trade_outcome(
+                realized_pnl
+            )
+        )
+
+        journal.exit_reason = (
+            "SPX_CASH_SETTLEMENT"
+            if evidence[
+                "cash_settled"
+            ]
+            else "EXPIRED_WORTHLESS"
+        )
+
+        journal.close_snapshot = (
+            _json_safe({
+                "type":
+                    "SPX_EXPIRATION_SETTLEMENT",
+                "settlement_dollars":
+                    settlement_dollars,
+                "transactions":
+                    evidence[
+                        "transactions"
+                    ],
+            })
+        )
+
+        session.commit()
+        session.refresh(
+            journal
+        )
+
+        return {
+            "recorded": True,
+            "changed": True,
+            "status": "EXPIRED",
+            "exit_debit":
+                journal.exit_debit,
+            "realized_pnl":
+                journal.realized_pnl,
+            "outcome":
+                journal.outcome,
+            "exit_reason":
+                journal.exit_reason,
+        }
