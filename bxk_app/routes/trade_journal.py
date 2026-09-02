@@ -3,8 +3,16 @@ from fastapi import (
     Depends,
 )
 
+from bxk_app.brokers.tastytrade import (
+    broker,
+)
+
 from bxk_app.authorization import (
     require_owner_or_auth_disabled,
+)
+
+from bxk_app.services.trade_journal_backfill_service import (
+    backfill_trade_journal,
 )
 
 from bxk_app.services.trade_journal_service import (
@@ -40,4 +48,19 @@ def trade_journal_trades(
     return get_trade_journal_trades(
         user_context=user_context,
         limit=limit,
+    )
+
+@router.post("/backfill")
+def trade_journal_backfill(
+    days: int = 30,
+    dry_run: bool = True,
+    user_context: dict = Depends(
+        require_owner_or_auth_disabled
+    ),
+):
+    return backfill_trade_journal(
+        broker_client=broker,
+        user_context=user_context,
+        days=days,
+        dry_run=dry_run,
     )
