@@ -3,6 +3,7 @@ import uuid
 from datetime import (
     date,
     datetime,
+    timedelta,
     timezone,
 )
 
@@ -892,3 +893,956 @@ def observe_linked_positions(
         )
 
     return results
+
+
+def _normalized_broker_action(
+    value,
+):
+    return " ".join(
+        str(value or "")
+        .replace("-", " ")
+        .strip()
+        .upper()
+        .split()
+    )
+
+
+def _entry_order_from_journal(
+    journal,
+):
+    snapshot = (
+        journal.entry_snapshot
+        if isinstance(
+            journal.entry_snapshot,
+            dict,
+        )
+        else {}
+    )
+
+    order = snapshot.get(
+        "order"
+    )
+
+    return (
+        order
+        if isinstance(
+            order,
+            dict,
+        )
+        else {}
+    )
+
+
+def _expected_close_actions(
+    journal,
+):
+    entry_order = (
+        _entry_order_from_journal(
+            journal
+        )
+    )
+
+    expected = {}
+
+    for leg in (
+        entry_order.get("legs")
+        or []
+    ):
+        if not isinstance(
+            leg,
+            dict,
+        ):
+            return {}
+
+        symbol = str(
+            leg.get("symbol")
+            or ""
+        ).strip()
+
+        action = str(
+            leg.get("action")
+            or ""
+        ).strip().upper()
+
+        if not symbol:
+            return {}
+
+        if action == "SELL":
+            expected[
+                symbol
+            ] = "BUY TO CLOSE"
+
+        elif action == "BUY":
+            expected[
+                symbol
+            ] = "SELL TO CLOSE"
+
+        else:
+            return {}
+
+    return expected
+
+
+def _order_fill_timestamp(
+    order,
+):
+    timestamps = []
+
+    for leg in (
+        (order or {}).get("legs")
+        or []
+    ):
+        if not isinstance(
+            leg,
+            dict,
+        ):
+            continue
+
+        for fill in (
+            leg.get("fills")
+            or []
+        ):
+            if not isinstance(
+                fill,
+                dict,
+            ):
+                continue
+
+            timestamp = _datetime(
+                fill.get(
+                    "filled-at"
+                )
+            )
+
+            if timestamp is not None:
+                timestamps.append(
+                    timestamp
+                )
+
+    if timestamps:
+        return max(
+            timestamps
+        )
+
+    for field in (
+        "terminal-at",
+        "updated-at",
+        "received-at",
+        "created-at",
+    ):
+        timestamp = _datetime(
+            (order or {}).get(
+                field
+            )
+        )
+
+        if timestamp is not None:
+            return timestamp
+
+    return None
+
+
+def _order_net_value(
+    order,
+):
+    """
+    Return signed strategy price per spread.
+
+    Debit is positive.
+    Credit is negative.
+    """
+
+    if not isinstance(
+        order,
+        dict,
+    ):
+        return None
+
+    direct_price = None
+
+    for field in (
+        "average-fill-price",
+        "average-price",
+        "fill-price",
+    ):
+        direct_price = _number(
+            order.get(field)
+        )
+
+        if direct_price is not None:
+            break
+
+    if direct_price is not None:
+        effect = str(
+            order.get(
+                "price-effect"
+            )
+            or order.get(
+                "value-effect"
+            )
+            or ""
+        ).strip().upper()
+
+        if effect == "CREDIT":
+            return -abs(
+                direct_price
+            )
+
+        if effect == "DEBIT":
+            return abs(
+                direct_price
+            )
+
+    signed_total = 0.0
+    saw_fill = False
+
+    for leg in (
+        order.get("legs")
+        or []
+    ):
+        if not isinstance(
+            leg,
+            dict,
+        ):
+            return None
+
+        fills = (
+            leg.get("fills")
+            or []
+        )
+
+        if not fills:
+            return None
+
+        value_total = 0.0
+        quantity_total = 0.0
+
+        for fill in fills:
+            if not isinstance(
+                fill,
+                dict,
+            ):
+                continue
+
+            price = _number(
+                fill.get(
+                    "fill-price"
+                )
+            )
+
+            quantity = _number(
+                fill.get(
+                    "quantity"
+                )
+            )
+
+            if (
+                price is None
+                or quantity is None
+                or quantity <= 0
+            ):
+                continue
+
+            value_total += (
+                price * quantity
+            )
+
+            quantity_total += (
+                quantity
+            )
+
+        if quantity_total <= 0:
+            return None
+
+        saw_fill = True
+
+        average = (
+            value_total
+            / quantity_total
+        )
+
+        action = (
+            _normalized_broker_action(
+                leg.get(
+                    "action"
+                )
+            )
+        )
+
+        if action.startswith(
+            "BUY "
+        ):
+            signed_total += (
+                average
+            )
+
+        elif action.startswith(
+            "SELL "
+        ):
+            signed_total -= (
+                average
+            )
+
+        else:
+            return None
+
+    if not saw_fill:
+        return None
+
+    return round(
+        signed_total,
+        6,
+    )
+
+
+def _opening_fill_credit(
+    order,
+):
+    value = _order_net_value(
+        order
+    )
+
+    if value is None:
+        return None
+
+    return abs(
+        value
+    )
+
+
+def _closing_exit_debit(
+    order,
+):
+    return _order_net_value(
+        order
+    )
+
+
+def _closing_order_matches(
+    journal,
+    order,
+):
+    if not isinstance(
+        order,
+        dict,
+    ):
+        return False
+
+    opening_order_id = str(
+        journal.broker_order_id
+        or ""
+    ).strip()
+
+    closing_order_id = str(
+        order.get("id")
+        or ""
+    ).strip()
+
+    if (
+        not closing_order_id
+        or closing_order_id
+        == opening_order_id
+    ):
+        return False
+
+    status = str(
+        order.get("status")
+        or ""
+    ).strip().upper()
+
+    if status != "FILLED":
+        return False
+
+    expected = (
+        _expected_close_actions(
+            journal
+        )
+    )
+
+    if not expected:
+        return False
+
+    actual = {}
+
+    for leg in (
+        order.get("legs")
+        or []
+    ):
+        if not isinstance(
+            leg,
+            dict,
+        ):
+            return False
+
+        symbol = str(
+            leg.get("symbol")
+            or ""
+        ).strip()
+
+        action = (
+            _normalized_broker_action(
+                leg.get(
+                    "action"
+                )
+            )
+        )
+
+        if not symbol:
+            return False
+
+        actual[
+            symbol
+        ] = action
+
+        quantity = _number(
+            leg.get(
+                "quantity"
+            )
+        )
+
+        required_quantity = (
+            journal.quantity
+            or 1
+        )
+
+        if (
+            quantity is None
+            or quantity
+            < required_quantity
+        ):
+            return False
+
+    if (
+        set(actual)
+        != set(expected)
+    ):
+        return False
+
+    return all(
+        actual.get(symbol)
+        == action
+        for symbol, action
+        in expected.items()
+    )
+
+
+def _trade_outcome(
+    realized_pnl,
+):
+    pnl = _number(
+        realized_pnl
+    )
+
+    if pnl is None:
+        return None
+
+    if pnl > 0.01:
+        return "WIN"
+
+    if pnl < -0.01:
+        return "LOSS"
+
+    return "SCRATCH"
+
+
+def finalize_closed_trade(
+    *,
+    broker_order_id,
+    closing_order,
+    opening_order=None,
+    session_factory=None,
+):
+    """
+    Finalize one journal only from a confirmed,
+    filled closing broker order.
+    """
+
+    if not database_configured():
+        return {
+            "recorded": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+        }
+
+    clean_order_id = str(
+        broker_order_id
+        or ""
+    ).strip()
+
+    if not clean_order_id:
+        return {
+            "recorded": False,
+            "reason":
+                "BROKER_ORDER_ID_MISSING",
+        }
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    with factory() as session:
+        journal = session.execute(
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.broker_order_id
+                == clean_order_id
+            )
+            .with_for_update()
+        ).scalar_one_or_none()
+
+        if journal is None:
+            return {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_NOT_FOUND",
+            }
+
+        if (
+            journal.status == "CLOSED"
+            and journal.
+            closing_broker_order_id
+        ):
+            return {
+                "recorded": True,
+                "changed": False,
+                "status": "CLOSED",
+                "closing_broker_order_id":
+                    journal.
+                    closing_broker_order_id,
+            }
+
+        if not _closing_order_matches(
+            journal,
+            closing_order,
+        ):
+            return {
+                "recorded": False,
+                "reason":
+                    "CLOSE_ORDER_MISMATCH",
+            }
+
+        closing_order_id = str(
+            closing_order.get("id")
+            or ""
+        ).strip()
+
+        entry_credit = (
+            journal.entry_fill_credit
+        )
+
+        if (
+            entry_credit is None
+            and isinstance(
+                opening_order,
+                dict,
+            )
+        ):
+            entry_credit = (
+                _opening_fill_credit(
+                    opening_order
+                )
+            )
+
+            if entry_credit is not None:
+                journal.entry_fill_credit = (
+                    entry_credit
+                )
+
+        exit_debit = (
+            _closing_exit_debit(
+                closing_order
+            )
+        )
+
+        quantity = int(
+            journal.quantity
+            or 1
+        )
+
+        realized_pnl = None
+
+        if (
+            entry_credit is not None
+            and exit_debit is not None
+        ):
+            realized_pnl = round(
+                (
+                    entry_credit
+                    - exit_debit
+                )
+                * 100
+                * quantity,
+                2,
+            )
+
+        closed_at = (
+            _order_fill_timestamp(
+                closing_order
+            )
+            or datetime.now(
+                timezone.utc
+            )
+        )
+
+        journal.status = "CLOSED"
+        journal.broker_status = (
+            str(
+                closing_order.get(
+                    "status"
+                )
+                or "FILLED"
+            ).strip()
+            or "FILLED"
+        )
+
+        journal.closing_broker_order_id = (
+            closing_order_id
+        )
+
+        journal.close_snapshot = (
+            _json_safe(
+                closing_order
+            )
+        )
+
+        journal.exit_debit = (
+            exit_debit
+        )
+
+        journal.realized_pnl = (
+            realized_pnl
+        )
+
+        journal.closed_at = (
+            closed_at
+        )
+
+        journal.outcome = (
+            _trade_outcome(
+                realized_pnl
+            )
+        )
+
+        journal.exit_reason = (
+            "BROKER_CLOSE_ORDER"
+        )
+
+        session.commit()
+        session.refresh(
+            journal
+        )
+
+        return {
+            "recorded": True,
+            "changed": True,
+            "status":
+                journal.status,
+            "closing_broker_order_id":
+                journal.
+                closing_broker_order_id,
+            "entry_fill_credit":
+                journal.
+                entry_fill_credit,
+            "exit_debit":
+                journal.exit_debit,
+            "realized_pnl":
+                journal.realized_pnl,
+            "outcome":
+                journal.outcome,
+        }
+
+
+def reconcile_missing_trade_journals(
+    active_positions,
+    *,
+    broker_client,
+    session_factory=None,
+):
+    """
+    Reconcile journal rows that are no longer present
+    in the live-position set.
+
+    Mere disappearance never closes a journal.
+    A matching FILLED broker closing order is required.
+    """
+
+    if not database_configured():
+        return {
+            "checked": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+            "results": [],
+        }
+
+    active_order_ids = {
+        str(
+            position.get(
+                "broker_order_id"
+            )
+            or ""
+        ).strip()
+        for position in (
+            active_positions
+            or []
+        )
+        if isinstance(
+            position,
+            dict,
+        )
+        and position.get(
+            "broker_order_id"
+        )
+    }
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    with factory() as session:
+        candidates = (
+            session.execute(
+                select(
+                    TradeJournal
+                )
+                .where(
+                    TradeJournal.status.in_(
+                        (
+                            "SUBMITTED",
+                            "OPEN",
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        candidates = [
+            journal
+            for journal
+            in candidates
+            if str(
+                journal.broker_order_id
+            ).strip()
+            not in active_order_ids
+        ]
+
+        if not candidates:
+            return {
+                "checked": True,
+                "candidates": 0,
+                "results": [],
+            }
+
+        earliest = min(
+            (
+                journal.submitted_at
+                for journal
+                in candidates
+                if journal.
+                submitted_at
+                is not None
+            ),
+            default=None,
+        )
+
+        start_date = (
+            earliest.date()
+            if earliest is not None
+            else (
+                datetime.now(
+                    timezone.utc
+                ).date()
+                - timedelta(
+                    days=14
+                )
+            )
+        )
+
+        journal_ids = [
+            str(
+                journal.
+                broker_order_id
+            ).strip()
+            for journal
+            in candidates
+        ]
+
+    account_number = (
+        broker_client.
+        get_first_account_number()
+    )
+
+    if not account_number:
+        return {
+            "checked": False,
+            "reason":
+                "BROKER_ACCOUNT_UNAVAILABLE",
+            "results": [],
+        }
+
+    history = broker_client.get_orders(
+        account_number=
+            account_number,
+        start_date=(
+            start_date
+            - timedelta(
+                days=1
+            )
+        ).isoformat(),
+        end_date=datetime.now(
+            timezone.utc
+        ).date().isoformat(),
+        statuses=[
+            "Filled",
+        ],
+    )
+
+    by_id = {
+        str(
+            order.get("id")
+            or ""
+        ).strip(): order
+        for order in (
+            history
+            or []
+        )
+        if isinstance(
+            order,
+            dict,
+        )
+        and order.get("id")
+    }
+
+    results = []
+    used_close_ids = set()
+
+    for opening_order_id in (
+        journal_ids
+    ):
+        with factory() as session:
+            journal = session.execute(
+                select(
+                    TradeJournal
+                ).where(
+                    TradeJournal.
+                    broker_order_id
+                    == opening_order_id
+                )
+            ).scalar_one_or_none()
+
+            if journal is None:
+                continue
+
+            matching = [
+                order
+                for order in (
+                    history
+                    or []
+                )
+                if isinstance(
+                    order,
+                    dict,
+                )
+                and str(
+                    order.get("id")
+                    or ""
+                ).strip()
+                not in used_close_ids
+                and _closing_order_matches(
+                    journal,
+                    order,
+                )
+            ]
+
+        if not matching:
+            results.append({
+                "broker_order_id":
+                    opening_order_id,
+                "closed": False,
+                "reason":
+                    "NO_CONFIRMED_CLOSE_ORDER",
+            })
+            continue
+
+        matching.sort(
+            key=lambda order: (
+                _order_fill_timestamp(
+                    order
+                )
+                or datetime.max.replace(
+                    tzinfo=timezone.utc
+                )
+            )
+        )
+
+        closing_order = (
+            matching[0]
+        )
+
+        closing_order_id = str(
+            closing_order.get("id")
+            or ""
+        ).strip()
+
+        detailed_close = (
+            broker_client.get_order(
+                closing_order_id,
+                account_number=
+                    account_number,
+            )
+            or closing_order
+        )
+
+        opening_order = (
+            by_id.get(
+                opening_order_id
+            )
+            or broker_client.get_order(
+                opening_order_id,
+                account_number=
+                    account_number,
+            )
+        )
+
+        result = (
+            finalize_closed_trade(
+                broker_order_id=
+                    opening_order_id,
+                closing_order=
+                    detailed_close,
+                opening_order=
+                    opening_order,
+                session_factory=
+                    factory,
+            )
+        )
+
+        if (
+            result.get(
+                "recorded"
+            )
+            and result.get(
+                "status"
+            )
+            == "CLOSED"
+        ):
+            used_close_ids.add(
+                closing_order_id
+            )
+
+        results.append(
+            result
+        )
+
+    return {
+        "checked": True,
+        "candidates":
+            len(journal_ids),
+        "results":
+            results,
+    }

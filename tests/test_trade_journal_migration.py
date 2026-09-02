@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 def test_trade_journal_migration():
@@ -38,5 +38,37 @@ def test_trade_journal_migration():
 
     assert (
         '"entry_snapshot"'
+        in source
+    )
+
+
+def test_trade_journal_closure_migration():
+    path = Path(
+        "alembic/versions/"
+        "0c3e7a9f1b24_"
+        "add_trade_journal_closure_fields.py"
+    )
+
+    source = path.read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert (
+        'revision = "0c3e7a9f1b24"'
+        in source
+    )
+
+    assert (
+        'down_revision = "f6a1c9d82b47"'
+        in source
+    )
+
+    assert (
+        '"closing_broker_order_id"'
+        in source
+    )
+
+    assert (
+        '"close_snapshot"'
         in source
     )
