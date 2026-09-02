@@ -45,6 +45,8 @@ from bxk_app.routes.sms_consent import (
     router as sms_consent_router,
 )
 
+from bxk_app.routes.trade_journal import router as trade_journal_router
+
 router = APIRouter()
 
 router.include_router(health_router)
@@ -60,3 +62,4 @@ router.include_router(system_settings_router)
 router.include_router(auth_router)
 router.include_router(admin_users_router)
 router.include_router(sms_consent_router)
+router.include_router(trade_journal_router)

@@ -2637,3 +2637,543 @@ def finalize_expired_trade(
             "exit_reason":
                 journal.exit_reason,
         }
+
+
+def _journal_iso(value):
+    if value is None:
+        return None
+
+    isoformat = getattr(
+        value,
+        "isoformat",
+        None,
+    )
+
+    if callable(isoformat):
+        return isoformat()
+
+    return str(value)
+
+
+def _journal_trade_row(
+    journal,
+):
+    return {
+        "id":
+            str(journal.id),
+        "broker_order_id":
+            journal.broker_order_id,
+        "status":
+            journal.status,
+        "broker_status":
+            journal.broker_status,
+        "strategy":
+            journal.strategy,
+        "underlying":
+            journal.underlying,
+        "expiration":
+            _journal_iso(
+                journal.expiration
+            ),
+        "dte":
+            journal.dte,
+        "quantity":
+            journal.quantity,
+        "wing_width":
+            journal.wing_width,
+        "short_put":
+            journal.short_put,
+        "long_put":
+            journal.long_put,
+        "short_call":
+            journal.short_call,
+        "long_call":
+            journal.long_call,
+        "submitted_credit":
+            journal.submitted_credit,
+        "entry_fill_credit":
+            journal.entry_fill_credit,
+        "exit_debit":
+            journal.exit_debit,
+        "realized_pnl":
+            journal.realized_pnl,
+        "outcome":
+            journal.outcome,
+        "exit_reason":
+            journal.exit_reason,
+        "worst_threat_state":
+            journal.worst_threat_state,
+        "min_short_cushion":
+            journal.min_short_cushion,
+        "submitted_at":
+            _journal_iso(
+                journal.submitted_at
+            ),
+        "opened_at":
+            _journal_iso(
+                journal.opened_at
+            ),
+        "closed_at":
+            _journal_iso(
+                journal.closed_at
+            ),
+        "first_orange_at":
+            _journal_iso(
+                journal.first_orange_at
+            ),
+        "first_red_at":
+            _journal_iso(
+                journal.first_red_at
+            ),
+        "first_critical_at":
+            _journal_iso(
+                journal.first_critical_at
+            ),
+    }
+
+
+def _journal_reporting_rows(
+    *,
+    user_context=None,
+    session_factory=None,
+):
+    if not database_configured():
+        return None
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    user_id = _user_id(
+        user_context
+    )
+
+    with factory() as session:
+        statement = select(
+            TradeJournal
+        )
+
+        if user_id is not None:
+            # Owner reporting includes legacy rows that
+            # predate user attribution.
+            statement = statement.where(
+                (
+                    TradeJournal.user_id
+                    == user_id
+                )
+                |
+                TradeJournal.user_id.is_(
+                    None
+                )
+            )
+
+        return (
+            session.execute(
+                statement
+            )
+            .scalars()
+            .all()
+        )
+
+
+def get_trade_journal_summary(
+    *,
+    user_context=None,
+    session_factory=None,
+):
+    """
+    Return database-only journal performance metrics.
+
+    No live broker calls are made here.
+    """
+
+    rows = _journal_reporting_rows(
+        user_context=user_context,
+        session_factory=session_factory,
+    )
+
+    if rows is None:
+        return {
+            "available": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+        }
+
+    terminal = [
+        journal
+        for journal in rows
+        if (
+            journal.closed_at
+            is not None
+            and journal.realized_pnl
+            is not None
+            and str(
+                journal.status
+                or ""
+            ).upper()
+            in {
+                "CLOSED",
+                "EXPIRED",
+            }
+        )
+    ]
+
+    open_rows = [
+        journal
+        for journal in rows
+        if str(
+            journal.status
+            or ""
+        ).upper()
+        in {
+            "SUBMITTED",
+            "OPEN",
+        }
+    ]
+
+    pnl_values = [
+        float(
+            journal.realized_pnl
+        )
+        for journal in terminal
+    ]
+
+    winners = [
+        pnl
+        for pnl in pnl_values
+        if pnl > 0.01
+    ]
+
+    losers = [
+        pnl
+        for pnl in pnl_values
+        if pnl < -0.01
+    ]
+
+    scratches = [
+        pnl
+        for pnl in pnl_values
+        if -0.01 <= pnl <= 0.01
+    ]
+
+    total_trades = len(
+        terminal
+    )
+
+    total_pnl = round(
+        sum(pnl_values),
+        2,
+    )
+
+    gross_profit = round(
+        sum(winners),
+        2,
+    )
+
+    gross_loss = round(
+        sum(losers),
+        2,
+    )
+
+    win_rate = (
+        round(
+            (
+                len(winners)
+                / total_trades
+            )
+            * 100,
+            2,
+        )
+        if total_trades
+        else 0.0
+    )
+
+    average_pnl = (
+        round(
+            total_pnl
+            / total_trades,
+            2,
+        )
+        if total_trades
+        else 0.0
+    )
+
+    average_winner = (
+        round(
+            gross_profit
+            / len(winners),
+            2,
+        )
+        if winners
+        else 0.0
+    )
+
+    average_loser = (
+        round(
+            gross_loss
+            / len(losers),
+            2,
+        )
+        if losers
+        else 0.0
+    )
+
+    profit_factor = (
+        round(
+            gross_profit
+            / abs(
+                gross_loss
+            ),
+            2,
+        )
+        if gross_loss < 0
+        else None
+    )
+
+    best = (
+        max(
+            terminal,
+            key=lambda journal:
+                float(
+                    journal.realized_pnl
+                ),
+        )
+        if terminal
+        else None
+    )
+
+    worst = (
+        min(
+            terminal,
+            key=lambda journal:
+                float(
+                    journal.realized_pnl
+                ),
+        )
+        if terminal
+        else None
+    )
+
+    cushion_values = [
+        float(
+            journal.min_short_cushion
+        )
+        for journal in terminal
+        if journal.min_short_cushion
+        is not None
+    ]
+
+    average_min_cushion = (
+        round(
+            sum(cushion_values)
+            / len(cushion_values),
+            2,
+        )
+        if cushion_values
+        else None
+    )
+
+    threat_counts = {
+        "orange": 0,
+        "red": 0,
+        "critical": 0,
+    }
+
+    for journal in terminal:
+        state = str(
+            journal.worst_threat_state
+            or "GREEN"
+        ).upper()
+
+        rank = STATE_RANK.get(
+            state,
+            0,
+        )
+
+        if rank >= STATE_RANK["ORANGE"]:
+            threat_counts[
+                "orange"
+            ] += 1
+
+        if rank >= STATE_RANK["RED"]:
+            threat_counts[
+                "red"
+            ] += 1
+
+        if rank >= STATE_RANK["CRITICAL"]:
+            threat_counts[
+                "critical"
+            ] += 1
+
+    exit_reasons = {
+        "broker_close": 0,
+        "expired_worthless": 0,
+        "cash_settlement": 0,
+        "other": 0,
+    }
+
+    for journal in terminal:
+        reason = str(
+            journal.exit_reason
+            or ""
+        ).upper()
+
+        if reason == "BROKER_CLOSE_ORDER":
+            exit_reasons[
+                "broker_close"
+            ] += 1
+
+        elif reason == "EXPIRED_WORTHLESS":
+            exit_reasons[
+                "expired_worthless"
+            ] += 1
+
+        elif reason == "SPX_CASH_SETTLEMENT":
+            exit_reasons[
+                "cash_settlement"
+            ] += 1
+
+        else:
+            exit_reasons[
+                "other"
+            ] += 1
+
+    return {
+        "available": True,
+        "total_trades":
+            total_trades,
+        "open_trades":
+            len(open_rows),
+        "wins":
+            len(winners),
+        "losses":
+            len(losers),
+        "scratches":
+            len(scratches),
+        "win_rate":
+            win_rate,
+        "total_realized_pnl":
+            total_pnl,
+        "average_pnl":
+            average_pnl,
+        "average_winner":
+            average_winner,
+        "average_loser":
+            average_loser,
+        "gross_profit":
+            gross_profit,
+        "gross_loss":
+            gross_loss,
+        "profit_factor":
+            profit_factor,
+        "average_min_short_cushion":
+            average_min_cushion,
+        "threat_counts":
+            threat_counts,
+        "exit_reasons":
+            exit_reasons,
+        "best_trade": (
+            _journal_trade_row(
+                best
+            )
+            if best is not None
+            else None
+        ),
+        "worst_trade": (
+            _journal_trade_row(
+                worst
+            )
+            if worst is not None
+            else None
+        ),
+    }
+
+
+def get_trade_journal_trades(
+    *,
+    user_context=None,
+    limit=25,
+    session_factory=None,
+):
+    """
+    Return most recently completed journal trades.
+    """
+
+    rows = _journal_reporting_rows(
+        user_context=user_context,
+        session_factory=session_factory,
+    )
+
+    if rows is None:
+        return {
+            "available": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+            "trades": [],
+        }
+
+    try:
+        clean_limit = int(
+            limit
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        clean_limit = 25
+
+    clean_limit = max(
+        1,
+        min(
+            clean_limit,
+            100,
+        ),
+    )
+
+    terminal = [
+        journal
+        for journal in rows
+        if (
+            journal.closed_at
+            is not None
+            and journal.realized_pnl
+            is not None
+            and str(
+                journal.status
+                or ""
+            ).upper()
+            in {
+                "CLOSED",
+                "EXPIRED",
+            }
+        )
+    ]
+
+    terminal.sort(
+        key=lambda journal: (
+            _journal_iso(
+                journal.closed_at
+                or journal.created_at
+            )
+            or ""
+        ),
+        reverse=True,
+    )
+
+    selected = terminal[
+        :clean_limit
+    ]
+
+    return {
+        "available": True,
+        "count":
+            len(selected),
+        "trades": [
+            _journal_trade_row(
+                journal
+            )
+            for journal in selected
+        ],
+    }
