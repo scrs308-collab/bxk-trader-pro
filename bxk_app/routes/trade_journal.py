@@ -14,7 +14,7 @@ from bxk_app.services.trade_journal_service import (
 
 
 router = APIRouter(
-    prefix="/trade-journal",
+    prefix="/api/trade-journal",
     tags=["trade-journal"],
 )
 

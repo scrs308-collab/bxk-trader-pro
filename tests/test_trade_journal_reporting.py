@@ -1,4 +1,4 @@
-﻿from datetime import (
+from datetime import (
     datetime,
     timezone,
 )
@@ -302,7 +302,6 @@ def test_trade_journal_api_routes(
 
     app.include_router(
         route_module.router,
-        prefix="/api",
     )
 
     app.dependency_overrides[
