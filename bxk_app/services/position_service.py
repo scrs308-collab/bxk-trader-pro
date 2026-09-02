@@ -15,6 +15,7 @@ from bxk_app.services.execution_audit import (
     read_recent_submitted_orders,
 )
 from bxk_app.services.trade_journal_service import (
+    get_open_trade_journal_candidates,
     observe_linked_positions,
     reconcile_missing_trade_journals,
 )
@@ -165,6 +166,8 @@ def link_positions_to_submissions(
                     "limit_price",
                     order.get("credit"),
                 ),
+                "broker_link_source":
+                    "EXECUTION_AUDIT",
             })
         else:
             enriched["broker_linked"] = False
@@ -173,6 +176,83 @@ def link_positions_to_submissions(
 
     return linked
 
+
+
+def _journal_candidate_symbols(
+    candidate: dict,
+) -> frozenset[str]:
+    return frozenset(
+        str(symbol or "").strip()
+        for symbol in (
+            candidate.get("symbols")
+            or []
+        )
+        if str(symbol or "").strip()
+    )
+
+
+def link_positions_to_journals(
+    summaries: list[dict],
+    candidates: list[dict],
+) -> list[dict]:
+    """
+    Fallback-link unmatched live positions to exactly
+    one OPEN/SUBMITTED TradeJournal row by exact
+    four-leg option-symbol identity.
+    """
+
+    available = list(candidates or [])
+    linked = []
+
+    for summary in summaries or []:
+        enriched = dict(summary)
+
+        if enriched.get("broker_linked"):
+            linked.append(enriched)
+            continue
+
+        position_symbols = _leg_symbols(summary)
+        matches = []
+
+        if len(position_symbols) == 4:
+            for index, candidate in enumerate(
+                available
+            ):
+                if (
+                    _journal_candidate_symbols(
+                        candidate
+                    )
+                    == position_symbols
+                ):
+                    matches.append(index)
+
+        if len(matches) == 1:
+            candidate = available.pop(
+                matches[0]
+            )
+
+            enriched.update({
+                "broker_linked":
+                    True,
+                "broker_order_id":
+                    candidate.get(
+                        "broker_order_id"
+                    ),
+                "submitted_at":
+                    candidate.get(
+                        "submitted_at"
+                    ),
+                "submitted_limit_credit":
+                    candidate.get(
+                        "submitted_limit_credit"
+                    ),
+                "broker_link_source":
+                    "TRADE_JOURNAL",
+            })
+
+        linked.append(enriched)
+
+    return linked
 
 def get_position_monitor():
     """
@@ -272,6 +352,18 @@ def get_position_monitor():
         summaries = link_positions_to_submissions(
             summaries,
             read_recent_submitted_orders(),
+        )
+
+        try:
+            journal_candidates = (
+                get_open_trade_journal_candidates()
+            )
+        except Exception:
+            journal_candidates = []
+
+        summaries = link_positions_to_journals(
+            summaries,
+            journal_candidates,
         )
 
         # Journal observation is deliberately
