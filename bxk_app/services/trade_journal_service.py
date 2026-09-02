@@ -1,4 +1,4 @@
-﻿import json
+import json
 import uuid
 from datetime import (
     date,
@@ -14,6 +14,10 @@ from bxk_app.database import (
 )
 from bxk_app.db_models.trade_journal import (
     TradeJournal,
+)
+from bxk_app.services.position_threat_service import (
+    STATE_RANK,
+    classify_position_threat,
 )
 
 
@@ -540,3 +544,351 @@ def record_submitted_trade(
             "status":
                 journal.status,
         }
+
+
+_TERMINAL_JOURNAL_STATUSES = {
+    "CLOSED",
+    "EXPIRED",
+    "CANCELLED",
+    "CANCELED",
+}
+
+
+def observe_open_position(
+    position: dict,
+    *,
+    observed_at=None,
+    session_factory=None,
+):
+    """
+    Preserve meaningful live extremes for a linked
+    open BXK position.
+
+    This function never creates a journal row.
+    The confirmed broker submission is responsible
+    for journal creation.
+    """
+
+    if not database_configured():
+        return {
+            "recorded": False,
+            "reason":
+                "DATABASE_NOT_CONFIGURED",
+        }
+
+    if not isinstance(
+        position,
+        dict,
+    ):
+        return {
+            "recorded": False,
+            "reason":
+                "INVALID_POSITION",
+        }
+
+    broker_order_id = str(
+        position.get(
+            "broker_order_id"
+        )
+        or ""
+    ).strip()
+
+    if not broker_order_id:
+        return {
+            "recorded": False,
+            "reason":
+                "BROKER_ORDER_ID_MISSING",
+        }
+
+    timestamp = (
+        _datetime(observed_at)
+        if observed_at is not None
+        else datetime.now(
+            timezone.utc
+        )
+    )
+
+    if timestamp is None:
+        timestamp = datetime.now(
+            timezone.utc
+        )
+
+    risk = classify_position_threat(
+        position
+    )
+
+    pnl = _number(
+        position.get("pnl")
+    )
+
+    pnl_is_estimate = bool(
+        position.get(
+            "pnl_is_estimate",
+            False,
+        )
+    )
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    with factory() as session:
+        statement = (
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.broker_order_id
+                == broker_order_id
+            )
+            .with_for_update()
+        )
+
+        journal = session.execute(
+            statement
+        ).scalar_one_or_none()
+
+        if journal is None:
+            return {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_NOT_FOUND",
+                "broker_order_id":
+                    broker_order_id,
+            }
+
+        existing_status = str(
+            journal.status or ""
+        ).strip().upper()
+
+        if (
+            existing_status
+            in _TERMINAL_JOURNAL_STATUSES
+        ):
+            return {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_TERMINAL",
+                "broker_order_id":
+                    broker_order_id,
+                "status":
+                    existing_status,
+            }
+
+        changed = False
+
+        if journal.status != "OPEN":
+            journal.status = "OPEN"
+            changed = True
+
+        if journal.opened_at is None:
+            journal.opened_at = timestamp
+            changed = True
+
+        pnl_recorded = False
+
+        # Quote-quality guard:
+        # estimated P/L does not become learning data.
+        if (
+            pnl is not None
+            and not pnl_is_estimate
+        ):
+            pnl_recorded = True
+
+            if (
+                journal.best_open_pnl
+                is None
+                or pnl
+                > journal.best_open_pnl
+            ):
+                journal.best_open_pnl = pnl
+                changed = True
+
+            if (
+                journal.worst_open_pnl
+                is None
+                or pnl
+                < journal.worst_open_pnl
+            ):
+                journal.worst_open_pnl = pnl
+                changed = True
+
+        if risk is not None:
+            distance = _number(
+                risk.get("distance")
+            )
+
+            current_state = str(
+                risk.get("state")
+                or ""
+            ).strip().upper()
+
+            if (
+                distance is not None
+                and (
+                    journal.min_short_cushion
+                    is None
+                    or distance
+                    < journal.min_short_cushion
+                )
+            ):
+                journal.min_short_cushion = (
+                    distance
+                )
+                changed = True
+
+            if current_state in STATE_RANK:
+                stored_state = str(
+                    journal.worst_threat_state
+                    or ""
+                ).strip().upper()
+
+                if (
+                    stored_state
+                    not in STATE_RANK
+                    or STATE_RANK[
+                        current_state
+                    ]
+                    > STATE_RANK[
+                        stored_state
+                    ]
+                ):
+                    journal.worst_threat_state = (
+                        current_state
+                    )
+                    changed = True
+
+                current_rank = STATE_RANK[
+                    current_state
+                ]
+
+                thresholds = (
+                    (
+                        "ORANGE",
+                        "first_orange_at",
+                    ),
+                    (
+                        "RED",
+                        "first_red_at",
+                    ),
+                    (
+                        "CRITICAL",
+                        "first_critical_at",
+                    ),
+                )
+
+                for (
+                    threshold,
+                    field,
+                ) in thresholds:
+                    if (
+                        current_rank
+                        >= STATE_RANK[
+                            threshold
+                        ]
+                        and getattr(
+                            journal,
+                            field,
+                        )
+                        is None
+                    ):
+                        setattr(
+                            journal,
+                            field,
+                            timestamp,
+                        )
+                        changed = True
+
+        if changed:
+            session.commit()
+            session.refresh(
+                journal
+            )
+
+        return {
+            "recorded": True,
+            "changed": changed,
+            "broker_order_id":
+                broker_order_id,
+            "status":
+                journal.status,
+            "pnl_recorded":
+                pnl_recorded,
+            "best_open_pnl":
+                journal.best_open_pnl,
+            "worst_open_pnl":
+                journal.worst_open_pnl,
+            "min_short_cushion":
+                journal.min_short_cushion,
+            "worst_threat_state":
+                journal.worst_threat_state,
+        }
+
+
+def observe_linked_positions(
+    positions,
+    *,
+    observed_at=None,
+    session_factory=None,
+):
+    """
+    Observe every broker-linked position independently.
+
+    One journal failure must never prevent Position
+    Monitor or another position from being processed.
+    """
+
+    results = []
+
+    if not database_configured():
+        return results
+
+    for position in (
+        positions or []
+    ):
+        if not isinstance(
+            position,
+            dict,
+        ):
+            continue
+
+        if not position.get(
+            "broker_linked"
+        ):
+            continue
+
+        if not position.get(
+            "broker_order_id"
+        ):
+            continue
+
+        try:
+            result = (
+                observe_open_position(
+                    position,
+                    observed_at=
+                        observed_at,
+                    session_factory=
+                        session_factory,
+                )
+            )
+
+        except Exception as exc:
+            result = {
+                "recorded": False,
+                "reason":
+                    "JOURNAL_OBSERVATION_FAILED",
+                "broker_order_id":
+                    position.get(
+                        "broker_order_id"
+                    ),
+                "error":
+                    type(exc).__name__,
+            }
+
+        results.append(
+            result
+        )
+
+    return results

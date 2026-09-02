@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import hashlib
 import logging
 import os
@@ -17,6 +17,10 @@ from bxk_app.db_models.overnight_alert_state import (
 from bxk_app.services.position_service import (
     get_position_monitor,
 )
+from bxk_app.services.position_threat_service import (
+    STATE_RANK,
+    classify_position_threat,
+)
 from bxk_app.services.sms_service import (
     send_bxk_sms,
 )
@@ -32,12 +36,6 @@ EASTERN = ZoneInfo("America/New_York")
 ALERT_SCOPE_PREFIX = "OWNER_DAYTIME"
 DEFAULT_INTERVAL_SECONDS = 60
 
-STATE_RANK = {
-    "GREEN": 0,
-    "ORANGE": 1,
-    "RED": 2,
-    "CRITICAL": 3,
-}
 
 ALERT_STATES = {
     "ORANGE",
@@ -127,80 +125,6 @@ def _format_number(value):
     )
 
 
-def classify_position_threat(
-    position: dict,
-):
-    if not isinstance(position, dict):
-        return None
-
-    spx_price = _number(
-        position.get("spx_price")
-    )
-
-    put_distance = _number(
-        position.get("put_distance")
-    )
-
-    call_distance = _number(
-        position.get("call_distance")
-    )
-
-    short_put = _number(
-        position.get("sell_put")
-    )
-
-    short_call = _number(
-        position.get("sell_call")
-    )
-
-    if (
-        spx_price is None
-        or put_distance is None
-        or call_distance is None
-        or short_put is None
-        or short_call is None
-    ):
-        return None
-
-    if put_distance <= call_distance:
-        side = "PUT"
-        distance = put_distance
-        short_strike = short_put
-    else:
-        side = "CALL"
-        distance = call_distance
-        short_strike = short_call
-
-    if distance <= 0:
-        state = "CRITICAL"
-
-    elif distance <= 10:
-        state = "RED"
-
-    elif distance <= 20:
-        state = "ORANGE"
-
-    else:
-        state = "GREEN"
-
-    return {
-        "state": state,
-        "side": side,
-        "distance": round(
-            distance,
-            2,
-        ),
-        "short_strike": short_strike,
-        "spx_price": round(
-            spx_price,
-            2,
-        ),
-        "expiration": position.get(
-            "expiration"
-        ),
-        "sell_put": short_put,
-        "sell_call": short_call,
-    }
 
 
 def _scope_for_position(
