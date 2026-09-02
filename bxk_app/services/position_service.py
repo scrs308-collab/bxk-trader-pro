@@ -7,6 +7,9 @@ from bxk_app.position_monitor import (
 from bxk_app.services.execution_audit import (
     read_recent_submitted_orders,
 )
+from bxk_app.services.trade_journal_service import (
+    observe_linked_positions,
+)
 
 
 def _leg_symbols(item: dict) -> frozenset[str]:
@@ -161,6 +164,16 @@ def get_position_monitor():
             summaries,
             read_recent_submitted_orders(),
         )
+
+        # Journal observation is deliberately
+        # downstream of live position construction.
+        # It must never block Position Monitor.
+        try:
+            observe_linked_positions(
+                summaries
+            )
+        except Exception:
+            pass
 
         if not summaries:
             return {

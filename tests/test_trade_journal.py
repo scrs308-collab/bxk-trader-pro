@@ -1,4 +1,6 @@
-﻿import uuid
+from pathlib import Path
+import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     create_engine,
@@ -273,7 +275,6 @@ def test_database_disabled_skips_cleanly(
 
 
 def test_order_route_contains_journal_hook():
-    from pathlib import Path
 
     source = Path(
         "bxk_app/routes/order.py"
@@ -299,4 +300,322 @@ def test_order_route_contains_journal_hook():
     assert (
         "user_context: dict = Depends"
         in source
+    )
+
+
+def _utc(value):
+    """
+    SQLite drops timezone metadata from DateTime
+    columns during these in-memory tests.
+    Normalize before comparing timestamps.
+    """
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        return value.replace(
+            tzinfo=timezone.utc
+        )
+
+    return value.astimezone(
+        timezone.utc
+    )
+
+
+def _journal_for(
+    factory,
+    broker_order_id,
+):
+    with factory() as session:
+        return session.execute(
+            select(
+                TradeJournal
+            ).where(
+                TradeJournal.broker_order_id
+                == broker_order_id
+            )
+        ).scalar_one()
+
+
+def test_live_observation_tracks_extremes(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-400",
+        broker_status="RECEIVED",
+        order=sample_order(),
+        reconciliation={},
+        session_factory=factory,
+    )
+
+    t1 = datetime(
+        2026,
+        9,
+        2,
+        14,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    t2 = datetime(
+        2026,
+        9,
+        2,
+        17,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    service.observe_open_position(
+        {
+            "broker_order_id":
+                "ORDER-400",
+            "broker_linked": True,
+            "pnl": 125,
+            "pnl_is_estimate": False,
+            "spx_price": 6575,
+            "put_distance": 75,
+            "call_distance": 75,
+            "sell_put": 6500,
+            "sell_call": 6650,
+        },
+        observed_at=t1,
+        session_factory=factory,
+    )
+
+    service.observe_open_position(
+        {
+            "broker_order_id":
+                "ORDER-400",
+            "broker_linked": True,
+            "pnl": -350,
+            "pnl_is_estimate": False,
+            "spx_price": 6642,
+            "put_distance": 142,
+            "call_distance": 8,
+            "sell_put": 6500,
+            "sell_call": 6650,
+        },
+        observed_at=t2,
+        session_factory=factory,
+    )
+
+    journal = _journal_for(
+        factory,
+        "ORDER-400",
+    )
+
+    assert journal.status == "OPEN"
+    assert journal.best_open_pnl == 125
+    assert journal.worst_open_pnl == -350
+    assert journal.min_short_cushion == 8
+    assert (
+        journal.worst_threat_state
+        == "RED"
+    )
+    assert _utc(journal.first_orange_at) == t2
+    assert _utc(journal.first_red_at) == t2
+    assert journal.first_critical_at is None
+
+
+def test_critical_first_observation_sets_thresholds(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-401",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    observed = datetime(
+        2026,
+        9,
+        2,
+        18,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    result = service.observe_open_position(
+        {
+            "broker_order_id":
+                "ORDER-401",
+            "broker_linked": True,
+            "pnl": -900,
+            "pnl_is_estimate": False,
+            "spx_price": 6653,
+            "put_distance": 153,
+            "call_distance": -3,
+            "sell_put": 6500,
+            "sell_call": 6650,
+        },
+        observed_at=observed,
+        session_factory=factory,
+    )
+
+    assert (
+        result["worst_threat_state"]
+        == "CRITICAL"
+    )
+
+    journal = _journal_for(
+        factory,
+        "ORDER-401",
+    )
+
+    assert journal.min_short_cushion == -3
+    assert _utc(journal.first_orange_at) == observed
+    assert _utc(journal.first_red_at) == observed
+    assert _utc(journal.first_critical_at) == observed
+
+
+def test_estimated_pnl_is_not_learning_data(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-402",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    result = service.observe_open_position(
+        {
+            "broker_order_id":
+                "ORDER-402",
+            "broker_linked": True,
+            "pnl": -1850,
+            "pnl_is_estimate": True,
+            "spx_price": 6635,
+            "put_distance": 135,
+            "call_distance": 15,
+            "sell_put": 6500,
+            "sell_call": 6650,
+        },
+        session_factory=factory,
+    )
+
+    journal = _journal_for(
+        factory,
+        "ORDER-402",
+    )
+
+    assert result["pnl_recorded"] is False
+    assert journal.best_open_pnl is None
+    assert journal.worst_open_pnl is None
+    assert journal.min_short_cushion == 15
+    assert (
+        journal.worst_threat_state
+        == "ORANGE"
+    )
+
+
+def test_repeated_observation_is_idempotent(
+    monkeypatch,
+):
+    factory = make_factory()
+
+    monkeypatch.setattr(
+        service,
+        "database_configured",
+        lambda: True,
+    )
+
+    service.record_submitted_trade(
+        broker_order_id="ORDER-403",
+        broker_status="FILLED",
+        order=sample_order(),
+        reconciliation={
+            "average_fill_price": 2.70,
+        },
+        session_factory=factory,
+    )
+
+    position = {
+        "broker_order_id":
+            "ORDER-403",
+        "broker_linked": True,
+        "pnl": 100,
+        "pnl_is_estimate": False,
+        "spx_price": 6575,
+        "put_distance": 75,
+        "call_distance": 75,
+        "sell_put": 6500,
+        "sell_call": 6650,
+    }
+
+    first = service.observe_open_position(
+        position,
+        session_factory=factory,
+    )
+
+    second = service.observe_open_position(
+        position,
+        session_factory=factory,
+    )
+
+    assert first["changed"] is True
+    assert second["changed"] is False
+
+
+def test_shared_classifier_and_position_hook():
+    alert_source = Path(
+        "bxk_app/services/"
+        "position_alert_service.py"
+    ).read_text(
+        encoding="utf-8-sig"
+    )
+
+    position_source = Path(
+        "bxk_app/services/"
+        "position_service.py"
+    ).read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert (
+        "from bxk_app.services."
+        "position_threat_service import"
+        in alert_source
+    )
+
+    assert (
+        "def classify_position_threat("
+        not in alert_source
+    )
+
+    assert (
+        "observe_linked_positions("
+        in position_source
     )
