@@ -11,11 +11,21 @@ from bxk_app.overnight_reference import (
 from bxk_app.overnight_risk import (
     calculate_overnight_risk,
 )
+from bxk_app.overnight_carry_risk import (
+    calculate_overnight_carry_risk,
+)
+from bxk_app.market_data import market_data
+from bxk_app.market_engine import (
+    calculate_expected_move,
+)
 from bxk_app.overnight_session import (
     get_spx_gth_session,
 )
 from bxk_app.services.position_service import (
     get_position_monitor,
+)
+from bxk_app.services.trade_journal_service import (
+    record_overnight_carry_snapshot,
 )
 
 
@@ -121,6 +131,142 @@ def _unavailable(
     payload.update(extra)
 
     return payload
+
+
+
+
+def _record_carry_learning(
+    *,
+    position,
+    carry_risk,
+    baseline,
+    baseline_source,
+    session,
+    vix1d,
+    vix,
+):
+    """
+    Persist the frozen close-of-session carry evaluation
+    for one broker-linked position.
+
+    Failure here must never interfere with overnight
+    monitoring.
+    """
+    if not isinstance(position, dict):
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "POSITION_UNAVAILABLE",
+        }
+
+    if not position.get("broker_linked"):
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "POSITION_NOT_BROKER_LINKED",
+        }
+
+    broker_order_id = str(
+        position.get("broker_order_id")
+        or ""
+    ).strip()
+
+    if not broker_order_id:
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "BROKER_ORDER_ID_UNAVAILABLE",
+        }
+
+    if baseline_source != "STORED":
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "STORED_BASELINE_REQUIRED",
+        }
+
+    if not isinstance(baseline, dict):
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "BASELINE_UNAVAILABLE",
+        }
+
+    captured_at = _parse_datetime(
+        baseline.get("captured_at")
+    )
+
+    if captured_at is None:
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "BASELINE_CAPTURE_TIME_UNAVAILABLE",
+        }
+
+    if not isinstance(carry_risk, dict):
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "CARRY_RISK_UNAVAILABLE",
+        }
+
+    snapshot = dict(carry_risk)
+
+    # Preserve baseline provenance so future analysis
+    # can distinguish exactly which close generated
+    # this carry decision.
+    snapshot["baseline_source"] = (
+        baseline_source
+    )
+    snapshot["baseline_trading_date"] = (
+        baseline.get("trading_date")
+    )
+    snapshot["baseline_captured_at"] = (
+        baseline.get("captured_at")
+    )
+
+    monitoring_state = str(
+        (session or {}).get(
+            "monitoring_state"
+        )
+        or ""
+    ).upper()
+
+    held_overnight = (
+        True
+        if monitoring_state in {
+            "GTH",
+            "ES_ONLY",
+            "OVERNIGHT",
+        }
+        else None
+    )
+
+    try:
+        return record_overnight_carry_snapshot(
+            broker_order_id=broker_order_id,
+            carry_risk=snapshot,
+            evaluated_at=captured_at,
+            vix1d=vix1d,
+            vix=vix,
+            held_overnight=held_overnight,
+        )
+    except Exception:
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code":
+                "CARRY_JOURNAL_WRITE_FAILED",
+            "broker_order_id":
+                broker_order_id,
+        }
 
 
 def get_live_overnight_risk(
@@ -371,6 +517,55 @@ def get_live_overnight_risk(
 
     results = []
 
+    # -------------------------------------------------
+    # Observation-only overnight carry context.
+    #
+    # Use the existing BXK one-trading-day expected-move
+    # formula and the latest market-data volatility value.
+    # Recalculate from the stored RTH SPX close so the
+    # carry ratio is anchored to the same close used by
+    # overnight monitoring.
+    #
+    # No extra broker calls are made here. If volatility
+    # context has not been populated, carry risk simply
+    # reports unavailable while normal overnight risk
+    # continues unaffected.
+    # -------------------------------------------------
+
+    try:
+        carry_vix1d = float(
+            market_data.vix1d or 0.0
+        )
+    except (TypeError, ValueError):
+        carry_vix1d = 0.0
+
+    try:
+        carry_vix = float(
+            market_data.vix or 0.0
+        )
+    except (TypeError, ValueError):
+        carry_vix = 0.0
+
+    if carry_vix1d > 0:
+        carry_volatility = carry_vix1d
+        carry_expected_move_source = "VIX1D"
+    elif carry_vix > 0:
+        carry_volatility = carry_vix
+        carry_expected_move_source = "VIX"
+    else:
+        carry_volatility = 0.0
+        carry_expected_move_source = "NONE"
+
+    try:
+        carry_expected_move = (
+            calculate_expected_move(
+                float(close),
+                carry_volatility,
+            )
+        )
+    except (TypeError, ValueError):
+        carry_expected_move = 0.0
+
     as_of = _utc_now()
 
     expired_position_count = 0
@@ -425,10 +620,40 @@ def get_live_overnight_risk(
             ),
         )
 
+        carry_risk = (
+            calculate_overnight_carry_risk(
+                spx_close=close,
+                short_put=fields["short_put"],
+                short_call=fields["short_call"],
+                expected_move=carry_expected_move,
+                expected_move_source=(
+                    carry_expected_move_source
+                ),
+                dte=fields["dte"],
+            )
+        )
+
+        carry_learning = (
+            _record_carry_learning(
+                position=position,
+                carry_risk=carry_risk,
+                baseline=baseline,
+                baseline_source=(
+                    baseline_source
+                ),
+                session=session,
+                vix1d=carry_vix1d,
+                vix=carry_vix,
+            )
+        )
+
         results.append(
             {
                 "position": position,
                 "risk": risk,
+                "carry_risk": carry_risk,
+                "carry_learning":
+                    carry_learning,
             }
         )
 

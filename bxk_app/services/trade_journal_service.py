@@ -3267,3 +3267,344 @@ def get_open_trade_journal_candidates(
             })
 
         return candidates
+
+def record_overnight_carry_snapshot(
+    *,
+    broker_order_id,
+    carry_risk,
+    evaluated_at=None,
+    vix1d=None,
+    vix=None,
+    held_overnight=None,
+    session_factory=None,
+):
+    """
+    Persist one frozen overnight carry-risk evaluation
+    for an OPEN/SUBMITTED trade journal row.
+
+    The carry snapshot is intentionally write-once.
+    Repeated dashboard/API refreshes must not rewrite
+    the historical close-of-session decision context.
+    """
+    if not database_configured():
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code": "DATABASE_NOT_CONFIGURED",
+        }
+
+    order_id = str(
+        broker_order_id or ""
+    ).strip()
+
+    if not order_id:
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code": "BROKER_ORDER_ID_UNAVAILABLE",
+        }
+
+    if not isinstance(carry_risk, dict):
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code": "CARRY_RISK_UNAVAILABLE",
+        }
+
+    if carry_risk.get("available") is not True:
+        return {
+            "recorded": False,
+            "changed": False,
+            "reason_code": (
+                carry_risk.get("reason_code")
+                or "CARRY_RISK_UNAVAILABLE"
+            ),
+        }
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    timestamp = (
+        evaluated_at
+        or datetime.now(timezone.utc)
+    )
+
+    def numeric(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    with factory() as session:
+        journal = (
+            session.execute(
+                select(TradeJournal).where(
+                    TradeJournal.broker_order_id
+                    == order_id,
+                    TradeJournal.status.in_(
+                        ("SUBMITTED", "OPEN")
+                    ),
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+        if journal is None:
+            return {
+                "recorded": False,
+                "changed": False,
+                "reason_code":
+                    "OPEN_TRADE_JOURNAL_NOT_FOUND",
+                "broker_order_id": order_id,
+            }
+
+        # Carry decision context is frozen once.
+        if journal.carry_evaluated_at is not None:
+            changed = False
+
+            # Allow held_overnight to be filled later
+            # without changing the original decision.
+            if (
+                journal.held_overnight is None
+                and held_overnight is not None
+            ):
+                journal.held_overnight = bool(
+                    held_overnight
+                )
+                changed = True
+
+            if changed:
+                session.commit()
+
+            return {
+                "recorded": True,
+                "changed": changed,
+                "reason_code":
+                    "CARRY_SNAPSHOT_ALREADY_RECORDED",
+                "broker_order_id": order_id,
+            }
+
+        journal.carry_evaluated_at = timestamp
+        journal.carry_state = (
+            carry_risk.get("state")
+        )
+        journal.carry_decision = (
+            carry_risk.get("decision")
+        )
+        journal.carry_threatened_side = (
+            carry_risk.get("threatened_side")
+        )
+        journal.carry_short_cushion = numeric(
+            carry_risk.get("short_cushion")
+        )
+        journal.carry_expected_move = numeric(
+            carry_risk.get(
+                "one_day_expected_move"
+            )
+        )
+        journal.carry_expected_move_source = (
+            carry_risk.get(
+                "expected_move_source"
+            )
+        )
+        journal.carry_cushion_ratio = numeric(
+            carry_risk.get(
+                "cushion_to_1d_em_ratio"
+            )
+        )
+        journal.carry_vix1d = numeric(vix1d)
+        journal.carry_vix = numeric(vix)
+        journal.carry_snapshot = dict(
+            carry_risk
+        )
+
+        if held_overnight is not None:
+            journal.held_overnight = bool(
+                held_overnight
+            )
+
+        session.commit()
+
+        return {
+            "recorded": True,
+            "changed": True,
+            "reason_code":
+                "CARRY_SNAPSHOT_RECORDED",
+            "broker_order_id": order_id,
+            "carry_state":
+                journal.carry_state,
+            "carry_decision":
+                journal.carry_decision,
+            "carry_cushion_ratio":
+                journal.carry_cushion_ratio,
+        }
+
+def record_next_open_outcomes(
+    *,
+    spx_open,
+    trading_date,
+    evaluated_at=None,
+    session_factory=None,
+):
+    """
+    Freeze the next regular-session SPX open for
+    overnight-held journal rows.
+
+    Uses the official session-open quote rather than
+    the current intraday SPX price. Repeated refreshes
+    cannot rewrite an already recorded outcome.
+    """
+    if not database_configured():
+        return {
+            "updated": 0,
+            "skipped": 0,
+            "reason_code":
+                "DATABASE_NOT_CONFIGURED",
+        }
+
+    try:
+        open_price = float(spx_open)
+    except (TypeError, ValueError):
+        open_price = 0.0
+
+    current_date = str(
+        trading_date or ""
+    ).strip()
+
+    if open_price <= 0 or not current_date:
+        return {
+            "updated": 0,
+            "skipped": 0,
+            "reason_code":
+                "NEXT_OPEN_INPUT_UNAVAILABLE",
+        }
+
+    timestamp = (
+        evaluated_at
+        or datetime.now(timezone.utc)
+    )
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    def numeric(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    with factory() as session:
+        journals = (
+            session.execute(
+                select(TradeJournal).where(
+                    TradeJournal.carry_evaluated_at
+                    .is_not(None),
+                    TradeJournal.held_overnight
+                    .is_(True),
+                    TradeJournal.next_open_evaluated_at
+                    .is_(None),
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        updated = 0
+        skipped = 0
+
+        for journal in journals:
+            snapshot = (
+                journal.carry_snapshot
+                if isinstance(
+                    journal.carry_snapshot,
+                    dict,
+                )
+                else {}
+            )
+
+            baseline_date = str(
+                snapshot.get(
+                    "baseline_trading_date"
+                )
+                or ""
+            ).strip()
+
+            # Never use the same trading day's open
+            # as the "next" open.
+            if (
+                not baseline_date
+                or baseline_date >= current_date
+            ):
+                skipped += 1
+                continue
+
+            prior_close = numeric(
+                snapshot.get("spx_close")
+            )
+
+            short_put = numeric(
+                journal.short_put
+            )
+
+            short_call = numeric(
+                journal.short_call
+            )
+
+            if (
+                prior_close is None
+                or short_put is None
+                or short_call is None
+                or prior_close <= 0
+                or short_put <= 0
+                or short_call <= 0
+            ):
+                skipped += 1
+                continue
+
+            gap_points = round(
+                open_price - prior_close,
+                2,
+            )
+
+            breached = bool(
+                open_price <= short_put
+                or open_price >= short_call
+            )
+
+            journal.next_open_evaluated_at = (
+                timestamp
+            )
+
+            journal.next_open_spx = round(
+                open_price,
+                2,
+            )
+
+            journal.next_open_gap_points = (
+                gap_points
+            )
+
+            journal.next_open_short_breached = (
+                breached
+            )
+
+            updated += 1
+
+        if updated:
+            session.commit()
+
+        return {
+            "updated": updated,
+            "skipped": skipped,
+            "reason_code":
+                (
+                    "NEXT_OPEN_OUTCOME_RECORDED"
+                    if updated
+                    else "NO_ELIGIBLE_CARRY_ROWS"
+                ),
+        }
