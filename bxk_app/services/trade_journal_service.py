@@ -2815,6 +2815,348 @@ def _journal_reporting_rows(
         )
 
 
+
+def _carry_learning_summary(
+    rows,
+):
+    """
+    Aggregate observation-only overnight carry learning.
+
+    Realized-P/L statistics intentionally use only trades
+    that were actually held overnight. Closing a trade
+    before the bell must not contaminate overnight outcome
+    learning.
+    """
+
+    carry_states = (
+        "GREEN",
+        "YELLOW",
+        "ORANGE",
+        "RED",
+        "CRITICAL",
+        "UNKNOWN",
+    )
+
+    ratio_definitions = (
+        (
+            "lt_0_50",
+            "< 0.50",
+            lambda ratio: ratio < 0.50,
+        ),
+        (
+            "0_50_to_0_74",
+            "0.50 - 0.74",
+            lambda ratio:
+                0.50 <= ratio < 0.75,
+        ),
+        (
+            "0_75_to_0_99",
+            "0.75 - 0.99",
+            lambda ratio:
+                0.75 <= ratio < 1.00,
+        ),
+        (
+            "gte_1_00",
+            ">= 1.00",
+            lambda ratio: ratio >= 1.00,
+        ),
+    )
+
+    def numeric(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def is_terminal(journal):
+        return (
+            journal.closed_at is not None
+            and journal.realized_pnl is not None
+            and str(
+                journal.status
+                or ""
+            ).upper()
+            in {
+                "CLOSED",
+                "EXPIRED",
+            }
+        )
+
+    def group_metrics(group):
+        trades = list(group)
+
+        held = [
+            journal
+            for journal in trades
+            if journal.held_overnight is True
+        ]
+
+        next_open = [
+            journal
+            for journal in held
+            if (
+                journal.next_open_evaluated_at
+                is not None
+                and journal.next_open_spx
+                is not None
+            )
+        ]
+
+        breaches = [
+            journal
+            for journal in next_open
+            if (
+                journal.next_open_short_breached
+                is True
+            )
+        ]
+
+        gap_values = [
+            numeric(
+                journal.next_open_gap_points
+            )
+            for journal in next_open
+        ]
+
+        gap_values = [
+            value
+            for value in gap_values
+            if value is not None
+        ]
+
+        held_terminal = [
+            journal
+            for journal in held
+            if is_terminal(journal)
+        ]
+
+        pnl_values = [
+            numeric(
+                journal.realized_pnl
+            )
+            for journal in held_terminal
+        ]
+
+        pnl_values = [
+            value
+            for value in pnl_values
+            if value is not None
+        ]
+
+        wins = [
+            pnl
+            for pnl in pnl_values
+            if pnl > 0.01
+        ]
+
+        losses = [
+            pnl
+            for pnl in pnl_values
+            if pnl < -0.01
+        ]
+
+        scratches = [
+            pnl
+            for pnl in pnl_values
+            if -0.01 <= pnl <= 0.01
+        ]
+
+        next_open_count = len(
+            next_open
+        )
+
+        completed_count = len(
+            pnl_values
+        )
+
+        return {
+            "trades":
+                len(trades),
+
+            "held_overnight":
+                len(held),
+
+            "next_open_observations":
+                next_open_count,
+
+            "short_breaches":
+                len(breaches),
+
+            "breach_rate":
+                (
+                    round(
+                        len(breaches)
+                        / next_open_count
+                        * 100,
+                        2,
+                    )
+                    if next_open_count
+                    else None
+                ),
+
+            "average_gap_points":
+                (
+                    round(
+                        sum(gap_values)
+                        / len(gap_values),
+                        2,
+                    )
+                    if gap_values
+                    else None
+                ),
+
+            "held_completed_trades":
+                completed_count,
+
+            "held_wins":
+                len(wins),
+
+            "held_losses":
+                len(losses),
+
+            "held_scratches":
+                len(scratches),
+
+            "held_win_rate":
+                (
+                    round(
+                        len(wins)
+                        / completed_count
+                        * 100,
+                        2,
+                    )
+                    if completed_count
+                    else None
+                ),
+
+            "held_total_realized_pnl":
+                (
+                    round(
+                        sum(pnl_values),
+                        2,
+                    )
+                    if pnl_values
+                    else 0.0
+                ),
+
+            "held_average_realized_pnl":
+                (
+                    round(
+                        sum(pnl_values)
+                        / completed_count,
+                        2,
+                    )
+                    if completed_count
+                    else None
+                ),
+        }
+
+    evaluated = [
+        journal
+        for journal in rows
+        if journal.carry_evaluated_at
+        is not None
+    ]
+
+    states = {}
+
+    for state in carry_states:
+        state_rows = [
+            journal
+            for journal in evaluated
+            if (
+                str(
+                    journal.carry_state
+                    or "UNKNOWN"
+                ).upper()
+                == state
+            )
+        ]
+
+        states[state] = group_metrics(
+            state_rows
+        )
+
+    ratio_buckets = {}
+
+    for (
+        key,
+        label,
+        matcher,
+    ) in ratio_definitions:
+        bucket_rows = []
+
+        for journal in evaluated:
+            ratio = numeric(
+                journal.carry_cushion_ratio
+            )
+
+            if (
+                ratio is not None
+                and matcher(ratio)
+            ):
+                bucket_rows.append(
+                    journal
+                )
+
+        ratio_buckets[key] = {
+            "label": label,
+            **group_metrics(
+                bucket_rows
+            ),
+        }
+
+    overall = group_metrics(
+        evaluated
+    )
+
+    return {
+        "evaluated_trades":
+            len(evaluated),
+
+        "held_overnight":
+            overall[
+                "held_overnight"
+            ],
+
+        "next_open_observations":
+            overall[
+                "next_open_observations"
+            ],
+
+        "short_breaches":
+            overall[
+                "short_breaches"
+            ],
+
+        "breach_rate":
+            overall[
+                "breach_rate"
+            ],
+
+        "held_completed_trades":
+            overall[
+                "held_completed_trades"
+            ],
+
+        "held_total_realized_pnl":
+            overall[
+                "held_total_realized_pnl"
+            ],
+
+        "held_average_realized_pnl":
+            overall[
+                "held_average_realized_pnl"
+            ],
+
+        "states":
+            states,
+
+        "ratio_buckets":
+            ratio_buckets,
+    }
+
+
 def get_trade_journal_summary(
     *,
     user_context=None,
@@ -3077,8 +3419,16 @@ def get_trade_journal_summary(
                 "other"
             ] += 1
 
+    carry_learning = (
+        _carry_learning_summary(
+            rows
+        )
+    )
+
     return {
         "available": True,
+        "carry_learning":
+            carry_learning,
         "total_trades":
             total_trades,
         "open_trades":

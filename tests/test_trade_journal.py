@@ -1138,3 +1138,146 @@ def test_trade_report_can_include_open_rows(
         "SUBMITTED",
         "OPEN",
     }
+
+def test_carry_learning_summary_metrics():
+    from types import SimpleNamespace
+
+    def journal(
+        *,
+        state,
+        ratio,
+        held,
+        next_open=False,
+        breached=None,
+        gap=None,
+        status="OPEN",
+        pnl=None,
+    ):
+        return SimpleNamespace(
+            carry_evaluated_at=object(),
+            carry_state=state,
+            carry_cushion_ratio=ratio,
+            held_overnight=held,
+            next_open_evaluated_at=(
+                object()
+                if next_open
+                else None
+            ),
+            next_open_spx=(
+                6600
+                if next_open
+                else None
+            ),
+            next_open_gap_points=gap,
+            next_open_short_breached=
+                breached,
+            status=status,
+            realized_pnl=pnl,
+            closed_at=(
+                object()
+                if status
+                in {"CLOSED", "EXPIRED"}
+                else None
+            ),
+        )
+
+    rows = [
+        journal(
+            state="RED",
+            ratio=0.40,
+            held=True,
+            next_open=True,
+            breached=True,
+            gap=50,
+            status="CLOSED",
+            pnl=-1000,
+        ),
+        journal(
+            state="RED",
+            ratio=0.60,
+            held=True,
+            next_open=True,
+            breached=False,
+            gap=-10,
+            status="CLOSED",
+            pnl=200,
+        ),
+        journal(
+            state="YELLOW",
+            ratio=0.80,
+            held=True,
+            next_open=True,
+            breached=False,
+            gap=5,
+        ),
+        journal(
+            state="GREEN",
+            ratio=1.20,
+            held=False,
+            status="CLOSED",
+            pnl=500,
+        ),
+    ]
+
+    result = service._carry_learning_summary(
+        rows
+    )
+
+    assert result["evaluated_trades"] == 4
+    assert result["held_overnight"] == 3
+    assert result["next_open_observations"] == 3
+    assert result["short_breaches"] == 1
+
+    red = result["states"]["RED"]
+
+    assert red["trades"] == 2
+    assert red["held_overnight"] == 2
+    assert red["next_open_observations"] == 2
+    assert red["short_breaches"] == 1
+    assert red["breach_rate"] == 50.0
+    assert red["average_gap_points"] == 20.0
+
+    assert red["held_completed_trades"] == 2
+    assert red["held_wins"] == 1
+    assert red["held_losses"] == 1
+    assert red["held_win_rate"] == 50.0
+    assert red["held_total_realized_pnl"] == -800.0
+    assert red["held_average_realized_pnl"] == -400.0
+
+    # Closed before overnight, so its +$500
+    # must not contaminate overnight P/L stats.
+    green = result["states"]["GREEN"]
+
+    assert green["trades"] == 1
+    assert green["held_overnight"] == 0
+    assert green["held_completed_trades"] == 0
+    assert green["held_average_realized_pnl"] is None
+
+    buckets = result["ratio_buckets"]
+
+    assert buckets["lt_0_50"]["trades"] == 1
+    assert buckets["0_50_to_0_74"]["trades"] == 1
+    assert buckets["0_75_to_0_99"]["trades"] == 1
+    assert buckets["gte_1_00"]["trades"] == 1
+
+
+def test_empty_carry_learning_is_not_misleading():
+    result = service._carry_learning_summary(
+        []
+    )
+
+    assert result["evaluated_trades"] == 0
+    assert result["next_open_observations"] == 0
+    assert result["breach_rate"] is None
+
+    assert (
+        result["states"]["RED"]["breach_rate"]
+        is None
+    )
+
+    assert (
+        result["states"]["RED"][
+            "held_average_realized_pnl"
+        ]
+        is None
+    )
