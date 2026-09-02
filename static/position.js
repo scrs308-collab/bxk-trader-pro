@@ -703,7 +703,7 @@ function renderOvernightCarryPanel(position) {
 
       <div class="position-v10-carry-state">
         ${state}
-        <span>?</span>
+        <span>&bull;</span>
         ${decision}
       </div>
 
