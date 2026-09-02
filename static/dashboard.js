@@ -1753,6 +1753,44 @@ function renderTradeJournalSummary(
   const exits =
     summary.exit_reasons || {};
 
+  const carry =
+    summary.carry_learning || {};
+
+  const ratioBuckets =
+    carry.ratio_buckets || {};
+
+  const carryPercent = (value) => {
+    if (
+      value === null
+      || value === undefined
+    ) {
+      return "--";
+    }
+
+    return `${
+      journalNumber(value, 1)
+    }%`;
+  };
+
+  const carryAveragePnl = (bucket) => {
+    if (
+      !bucket
+      || !Number(
+        bucket.held_completed_trades || 0
+      )
+      || bucket.held_average_realized_pnl
+        === null
+      || bucket.held_average_realized_pnl
+        === undefined
+    ) {
+      return "--";
+    }
+
+    return journalCurrency(
+      bucket.held_average_realized_pnl,
+    );
+  };
+
   const cards = [
     journalStatCard(
       "Completed Trades",
@@ -1890,8 +1928,118 @@ function renderTradeJournalSummary(
     ),
   ];
 
-  target.innerHTML =
-    cards.join("");
+  const carryCards = [
+    journalStatCard(
+      "Carry Learning",
+      Number(
+        carry.evaluated_trades || 0
+      ),
+      "",
+      `${
+        carry.held_overnight || 0
+      } held overnight / ${
+        carry.next_open_observations || 0
+      } next-open observations`,
+    ),
+
+    journalStatCard(
+      "Next-Open Breach",
+      carryPercent(
+        carry.breach_rate,
+      ),
+      Number(
+        carry.short_breaches || 0
+      ) > 0
+        ? "journal-negative"
+        : "",
+      `${
+        carry.short_breaches || 0
+      } breaches / ${
+        carry.next_open_observations || 0
+      } observed`,
+    ),
+
+    journalStatCard(
+      "Held Carry P/L",
+      Number(
+        carry.held_completed_trades || 0
+      ) > 0
+        ? journalCurrency(
+            carry.held_total_realized_pnl,
+          )
+        : "--",
+      Number(
+        carry.held_completed_trades || 0
+      ) > 0
+        ? journalPnlClass(
+            carry.held_total_realized_pnl,
+          )
+        : "",
+      `${
+        carry.held_completed_trades || 0
+      } completed / avg ${
+        Number(
+          carry.held_completed_trades || 0
+        ) > 0
+          ? journalCurrency(
+              carry.held_average_realized_pnl,
+            )
+          : "--"
+      }`,
+    ),
+  ];
+
+  const ratioCards = [
+    [
+      "Carry < 0.50",
+      ratioBuckets.lt_0_50,
+    ],
+    [
+      "Carry 0.50-0.74",
+      ratioBuckets["0_50_to_0_74"],
+    ],
+    [
+      "Carry 0.75-0.99",
+      ratioBuckets["0_75_to_0_99"],
+    ],
+    [
+      "Carry >= 1.00",
+      ratioBuckets.gte_1_00,
+    ],
+  ].map(
+    ([label, bucket]) => {
+      const data = bucket || {};
+
+      const observations = Number(
+        data.next_open_observations || 0
+      );
+
+      return journalStatCard(
+        label,
+        carryPercent(
+          data.breach_rate,
+        ),
+        Number(
+          data.short_breaches || 0
+        ) > 0
+          ? "journal-negative"
+          : "",
+        `n=${
+          data.trades || 0
+        } / ${
+          observations
+        } opens / avg P/L ${
+          carryAveragePnl(data)
+        }`,
+      );
+    },
+  );
+
+  target.innerHTML = [
+    ...cards,
+    ...carryCards,
+    ...ratioCards,
+  ].join("");
 }
 
 
