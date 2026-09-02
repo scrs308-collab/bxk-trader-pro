@@ -318,6 +318,9 @@ function renderPositionCard(position) {
   const recommendation =
     getPositionRecommendation(position);
 
+  const carryHtml =
+    renderOvernightCarryPanel(position);
+
   const expiration =
     position.expiration || "--";
 
@@ -580,9 +583,187 @@ function renderPositionCard(position) {
         </div>
       </div>
 
+      ${carryHtml}
+
     </div>
   `;
 }
+
+
+function renderOvernightCarryPanel(position) {
+  const carry =
+    position?.carry_risk;
+
+  if (!carry) {
+    return "";
+  }
+
+  const state =
+    String(
+      carry.state || "UNKNOWN",
+    ).toUpperCase();
+
+  const phase =
+    String(
+      carry.evaluation_phase ||
+      "PROVISIONAL",
+    ).toUpperCase();
+
+  const validStates = [
+    "GREEN",
+    "YELLOW",
+    "ORANGE",
+    "RED",
+    "CRITICAL",
+  ];
+
+  const stateClass =
+    validStates.includes(state)
+      ? state.toLowerCase()
+      : "unknown";
+
+  const prettyText = (value) =>
+    String(value || "--")
+      .replaceAll("_", " ");
+
+  const formatCarryNumber = (
+    value,
+    digits = 1,
+  ) => {
+    const number =
+      Number(value);
+
+    return Number.isFinite(number)
+      ? number.toFixed(digits)
+      : "--";
+  };
+
+  if (carry.available !== true) {
+    return `
+      <div
+        class="
+          position-v10-carry
+          unknown
+        "
+      >
+        <div class="position-v10-carry-heading">
+          <span>OVERNIGHT CARRY</span>
+
+          <strong>${phase}</strong>
+        </div>
+
+        <div class="position-v10-carry-state">
+          UNAVAILABLE
+        </div>
+
+        <div class="position-v10-carry-note">
+          ${prettyText(
+            carry.reason_code ||
+            "Carry evaluation unavailable",
+          )}
+        </div>
+      </div>
+    `;
+  }
+
+  const decision =
+    prettyText(
+      carry.decision,
+    );
+
+  const recommendation =
+    prettyText(
+      carry.recommendation ||
+      carry.decision,
+    );
+
+  const expectedMoveSource =
+    String(
+      carry.expected_move_source ||
+      "",
+    ).trim();
+
+  const expectedMoveLabel =
+    expectedMoveSource
+      ? `1-Day Exp Move (${expectedMoveSource})`
+      : "1-Day Exp Move";
+
+  return `
+    <div
+      class="
+        position-v10-carry
+        ${stateClass}
+      "
+    >
+      <div class="position-v10-carry-heading">
+        <span>OVERNIGHT CARRY</span>
+
+        <strong>${phase}</strong>
+      </div>
+
+      <div class="position-v10-carry-state">
+        ${state}
+        <span>?</span>
+        ${decision}
+      </div>
+
+      <div class="position-v10-carry-grid">
+
+        <div class="position-v10-carry-metric">
+          <span>Carry Ratio</span>
+          <strong>
+            ${formatCarryNumber(
+              carry.cushion_to_1d_em_ratio,
+              3,
+            )}x
+          </strong>
+        </div>
+
+        <div class="position-v10-carry-metric">
+          <span>Nearest Cushion</span>
+          <strong>
+            ${formatCarryNumber(
+              carry.short_cushion,
+              1,
+            )} pts
+          </strong>
+        </div>
+
+        <div class="position-v10-carry-metric">
+          <span>${expectedMoveLabel}</span>
+          <strong>
+            ${formatCarryNumber(
+              carry.one_day_expected_move,
+              1,
+            )} pts
+          </strong>
+        </div>
+
+        <div class="position-v10-carry-metric">
+          <span>Threatened Side</span>
+          <strong>
+            ${prettyText(
+              carry.threatened_side,
+            )}
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="position-v10-carry-action">
+        <span>RECOMMENDATION</span>
+        <strong>${recommendation}</strong>
+      </div>
+
+      <div class="position-v10-carry-note">
+        Live provisional reading.
+        Official carry learning snapshot
+        is frozen near the regular-session close.
+      </div>
+    </div>
+  `;
+}
+
 
 function renderPositionMonitor(
   positions,

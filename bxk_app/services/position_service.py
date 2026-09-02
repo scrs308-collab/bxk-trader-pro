@@ -2,6 +2,9 @@ import os
 import threading
 import time
 
+from bxk_app.overnight_carry_risk import (
+    calculate_overnight_carry_risk,
+)
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.brokers.tastytrade import (
     broker as order_broker,
@@ -254,6 +257,142 @@ def link_positions_to_journals(
 
     return linked
 
+
+def _carry_positive_float(value):
+    try:
+        number = float(value)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+    if number <= 0:
+        return None
+
+    return number
+
+
+def _attach_provisional_carry_risk(
+    summaries,
+    *,
+    snapshot,
+    spx_price,
+):
+    """
+    Attach a live, observation-only overnight carry
+    evaluation to Position Monitor summaries.
+
+    This is deliberately provisional. The official
+    close snapshot remains owned by the overnight
+    carry learning / journal workflow.
+    """
+
+    market_snapshot = snapshot or {}
+
+    expected_move = _carry_positive_float(
+        market_snapshot.get(
+            "expected_move"
+        )
+    )
+
+    vix1d = _carry_positive_float(
+        market_snapshot.get(
+            "vix1d"
+        )
+    )
+
+    vix = _carry_positive_float(
+        market_snapshot.get(
+            "vix"
+        )
+    )
+
+    if vix1d is not None:
+        expected_move_source = "VIX1D"
+
+    elif vix is not None:
+        expected_move_source = "VIX"
+
+    else:
+        expected_move_source = None
+
+    evaluated_at = (
+        market_snapshot.get(
+            "timestamp"
+        )
+    )
+
+    for summary in summaries:
+        try:
+            carry_risk = (
+                calculate_overnight_carry_risk(
+                    spx_close=spx_price,
+                    short_put=summary.get(
+                        "sell_put"
+                    ),
+                    short_call=summary.get(
+                        "sell_call"
+                    ),
+                    expected_move=expected_move,
+                    expected_move_source=(
+                        expected_move_source
+                    ),
+                    dte=summary.get(
+                        "dte"
+                    ),
+                )
+            )
+
+        except Exception:
+            carry_risk = {
+                "available": False,
+                "observation_only": True,
+                "execution_authorized": False,
+                "state": "UNKNOWN",
+                "decision": "UNAVAILABLE",
+                "recommendation": None,
+                "reason_code": (
+                    "LIVE_CARRY_EVALUATION_ERROR"
+                ),
+            }
+
+        if not isinstance(
+            carry_risk,
+            dict,
+        ):
+            carry_risk = {
+                "available": False,
+                "observation_only": True,
+                "execution_authorized": False,
+                "state": "UNKNOWN",
+                "decision": "UNAVAILABLE",
+                "recommendation": None,
+                "reason_code": (
+                    "LIVE_CARRY_EVALUATION_INVALID"
+                ),
+            }
+
+        carry_risk = dict(
+            carry_risk
+        )
+
+        carry_risk[
+            "evaluation_phase"
+        ] = "PROVISIONAL"
+
+        carry_risk[
+            "evaluated_at"
+        ] = evaluated_at
+
+        summary[
+            "carry_risk"
+        ] = carry_risk
+
+    return summaries
+
+
+
 def get_position_monitor():
     """
     Return open SPX option legs grouped into separate
@@ -345,6 +484,18 @@ def get_position_monitor():
         summaries = (
             build_position_summaries(
                 positions=positions,
+                spx_price=spx_price,
+            )
+        )
+
+        carry_snapshot = (
+            market_data.get_snapshot()
+        )
+
+        summaries = (
+            _attach_provisional_carry_risk(
+                summaries,
+                snapshot=carry_snapshot,
                 spx_price=spx_price,
             )
         )
