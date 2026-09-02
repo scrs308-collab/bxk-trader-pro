@@ -381,6 +381,170 @@ class TastytradeBroker(BrokerBase):
         return order
 
 
+
+    def get_transactions(
+        self,
+        account_number=None,
+        *,
+        start_date=None,
+        end_date=None,
+        instrument_type=None,
+    ):
+        """
+        Read account transaction history.
+
+        Used for broker-confirmed SPX expiration and
+        cash-settlement reconciliation.
+        """
+
+        if account_number is None:
+            account_number = (
+                self.get_first_account_number()
+            )
+
+        if not account_number:
+            self.last_error = (
+                self.last_error
+                or "No account number available"
+            )
+            return []
+
+        page_offset = 0
+        per_page = 250
+        transactions = []
+
+        while True:
+            params = {
+                "per-page": per_page,
+                "page-offset": page_offset,
+                "sort": "Desc",
+            }
+
+            if start_date:
+                params["start-date"] = str(
+                    start_date
+                )
+
+            if end_date:
+                params["end-date"] = str(
+                    end_date
+                )
+
+            if instrument_type:
+                params["instrument-type"] = str(
+                    instrument_type
+                )
+
+            response = self._request(
+                "GET",
+                (
+                    f"/accounts/{account_number}"
+                    "/transactions"
+                ),
+                params=params,
+            )
+
+            if response is None:
+                return []
+
+            try:
+                payload = response.json()
+
+                data = (
+                    payload.get("data")
+                    or {}
+                )
+
+                items = (
+                    data.get("items")
+                    or []
+                )
+
+                pagination = (
+                    payload.get("pagination")
+                    or data.get("pagination")
+                    or {}
+                )
+
+            except (
+                AttributeError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                self.last_error = (
+                    "Invalid Tastytrade transaction "
+                    f"response: {exc}"
+                )
+                return []
+
+            if not isinstance(
+                items,
+                list,
+            ):
+                self.last_error = (
+                    "Invalid Tastytrade transaction "
+                    "items collection."
+                )
+                return []
+
+            transactions.extend(
+                items
+            )
+
+            raw_total_pages = (
+                pagination.get(
+                    "total-pages"
+                )
+            )
+
+            if raw_total_pages is None:
+                total_pages = (
+                    1
+                    if items
+                    else 0
+                )
+
+            else:
+                try:
+                    total_pages = int(
+                        raw_total_pages
+                    )
+
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    self.last_error = (
+                        "Invalid Tastytrade transaction "
+                        "pagination."
+                    )
+                    return []
+
+            if total_pages == 0:
+                break
+
+            if (
+                total_pages < 0
+                or total_pages > 100
+            ):
+                self.last_error = (
+                    "Unsafe Tastytrade transaction "
+                    "pagination range."
+                )
+                return []
+
+            page_offset += 1
+
+            if (
+                page_offset
+                >= total_pages
+            ):
+                break
+
+        self.last_error = None
+
+        return transactions
+
     def get_orders(
         self,
         account_number=None,
