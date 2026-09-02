@@ -3177,3 +3177,93 @@ def get_trade_journal_trades(
             for journal in selected
         ],
     }
+
+def get_open_trade_journal_candidates(
+    *,
+    session_factory=None,
+):
+    """
+    Return open journal rows suitable for exact-symbol
+    position linking.
+
+    This is a read-only fallback for broker positions
+    that were not created through the local execution
+    audit, such as historical/backfilled Tastytrade
+    positions.
+
+    Ambiguity is handled by the caller. This function
+    never guesses which position belongs to which row.
+    """
+
+    if not database_configured():
+        return []
+
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    with factory() as session:
+        journals = (
+            session.execute(
+                select(
+                    TradeJournal
+                ).where(
+                    TradeJournal.status.in_(
+                        (
+                            "SUBMITTED",
+                            "OPEN",
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        candidates = []
+
+        for journal in journals:
+            order_id = str(
+                journal.broker_order_id
+                or ""
+            ).strip()
+
+            if not order_id:
+                continue
+
+            symbols = sorted(
+                _journal_option_symbols(
+                    journal
+                )
+            )
+
+            if len(symbols) != 4:
+                continue
+
+            submitted_at = (
+                journal.submitted_at.isoformat()
+                if journal.submitted_at
+                is not None
+                else None
+            )
+
+            credit = (
+                journal.entry_fill_credit
+                if journal.entry_fill_credit
+                is not None
+                else journal.submitted_credit
+            )
+
+            candidates.append({
+                "broker_order_id":
+                    order_id,
+                "submitted_at":
+                    submitted_at,
+                "submitted_limit_credit":
+                    credit,
+                "symbols":
+                    symbols,
+            })
+
+        return candidates
