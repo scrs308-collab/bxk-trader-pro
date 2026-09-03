@@ -180,137 +180,71 @@ function renderNoOpenPosition(container, message) {
 }
 
 function renderPositionCard(position) {
-  const pnl = safeNumber(position.pnl, 0);
+  const legs = Array.isArray(position.legs)
+    ? position.legs
+    : [];
+
+  const pnl = safeNumber(
+    position.pnl,
+    0,
+  );
 
   const pnlPercent = safeNumber(
     position.pnl_percent,
     0,
   );
 
-  const openingCredit = safeNumber(
-    position.opening_credit_dollars,
-    0,
-  );
-
-  const maxProfit = safeNumber(
-    position.max_profit,
-    openingCredit,
-  );
-
-  const maxRisk = safeNumber(
-    position.max_risk,
-    0,
-  );
-
-  const currentDebit = safeNumber(
-    position.current_debit,
-    0,
-  );
-
-  const valuationReliable =
-    position.valuation_reliable !== false;
-
-  const pnlIsEstimate =
-    position.pnl_is_estimate === true ||
-    !valuationReliable;
-
-  const quoteQuality = String(
-    position.quote_quality || "GOOD",
-  ).toUpperCase();
-
-  const unreliableLegs =
-    Array.isArray(position.unreliable_legs)
-      ? position.unreliable_legs
-      : [];
-
-  const valuationWarning =
-    position.valuation_warning ||
-    (
-      !valuationReliable
-        ? "Wide or incomplete option quotes detected. P/L-based exit guidance is suspended."
-        : ""
-    );
-
   const quantity = safeNumber(
     position.quantity,
     0,
   );
 
-  const openingCreditPerSpread =
-    quantity > 0
-      ? openingCredit / 100 / quantity
-      : 0;
+  const strategy =
+    position.strategy ||
+    "SPX Position";
 
-  const stopDebit =
-    openingCreditPerSpread * 2;
+  const expiration =
+    position.expiration || "--";
 
-  const stopLossAmount =
-    quantity > 0
-      ? -(
-          (
-            stopDebit -
-            openingCreditPerSpread
-          ) *
-          100 *
-          quantity
-        )
-      : 0;
+  const positionType = String(
+    position.position_type ||
+    (
+      position.sell_put != null &&
+      position.buy_put != null &&
+      position.sell_call != null &&
+      position.buy_call != null
+        ? "IRON_CONDOR"
+        : "CUSTOM"
+    ),
+  ).toUpperCase();
 
-  const progress =
-    valuationReliable && maxProfit > 0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            (pnl / maxProfit) * 100,
-          ),
-        )
-      : 0;
+  const isIronCondor =
+    positionType === "IRON_CONDOR";
 
-  const progressDisplay =
-    valuationReliable
-      ? `${formatNumber(progress, 1)}%`
-      : "--";
+  const isVertical =
+    positionType === "VERTICAL";
+
+  const isSingle =
+    positionType === "SINGLE";
+
+  const legQuoteUnreliable =
+    legs.some(
+      (leg) =>
+        leg.quote_reliable === false,
+    );
+
+  const valuationReliable =
+    position.valuation_reliable !== false &&
+    !legQuoteUnreliable;
+
+  const pnlIsEstimate =
+    position.pnl_is_estimate === true ||
+    !valuationReliable;
 
   const pnlLabel =
     pnlIsEstimate
-      ? "P/L ESTIMATE"
+      ? "OPEN P/L ESTIMATE"
       : "OPEN P/L";
-
-  const currentDebitLabel =
-    pnlIsEstimate
-      ? "Current Debit Estimate"
-      : "Current Debit";
-
-  const quoteWarningHtml =
-    !valuationReliable
-      ? `
-        <div class="position-v10-quote-warning">
-          <div class="position-v10-quote-warning-title">
-            ? P/L ESTIMATE UNRELIABLE
-          </div>
-
-          <div class="position-v10-quote-warning-text">
-            ${valuationWarning}
-          </div>
-
-          ${
-            unreliableLegs.length > 0
-              ? `
-                <div class="position-v10-quote-warning-legs">
-                  Affected:
-                  ${unreliableLegs.join(", ")}
-                </div>
-              `
-              : ""
-          }
-
-          <div class="position-v10-quote-warning-action">
-            Automated P/L exit guidance suspended.
-          </div>
-        </div>
-      `
-      : "";
 
   const pnlClass =
     getPositionStatusClass(pnl);
@@ -318,35 +252,66 @@ function renderPositionCard(position) {
   const recommendation =
     getPositionRecommendation(position);
 
-  const carryHtml =
-    renderOvernightCarryPanel(position);
+  const hasMaxProfit =
+    position.max_profit !== null &&
+    position.max_profit !== undefined &&
+    Number.isFinite(
+      Number(position.max_profit),
+    );
 
-  const expiration =
-    position.expiration || "--";
+  const hasMaxRisk =
+    position.max_risk !== null &&
+    position.max_risk !== undefined &&
+    Number.isFinite(
+      Number(position.max_risk),
+    );
 
-  const strategy =
-    position.strategy ||
-    "SPX Iron Condor";
+  const maxProfit =
+    hasMaxProfit
+      ? safeNumber(
+          position.max_profit,
+          0,
+        )
+      : null;
 
-  const sellPut =
-    position.sell_put ?? "--";
+  const maxRisk =
+    hasMaxRisk
+      ? safeNumber(
+          position.max_risk,
+          0,
+        )
+      : null;
 
-  const buyPut =
-    position.buy_put ?? "--";
+  const progressRaw =
+    maxProfit !== null &&
+    maxProfit > 0
+      ? (
+          pnl /
+          maxProfit
+        ) * 100
+      : 0;
 
-  const sellCall =
-    position.sell_call ?? "--";
+  const progress = Math.max(
+    0,
+    Math.min(
+      100,
+      progressRaw,
+    ),
+  );
 
-  const buyCall =
-    position.buy_call ?? "--";
+  const progressDisplay =
+    maxProfit !== null &&
+    maxProfit > 0
+      ? `${progress.toFixed(1)}%`
+      : "--";
 
   const priceSource =
     position.price_source ||
     (
-      Array.isArray(position.legs) &&
-      position.legs.some(
+      legs.some(
         (leg) =>
-          leg.price_source === "live-mid",
+          leg.price_source ===
+          "live-mid",
       )
         ? "live-mid"
         : "close-price"
@@ -372,7 +337,8 @@ function renderPositionCard(position) {
   ).trim();
 
   const brokerLinkHtml =
-    position.broker_linked === true && brokerOrderId
+    position.broker_linked === true &&
+    brokerOrderId
       ? `
         <div class="position-source live">
           TASTYTRADE ORDER ${brokerOrderId}
@@ -380,8 +346,578 @@ function renderPositionCard(position) {
       `
       : "";
 
+  const unreliableLegs =
+    Array.isArray(
+      position.unreliable_legs,
+    )
+      ? position.unreliable_legs
+      : legs
+          .filter(
+            (leg) =>
+              leg.quote_reliable ===
+              false,
+          )
+          .map(
+            (leg) =>
+              `${
+                leg.strike ?? "?"
+              } ${
+                leg.option_type === "P"
+                  ? "PUT"
+                  : "CALL"
+              }`,
+          );
+
+  const quoteWarningHtml =
+    !valuationReliable
+      ? `
+        <div class="position-v10-quote-warning">
+          <div>
+            QUOTE QUALITY WARNING
+          </div>
+
+          <div>
+            Wide or incomplete option
+            quotes detected.
+          </div>
+
+          ${
+            unreliableLegs.length
+              ? `
+                <div>
+                  Affected:
+                  ${unreliableLegs.join(", ")}
+                </div>
+              `
+              : ""
+          }
+
+          <div class="position-v10-quote-warning-action">
+            Automated P/L exit guidance suspended.
+          </div>
+        </div>
+      `
+      : "";
+
+  let structureHtml = "";
+
+  if (isIronCondor) {
+    const sellPut =
+      position.sell_put ?? "--";
+
+    const buyPut =
+      position.buy_put ?? "--";
+
+    const sellCall =
+      position.sell_call ?? "--";
+
+    const buyCall =
+      position.buy_call ?? "--";
+
+    structureHtml = `
+      <div class="position-v10-spread put">
+
+        <div class="position-v10-spread-name">
+          PUT SPREAD
+        </div>
+
+        <div class="position-v10-leg short-leg">
+          <span>SELL</span>
+          <strong>
+            ${sellPut} PUT
+          </strong>
+        </div>
+
+        <div class="position-v10-leg long-leg">
+          <span>BUY</span>
+          <strong>
+            ${buyPut} PUT
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="position-v10-spread call">
+
+        <div class="position-v10-spread-name">
+          CALL SPREAD
+        </div>
+
+        <div class="position-v10-leg short-leg">
+          <span>SELL</span>
+          <strong>
+            ${sellCall} CALL
+          </strong>
+        </div>
+
+        <div class="position-v10-leg long-leg">
+          <span>BUY</span>
+          <strong>
+            ${buyCall} CALL
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="position-v10-wing-width">
+        ${
+          position.wing_width ??
+          "--"
+        }-point wings
+      </div>
+    `;
+  } else if (isVertical) {
+    const optionType =
+      String(
+        position.option_type ||
+        "",
+      ).toUpperCase() === "PUT"
+        ? "PUT"
+        : "CALL";
+
+    const spreadClass =
+      optionType === "PUT"
+        ? "put"
+        : "call";
+
+    const spreadType =
+      String(
+        position.spread_type ||
+        "",
+      ).toUpperCase();
+
+    structureHtml = `
+      <div
+        class="
+          position-v10-spread
+          ${spreadClass}
+        "
+      >
+
+        <div class="position-v10-spread-name">
+          ${optionType}
+          ${spreadType}
+          SPREAD
+        </div>
+
+        <div class="position-v10-leg short-leg">
+          <span>SELL</span>
+          <strong>
+            ${
+              position.short_strike ??
+              "--"
+            }
+            ${optionType}
+          </strong>
+        </div>
+
+        <div class="position-v10-leg long-leg">
+          <span>BUY</span>
+          <strong>
+            ${
+              position.long_strike ??
+              "--"
+            }
+            ${optionType}
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="position-v10-wing-width">
+        ${
+          position.width ?? "--"
+        }-point spread
+      </div>
+    `;
+  } else if (isSingle) {
+    const optionType =
+      String(
+        position.option_type ||
+        "",
+      ).toUpperCase() === "PUT"
+        ? "PUT"
+        : "CALL";
+
+    const isShort =
+      String(
+        position.direction ||
+        "",
+      ).toUpperCase() ===
+      "SHORT";
+
+    const action =
+      isShort
+        ? "SELL"
+        : "BUY";
+
+    const legClass =
+      isShort
+        ? "short-leg"
+        : "long-leg";
+
+    const spreadClass =
+      optionType === "PUT"
+        ? "put"
+        : "call";
+
+    structureHtml = `
+      <div
+        class="
+          position-v10-spread
+          ${spreadClass}
+        "
+      >
+
+        <div class="position-v10-spread-name">
+          SINGLE ${optionType}
+        </div>
+
+        <div
+          class="
+            position-v10-leg
+            ${legClass}
+          "
+        >
+          <span>${action}</span>
+          <strong>
+            ${
+              position.strike ??
+              "--"
+            }
+            ${optionType}
+          </strong>
+        </div>
+
+      </div>
+
+      <div class="position-v10-wing-width">
+        Unhedged option position
+      </div>
+    `;
+  } else {
+    structureHtml = legs
+      .map((leg) => {
+        const optionType =
+          leg.option_type === "P"
+            ? "PUT"
+            : "CALL";
+
+        const isShort =
+          String(
+            leg.direction || "",
+          ).toUpperCase() ===
+          "SHORT";
+
+        return `
+          <div
+            class="
+              position-v10-leg
+              ${
+                isShort
+                  ? "short-leg"
+                  : "long-leg"
+              }
+            "
+          >
+            <span>
+              ${
+                isShort
+                  ? "SELL"
+                  : "BUY"
+              }
+            </span>
+
+            <strong>
+              ${leg.strike ?? "--"}
+              ${optionType}
+            </strong>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  const metricRow = (
+    label,
+    value,
+    className = "",
+  ) => `
+    <div class="position-v10-metric">
+      <span>${label}</span>
+      <strong class="${className}">
+        ${value}
+      </strong>
+    </div>
+  `;
+
+  let metricsHtml = "";
+
+  if (isIronCondor) {
+    const openingCredit =
+      safeNumber(
+        position.opening_credit_dollars,
+        0,
+      );
+
+    const currentDebit =
+      safeNumber(
+        position.current_debit,
+        0,
+      );
+
+    const openingCreditPerSpread =
+      quantity > 0
+        ? (
+            openingCredit /
+            100 /
+            quantity
+          )
+        : 0;
+
+    const stopDebit =
+      openingCreditPerSpread * 2;
+
+    const stopLossAmount =
+      quantity > 0
+        ? -(
+            (
+              stopDebit -
+              openingCreditPerSpread
+            ) *
+            100 *
+            quantity
+          )
+        : 0;
+
+    metricsHtml =
+      metricRow(
+        "Opening Credit",
+        formatMoney(
+          openingCredit,
+        ),
+      ) +
+      metricRow(
+        "Current Debit",
+        formatMoney(
+          currentDebit,
+        ),
+      ) +
+      metricRow(
+        "Max Profit",
+        maxProfit !== null
+          ? formatMoney(maxProfit)
+          : "--",
+        "positive-value",
+      ) +
+      metricRow(
+        "Max Risk",
+        maxRisk !== null
+          ? formatMoney(maxRisk)
+          : "--",
+        "negative-value",
+      ) +
+      metricRow(
+        "Stop Debit",
+        formatMoney(
+          stopDebit,
+        ),
+        "negative-value",
+      ) +
+      metricRow(
+        "Stop P/L",
+        formatSignedMoney(
+          stopLossAmount,
+        ),
+        "negative-value",
+      ) +
+      `
+        <div class="position-v10-stop-note">
+          Stop based on 2x opening credit
+        </div>
+      `;
+  } else if (isVertical) {
+    const spreadType =
+      String(
+        position.spread_type ||
+        "",
+      ).toUpperCase();
+
+    const isCredit =
+      spreadType === "CREDIT";
+
+    const openingAmount =
+      isCredit
+        ? safeNumber(
+            position.opening_credit_dollars,
+            0,
+          )
+        : safeNumber(
+            position.opening_debit_dollars,
+            0,
+          );
+
+    const currentValue =
+      safeNumber(
+        position.current_value,
+        0,
+      );
+
+    metricsHtml =
+      metricRow(
+        isCredit
+          ? "Opening Credit"
+          : "Opening Debit",
+        formatMoney(
+          openingAmount,
+        ),
+      ) +
+      metricRow(
+        "Current Spread Value",
+        formatMoney(
+          currentValue,
+        ),
+      ) +
+      metricRow(
+        "Max Profit",
+        maxProfit !== null
+          ? formatMoney(maxProfit)
+          : "--",
+        "positive-value",
+      ) +
+      metricRow(
+        "Max Risk",
+        maxRisk !== null
+          ? formatMoney(maxRisk)
+          : "--",
+        "negative-value",
+      );
+
+    if (isCredit) {
+      const openingCreditPerSpread =
+        quantity > 0
+          ? (
+              openingAmount /
+              100 /
+              quantity
+            )
+          : 0;
+
+      const stopDebit =
+        openingCreditPerSpread * 2;
+
+      const stopLossAmount =
+        quantity > 0
+          ? -(
+              (
+                stopDebit -
+                openingCreditPerSpread
+              ) *
+              100 *
+              quantity
+            )
+          : 0;
+
+      metricsHtml +=
+        metricRow(
+          "Stop Debit",
+          formatMoney(
+            stopDebit,
+          ),
+          "negative-value",
+        ) +
+        metricRow(
+          "Stop P/L",
+          formatSignedMoney(
+            stopLossAmount,
+          ),
+          "negative-value",
+        ) +
+        `
+          <div class="position-v10-stop-note">
+            Stop based on 2x opening credit
+          </div>
+        `;
+    }
+  } else if (isSingle) {
+    const isShort =
+      String(
+        position.direction ||
+        "",
+      ).toUpperCase() ===
+      "SHORT";
+
+    const openingPrice =
+      isShort
+        ? safeNumber(
+            position.opening_credit,
+            0,
+          )
+        : safeNumber(
+            position.opening_debit,
+            0,
+          );
+
+    const openingDollars =
+      openingPrice *
+      100 *
+      quantity;
+
+    const currentValue =
+      safeNumber(
+        position.current_value,
+        0,
+      );
+
+    metricsHtml =
+      metricRow(
+        isShort
+          ? "Opening Credit"
+          : "Opening Debit",
+        formatMoney(
+          openingDollars,
+        ),
+      ) +
+      metricRow(
+        "Current Option Value",
+        formatMoney(
+          currentValue,
+        ),
+      ) +
+      metricRow(
+        "Max Profit",
+        maxProfit !== null
+          ? formatMoney(maxProfit)
+          : (
+              isShort
+                ? "PREMIUM RECEIVED"
+                : "--"
+            ),
+        "positive-value",
+      ) +
+      metricRow(
+        "Max Risk",
+        maxRisk !== null
+          ? formatMoney(maxRisk)
+          : "UNCAPPED",
+        "negative-value",
+      );
+  } else {
+    metricsHtml =
+      metricRow(
+        "Open P/L",
+        formatSignedMoney(pnl),
+        pnlClass,
+      );
+  }
+
   return `
-    <div class="position-monitor-card position-v10-card">
+    <div
+      class="
+        position-monitor-card
+        position-v10-card
+      "
+    >
 
       <div class="position-v10-header">
         <div>
@@ -390,15 +926,23 @@ function renderPositionCard(position) {
           </div>
 
           <div class="position-v10-contracts">
-            ${quantity} contract${
-              quantity === 1 ? "" : "s"
+            ${quantity}
+            contract${
+              quantity === 1
+                ? ""
+                : "s"
             }
           </div>
         </div>
 
         <div class="position-v10-expiration">
-          <strong>${dteLabel}</strong>
-          <span>Expires ${expiration}</span>
+          <strong>
+            ${dteLabel}
+          </strong>
+
+          <span>
+            Expires ${expiration}
+          </span>
         </div>
       </div>
 
@@ -406,7 +950,12 @@ function renderPositionCard(position) {
 
       <div class="position-v10-summary">
 
-        <div class="position-v10-pnl ${pnlClass}">
+        <div
+          class="
+            position-v10-pnl
+            ${pnlClass}
+          "
+        >
           <div class="position-v10-label">
             ${pnlLabel}
           </div>
@@ -425,7 +974,9 @@ function renderPositionCard(position) {
 
         <div class="position-v10-progress">
           <div class="position-v10-progress-header">
-            <span>PROFIT CAPTURED</span>
+            <span>
+              PROFIT CAPTURED
+            </span>
 
             <strong>
               ${progressDisplay}
@@ -434,8 +985,13 @@ function renderPositionCard(position) {
 
           <div class="position-progress-bar">
             <div
-              class="position-progress-fill ${pnlClass}"
-              style="width:${progress}%"
+              class="
+                position-progress-fill
+                ${pnlClass}
+              "
+              style="
+                width:${progress}%
+              "
             ></div>
           </div>
 
@@ -447,7 +1003,12 @@ function renderPositionCard(position) {
           </div>
         </div>
 
-        <div class="position-source ${sourceClass}">
+        <div
+          class="
+            position-source
+            ${sourceClass}
+          "
+        >
           ${sourceLabel}
         </div>
 
@@ -463,45 +1024,7 @@ function renderPositionCard(position) {
             POSITION STRUCTURE
           </div>
 
-          <div class="position-v10-spread put">
-
-            <div class="position-v10-spread-name">
-              PUT SPREAD
-            </div>
-
-            <div class="position-v10-leg short-leg">
-              <span>SELL</span>
-              <strong>${sellPut} PUT</strong>
-            </div>
-
-            <div class="position-v10-leg long-leg">
-              <span>BUY</span>
-              <strong>${buyPut} PUT</strong>
-            </div>
-
-          </div>
-
-          <div class="position-v10-spread call">
-
-            <div class="position-v10-spread-name">
-              CALL SPREAD
-            </div>
-
-            <div class="position-v10-leg short-leg">
-              <span>SELL</span>
-              <strong>${sellCall} CALL</strong>
-            </div>
-
-            <div class="position-v10-leg long-leg">
-              <span>BUY</span>
-              <strong>${buyCall} CALL</strong>
-            </div>
-
-          </div>
-
-          <div class="position-v10-wing-width">
-            ${position.wing_width ?? "--"}-point wings
-          </div>
+          ${structureHtml}
 
         </div>
 
@@ -511,53 +1034,7 @@ function renderPositionCard(position) {
             TRADE VALUES
           </div>
 
-          <div class="position-v10-metric">
-            <span>Opening Credit</span>
-            <strong>
-              ${formatMoney(openingCredit)}
-            </strong>
-          </div>
-
-          <div class="position-v10-metric">
-            <span>${currentDebitLabel}</span>
-            <strong>
-              ${formatMoney(currentDebit)}
-            </strong>
-          </div>
-
-          <div class="position-v10-metric">
-            <span>Max Profit</span>
-            <strong class="positive-value">
-              ${formatMoney(maxProfit)}
-            </strong>
-          </div>
-
-          <div class="position-v10-metric">
-            <span>Max Risk</span>
-            <strong class="negative-value">
-              ${formatMoney(maxRisk)}
-            </strong>
-          </div>
-
-          <div class="position-v10-metric">
-            <span>Stop Debit</span>
-            <strong class="negative-value">
-              ${formatMoney(stopDebit)}
-            </strong>
-          </div>
-
-          <div class="position-v10-metric">
-            <span>Stop P/L</span>
-            <strong class="negative-value">
-              ${formatSignedMoney(
-                stopLossAmount,
-              )}
-            </strong>
-          </div>
-
-          <div class="position-v10-stop-note">
-            Stop based on 2× opening credit
-          </div>
+          ${metricsHtml}
 
         </div>
 
@@ -571,7 +1048,9 @@ function renderPositionCard(position) {
         "
       >
         <div class="position-v10-coach-heading">
-          <span>BXK POSITION COACH</span>
+          <span>
+            BXK POSITION COACH
+          </span>
 
           <strong>
             ${recommendation.label}
@@ -583,183 +1062,6 @@ function renderPositionCard(position) {
         </div>
       </div>
 
-      ${carryHtml}
-
-    </div>
-  `;
-}
-
-
-function renderOvernightCarryPanel(position) {
-  const carry =
-    position?.carry_risk;
-
-  if (!carry) {
-    return "";
-  }
-
-  const state =
-    String(
-      carry.state || "UNKNOWN",
-    ).toUpperCase();
-
-  const phase =
-    String(
-      carry.evaluation_phase ||
-      "PROVISIONAL",
-    ).toUpperCase();
-
-  const validStates = [
-    "GREEN",
-    "YELLOW",
-    "ORANGE",
-    "RED",
-    "CRITICAL",
-  ];
-
-  const stateClass =
-    validStates.includes(state)
-      ? state.toLowerCase()
-      : "unknown";
-
-  const prettyText = (value) =>
-    String(value || "--")
-      .replaceAll("_", " ");
-
-  const formatCarryNumber = (
-    value,
-    digits = 1,
-  ) => {
-    const number =
-      Number(value);
-
-    return Number.isFinite(number)
-      ? number.toFixed(digits)
-      : "--";
-  };
-
-  if (carry.available !== true) {
-    return `
-      <div
-        class="
-          position-v10-carry
-          unknown
-        "
-      >
-        <div class="position-v10-carry-heading">
-          <span>OVERNIGHT CARRY</span>
-
-          <strong>${phase}</strong>
-        </div>
-
-        <div class="position-v10-carry-state">
-          UNAVAILABLE
-        </div>
-
-        <div class="position-v10-carry-note">
-          ${prettyText(
-            carry.reason_code ||
-            "Carry evaluation unavailable",
-          )}
-        </div>
-      </div>
-    `;
-  }
-
-  const decision =
-    prettyText(
-      carry.decision,
-    );
-
-  const recommendation =
-    prettyText(
-      carry.recommendation ||
-      carry.decision,
-    );
-
-  const expectedMoveSource =
-    String(
-      carry.expected_move_source ||
-      "",
-    ).trim();
-
-  const expectedMoveLabel =
-    expectedMoveSource
-      ? `1-Day Exp Move (${expectedMoveSource})`
-      : "1-Day Exp Move";
-
-  return `
-    <div
-      class="
-        position-v10-carry
-        ${stateClass}
-      "
-    >
-      <div class="position-v10-carry-heading">
-        <span>OVERNIGHT CARRY</span>
-
-        <strong>${phase}</strong>
-      </div>
-
-      <div class="position-v10-carry-state">
-        ${state}
-        <span>&bull;</span>
-        ${decision}
-      </div>
-
-      <div class="position-v10-carry-grid">
-
-        <div class="position-v10-carry-metric">
-          <span>Carry Ratio</span>
-          <strong>
-            ${formatCarryNumber(
-              carry.cushion_to_1d_em_ratio,
-              3,
-            )}x
-          </strong>
-        </div>
-
-        <div class="position-v10-carry-metric">
-          <span>Nearest Cushion</span>
-          <strong>
-            ${formatCarryNumber(
-              carry.short_cushion,
-              1,
-            )} pts
-          </strong>
-        </div>
-
-        <div class="position-v10-carry-metric">
-          <span>${expectedMoveLabel}</span>
-          <strong>
-            ${formatCarryNumber(
-              carry.one_day_expected_move,
-              1,
-            )} pts
-          </strong>
-        </div>
-
-        <div class="position-v10-carry-metric">
-          <span>Threatened Side</span>
-          <strong>
-            ${prettyText(
-              carry.threatened_side,
-            )}
-          </strong>
-        </div>
-
-      </div>
-
-      <div class="position-v10-carry-action">
-        <span>RECOMMENDATION</span>
-        <strong>${recommendation}</strong>
-      </div>
-
-      <div class="position-v10-carry-note">
-        Live provisional reading.
-        Official carry learning snapshot
-        is frozen near the regular-session close.
-      </div>
     </div>
   `;
 }

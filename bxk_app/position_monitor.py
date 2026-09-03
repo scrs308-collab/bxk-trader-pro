@@ -768,17 +768,728 @@ def build_iron_condor_summary(
     )
 
     return position_summary
+def _build_universal_leg(
+    position: dict,
+) -> dict | None:
+    """
+    Normalize one broker option leg for vertical/single
+    position summaries.
+    """
+
+    parsed = parse_option_symbol(
+        position.get("symbol", "")
+    )
+
+    if not parsed:
+        return None
+
+    direction = str(
+        position.get("direction", "")
+    ).upper()
+
+    if direction not in {
+        "LONG",
+        "SHORT",
+    }:
+        return None
+
+    quantity = abs(
+        safe_float(
+            position.get("quantity")
+        )
+    )
+
+    if quantity <= 0:
+        return None
+
+    multiplier = safe_float(
+        position.get("multiplier"),
+        100,
+    )
+
+    open_price = safe_float(
+        position.get(
+            "average_open_price"
+        )
+    )
+
+    current_price = safe_float(
+        position.get(
+            "current_price"
+        )
+    )
+
+    calculated_pnl = calculate_leg_pnl(
+        direction=direction,
+        open_price=open_price,
+        current_price=current_price,
+        quantity=quantity,
+        multiplier=multiplier,
+    )
+
+    broker_pnl_raw = position.get("pnl")
+
+    has_broker_pnl = (
+        broker_pnl_raw is not None
+        and str(broker_pnl_raw).strip()
+        != ""
+    )
+
+    broker_open_pnl = (
+        safe_float(broker_pnl_raw)
+        if has_broker_pnl
+        else calculated_pnl
+    )
+
+    return {
+        **parsed,
+        "symbol": position.get("symbol"),
+        "direction": direction,
+        "quantity": quantity,
+        "multiplier": multiplier,
+        "open_price": open_price,
+        "current_price": current_price,
+        "bid": safe_float(
+            position.get("bid")
+        ),
+        "ask": safe_float(
+            position.get("ask")
+        ),
+        "price_source": position.get(
+            "price_source",
+            "close-price",
+        ),
+        "quote_quality": position.get(
+            "quote_quality"
+        ),
+        "quote_reliable": position.get(
+            "quote_reliable"
+        ),
+        "quote_spread": position.get(
+            "quote_spread"
+        ),
+        "quote_spread_pct": position.get(
+            "quote_spread_pct"
+        ),
+        "quote_issue": position.get(
+            "quote_issue"
+        ),
+        "pnl": calculated_pnl,
+        "broker_open_pnl": (
+            broker_open_pnl
+        ),
+        "has_broker_pnl": (
+            has_broker_pnl
+        ),
+        "expires_at": position.get(
+            "expires_at"
+        ),
+    }
+
+
+def _universal_position_status(
+    pnl_percent: float,
+    dte: int | None,
+    short_distance: float | None = None,
+    credit_position: bool = False,
+) -> tuple[str, str]:
+    """
+    Management state for non-Iron-Condor positions.
+    """
+
+    if (
+        credit_position
+        and short_distance is not None
+        and short_distance <= 10
+    ):
+        return (
+            "DEFEND",
+            (
+                "SPX is within 10 points "
+                "of the short strike."
+            ),
+        )
+
+    if (
+        credit_position
+        and short_distance is not None
+        and short_distance <= 20
+    ):
+        return (
+            "WARNING",
+            (
+                "SPX is approaching "
+                "the short strike."
+            ),
+        )
+
+    if pnl_percent >= 50:
+        return (
+            "TAKE PROFITS",
+            (
+                "Position has reached "
+                "the 50% profit level."
+            ),
+        )
+
+    if pnl_percent <= -100:
+        return (
+            "REVIEW",
+            (
+                "Position loss requires "
+                "active review."
+            ),
+        )
+
+    if dte == 0:
+        return (
+            "MANAGE",
+            "Position expires today.",
+        )
+
+    return (
+        "HOLD",
+        (
+            "Position remains within "
+            "the normal management range."
+        ),
+    )
+
+
+def build_vertical_summary(
+    positions: list[dict],
+    spx_price: float | None = None,
+) -> dict | None:
+    """
+    Build one two-leg SPX vertical spread summary.
+    """
+
+    if len(positions) != 2:
+        return None
+
+    parsed_legs = [
+        _build_universal_leg(position)
+        for position in positions
+    ]
+
+    if any(
+        leg is None
+        for leg in parsed_legs
+    ):
+        return None
+
+    legs = [
+        leg
+        for leg in parsed_legs
+        if leg is not None
+    ]
+
+    option_types = {
+        leg["option_type"]
+        for leg in legs
+    }
+
+    if len(option_types) != 1:
+        return None
+
+    long_legs = [
+        leg
+        for leg in legs
+        if leg["direction"] == "LONG"
+    ]
+
+    short_legs = [
+        leg
+        for leg in legs
+        if leg["direction"] == "SHORT"
+    ]
+
+    if (
+        len(long_legs) != 1
+        or len(short_legs) != 1
+    ):
+        return None
+
+    long_leg = long_legs[0]
+    short_leg = short_legs[0]
+
+    option_type = long_leg[
+        "option_type"
+    ]
+
+    quantity = min(
+        long_leg["quantity"],
+        short_leg["quantity"],
+    )
+
+    multiplier = short_leg[
+        "multiplier"
+    ]
+
+    width = abs(
+        short_leg["strike"]
+        - long_leg["strike"]
+    )
+
+    opening_net_credit = (
+        short_leg["open_price"]
+        - long_leg["open_price"]
+    )
+
+    current_net_credit = (
+        short_leg["current_price"]
+        - long_leg["current_price"]
+    )
+
+    is_credit = (
+        opening_net_credit >= 0
+    )
+
+    opening_amount = abs(
+        opening_net_credit
+    )
+
+    opening_dollars = (
+        opening_amount
+        * quantity
+        * multiplier
+    )
+
+    width_dollars = (
+        width
+        * quantity
+        * multiplier
+    )
+
+    calculated_pnl = sum(
+        leg["pnl"]
+        for leg in legs
+    )
+
+    broker_pnl = sum(
+        leg["broker_open_pnl"]
+        for leg in legs
+    )
+
+    use_broker_pnl = all(
+        leg["has_broker_pnl"]
+        for leg in legs
+    )
+
+    pnl = (
+        broker_pnl
+        if use_broker_pnl
+        else calculated_pnl
+    )
+
+    pnl_percent = (
+        pnl
+        / opening_dollars
+        * 100
+        if opening_dollars > 0
+        else 0
+    )
+
+    if is_credit:
+        max_profit = opening_dollars
+        max_risk = max(
+            width_dollars
+            - opening_dollars,
+            0,
+        )
+        spread_kind = "Credit"
+    else:
+        max_risk = opening_dollars
+        max_profit = max(
+            width_dollars
+            - opening_dollars,
+            0,
+        )
+        spread_kind = "Debit"
+
+    type_label = (
+        "Put"
+        if option_type == "P"
+        else "Call"
+    )
+
+    strategy = (
+        f"SPX {type_label} "
+        f"{spread_kind} Spread"
+    )
+
+    expires_at = (
+        short_leg.get("expires_at")
+        or long_leg.get("expires_at")
+    )
+
+    dte = days_until_expiration(
+        expires_at
+    )
+
+    short_distance = None
+
+    if (
+        spx_price is not None
+        and spx_price > 0
+    ):
+        if option_type == "P":
+            short_distance = round(
+                spx_price
+                - short_leg["strike"],
+                2,
+            )
+        else:
+            short_distance = round(
+                short_leg["strike"]
+                - spx_price,
+                2,
+            )
+
+    status, recommendation = (
+        _universal_position_status(
+            pnl_percent=pnl_percent,
+            dte=dte,
+            short_distance=(
+                short_distance
+            ),
+            credit_position=is_credit,
+        )
+    )
+
+    quantity_value = (
+        int(quantity)
+        if float(quantity).is_integer()
+        else quantity
+    )
+
+    summary = {
+        "strategy": strategy,
+        "position_type": "VERTICAL",
+        "spread_type": (
+            spread_kind.upper()
+        ),
+        "option_type": (
+            "PUT"
+            if option_type == "P"
+            else "CALL"
+        ),
+        "underlying": "SPX",
+        "quantity": quantity_value,
+        "expiration": short_leg[
+            "expiration"
+        ],
+        "expires_at": expires_at,
+        "dte": dte,
+        "long_strike": int(
+            long_leg["strike"]
+        ),
+        "short_strike": int(
+            short_leg["strike"]
+        ),
+        "width": int(width),
+        "opening_credit": (
+            round(
+                opening_amount,
+                2,
+            )
+            if is_credit
+            else 0.0
+        ),
+        "opening_debit": (
+            round(
+                opening_amount,
+                2,
+            )
+            if not is_credit
+            else 0.0
+        ),
+        "opening_credit_dollars": (
+            round(
+                opening_dollars,
+                2,
+            )
+            if is_credit
+            else 0.0
+        ),
+        "opening_debit_dollars": (
+            round(
+                opening_dollars,
+                2,
+            )
+            if not is_credit
+            else 0.0
+        ),
+        "current_value": round(
+            abs(current_net_credit),
+            2,
+        ),
+        "current_debit": (
+            round(
+                max(
+                    current_net_credit,
+                    0,
+                ),
+                2,
+            )
+            if is_credit
+            else None
+        ),
+        "pnl": round(
+            pnl,
+            2,
+        ),
+        "calculated_pnl": round(
+            calculated_pnl,
+            2,
+        ),
+        "pnl_percent": round(
+            pnl_percent,
+            1,
+        ),
+        "pnl_is_estimate": (
+            not use_broker_pnl
+        ),
+        "max_profit": round(
+            max_profit,
+            2,
+        ),
+        "max_risk": round(
+            max_risk,
+            2,
+        ),
+        "spx_price": (
+            round(spx_price, 2)
+            if (
+                spx_price is not None
+                and spx_price > 0
+            )
+            else None
+        ),
+        "short_distance": (
+            short_distance
+        ),
+        "status": status,
+        "recommendation": (
+            recommendation
+        ),
+        "price_source": (
+            "live-mid"
+            if any(
+                leg.get(
+                    "price_source"
+                )
+                == "live-mid"
+                for leg in legs
+            )
+            else "close-price"
+        ),
+        "legs": legs,
+    }
+
+    if option_type == "P":
+        summary.update({
+            "buy_put": int(
+                long_leg["strike"]
+            ),
+            "sell_put": int(
+                short_leg["strike"]
+            ),
+        })
+    else:
+        summary.update({
+            "buy_call": int(
+                long_leg["strike"]
+            ),
+            "sell_call": int(
+                short_leg["strike"]
+            ),
+        })
+
+    return summary
+
+
+def build_single_option_summary(
+    position: dict,
+    spx_price: float | None = None,
+) -> dict | None:
+    """
+    Build one long/short SPX call or put summary.
+    """
+
+    leg = _build_universal_leg(
+        position
+    )
+
+    if leg is None:
+        return None
+
+    option_label = (
+        "Call"
+        if leg["option_type"] == "C"
+        else "Put"
+    )
+
+    direction_label = (
+        "Long"
+        if leg["direction"] == "LONG"
+        else "Short"
+    )
+
+    strategy = (
+        f"SPX {direction_label} "
+        f"{option_label}"
+    )
+
+    quantity = leg["quantity"]
+    multiplier = leg["multiplier"]
+
+    opening_dollars = (
+        leg["open_price"]
+        * quantity
+        * multiplier
+    )
+
+    pnl = (
+        leg["broker_open_pnl"]
+        if leg["has_broker_pnl"]
+        else leg["pnl"]
+    )
+
+    pnl_percent = (
+        pnl
+        / opening_dollars
+        * 100
+        if opening_dollars > 0
+        else 0
+    )
+
+    expires_at = leg.get(
+        "expires_at"
+    )
+
+    dte = days_until_expiration(
+        expires_at
+    )
+
+    status, recommendation = (
+        _universal_position_status(
+            pnl_percent=pnl_percent,
+            dte=dte,
+        )
+    )
+
+    quantity_value = (
+        int(quantity)
+        if float(quantity).is_integer()
+        else quantity
+    )
+
+    is_long = (
+        leg["direction"] == "LONG"
+    )
+
+    return {
+        "strategy": strategy,
+        "position_type": "SINGLE",
+        "option_type": (
+            "CALL"
+            if leg["option_type"] == "C"
+            else "PUT"
+        ),
+        "direction": leg[
+            "direction"
+        ],
+        "underlying": "SPX",
+        "quantity": quantity_value,
+        "expiration": leg[
+            "expiration"
+        ],
+        "expires_at": expires_at,
+        "dte": dte,
+        "strike": int(
+            leg["strike"]
+        ),
+        "opening_debit": (
+            round(
+                leg["open_price"],
+                2,
+            )
+            if is_long
+            else 0.0
+        ),
+        "opening_credit": (
+            round(
+                leg["open_price"],
+                2,
+            )
+            if not is_long
+            else 0.0
+        ),
+        "current_value": round(
+            leg["current_price"],
+            2,
+        ),
+        "pnl": round(
+            pnl,
+            2,
+        ),
+        "calculated_pnl": round(
+            leg["pnl"],
+            2,
+        ),
+        "pnl_percent": round(
+            pnl_percent,
+            1,
+        ),
+        "pnl_is_estimate": (
+            not leg[
+                "has_broker_pnl"
+            ]
+        ),
+        "max_profit": None,
+        "max_risk": (
+            round(
+                opening_dollars,
+                2,
+            )
+            if is_long
+            else None
+        ),
+        "spx_price": (
+            round(spx_price, 2)
+            if (
+                spx_price is not None
+                and spx_price > 0
+            )
+            else None
+        ),
+        "status": status,
+        "recommendation": (
+            recommendation
+        ),
+        "price_source": leg.get(
+            "price_source",
+            "close-price",
+        ),
+        "legs": [leg],
+    }
+
+
 def build_position_summaries(
     positions: list[dict],
     spx_price: float | None = None,
 ) -> list[dict]:
     """
-    Group multiple open SPX iron condors.
+    Build all supported open SPX position summaries.
 
-    Tastytrade commonly returns each iron condor as
-    four consecutive legs. Positions are first grouped
-    by root, expiration, and quantity, then evaluated
-    in four-leg blocks.
+    Priority:
+    1. Preserve valid Iron Condors.
+    2. Build two-leg vertical spreads.
+    3. Preserve unmatched legs as single options.
+
+    An open parseable SPX option position should never
+    disappear merely because it is not an Iron Condor.
     """
 
     if not positions:
@@ -797,22 +1508,11 @@ def build_position_summaries(
         if not parsed:
             continue
 
-        try:
-            quantity = abs(
-                float(
-                    position.get(
-                        "quantity",
-                        0,
-                    )
-                    or 0
-                )
+        quantity = abs(
+            safe_float(
+                position.get("quantity")
             )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-            quantity = 0.0
+        )
 
         if quantity <= 0:
             continue
@@ -840,29 +1540,226 @@ def build_position_summaries(
 
     for _, grouped_legs in sorted_groups:
 
-        # A complete Iron Condor requires four legs.
-        if len(grouped_legs) < 4:
-            continue
+        remaining = list(
+            grouped_legs
+        )
 
-        # Process every consecutive four-leg position.
-        for index in range(
-            0,
-            len(grouped_legs),
-            4,
-        ):
-            position_legs = grouped_legs[
-                index:index + 4
-            ]
-
-            if len(position_legs) != 4:
-                continue
-
-            summary = build_iron_condor_summary(
-                positions=position_legs,
-                spx_price=spx_price,
+        # First preserve the existing Iron Condor
+        # behavior whenever a complete 4-leg group
+        # can be recognized.
+        if len(remaining) == 4:
+            condor = (
+                build_iron_condor_summary(
+                    positions=remaining,
+                    spx_price=spx_price,
+                )
             )
 
-            if summary is not None:
-                summaries.append(summary)
+            if condor is not None:
+                condor.setdefault(
+                    "position_type",
+                    "IRON_CONDOR",
+                )
+                summaries.append(
+                    condor
+                )
+                continue
+
+        # Preserve multiple consecutive Iron
+        # Condors of the same expiration/quantity.
+        if (
+            len(remaining) > 4
+            and len(remaining) % 4 == 0
+        ):
+            possible_condors = []
+            valid_blocks = True
+
+            for index in range(
+                0,
+                len(remaining),
+                4,
+            ):
+                block = remaining[
+                    index:index + 4
+                ]
+
+                condor = (
+                    build_iron_condor_summary(
+                        positions=block,
+                        spx_price=spx_price,
+                    )
+                )
+
+                if condor is None:
+                    valid_blocks = False
+                    break
+
+                condor.setdefault(
+                    "position_type",
+                    "IRON_CONDOR",
+                )
+
+                possible_condors.append(
+                    condor
+                )
+
+            if valid_blocks:
+                summaries.extend(
+                    possible_condors
+                )
+                continue
+
+        parsed_remaining = []
+
+        for position in remaining:
+            parsed = (
+                _build_universal_leg(
+                    position
+                )
+            )
+
+            if parsed is None:
+                continue
+
+            parsed_remaining.append({
+                "raw": position,
+                "parsed": parsed,
+            })
+
+        used: set[int] = set()
+
+        # Pair the nearest long/short strikes
+        # of the same option type into verticals.
+        for option_type in (
+            "P",
+            "C",
+        ):
+            short_indexes = [
+                index
+                for index, item
+                in enumerate(
+                    parsed_remaining
+                )
+                if (
+                    item["parsed"][
+                        "option_type"
+                    ]
+                    == option_type
+                    and item["parsed"][
+                        "direction"
+                    ]
+                    == "SHORT"
+                )
+            ]
+
+            short_indexes.sort(
+                key=lambda index:
+                    parsed_remaining[
+                        index
+                    ]["parsed"]["strike"]
+            )
+
+            for short_index in (
+                short_indexes
+            ):
+                if short_index in used:
+                    continue
+
+                long_indexes = [
+                    index
+                    for index, item
+                    in enumerate(
+                        parsed_remaining
+                    )
+                    if (
+                        index not in used
+                        and index
+                        != short_index
+                        and item[
+                            "parsed"
+                        ][
+                            "option_type"
+                        ]
+                        == option_type
+                        and item[
+                            "parsed"
+                        ][
+                            "direction"
+                        ]
+                        == "LONG"
+                    )
+                ]
+
+                if not long_indexes:
+                    continue
+
+                short_strike = (
+                    parsed_remaining[
+                        short_index
+                    ]["parsed"]["strike"]
+                )
+
+                long_index = min(
+                    long_indexes,
+                    key=lambda index: abs(
+                        parsed_remaining[
+                            index
+                        ][
+                            "parsed"
+                        ][
+                            "strike"
+                        ]
+                        - short_strike
+                    ),
+                )
+
+                vertical = (
+                    build_vertical_summary(
+                        positions=[
+                            parsed_remaining[
+                                short_index
+                            ]["raw"],
+                            parsed_remaining[
+                                long_index
+                            ]["raw"],
+                        ],
+                        spx_price=spx_price,
+                    )
+                )
+
+                if vertical is None:
+                    continue
+
+                summaries.append(
+                    vertical
+                )
+
+                used.add(
+                    short_index
+                )
+
+                used.add(
+                    long_index
+                )
+
+        # Anything still unmatched is a real
+        # open option position, so display it.
+        for index, item in enumerate(
+            parsed_remaining
+        ):
+            if index in used:
+                continue
+
+            single = (
+                build_single_option_summary(
+                    position=item["raw"],
+                    spx_price=spx_price,
+                )
+            )
+
+            if single is not None:
+                summaries.append(
+                    single
+                )
 
     return summaries
