@@ -2873,18 +2873,49 @@ def _journal_reporting_rows(
         )
 
         if user_id is not None:
-            # Owner reporting includes legacy rows that
-            # predate user attribution.
-            statement = statement.where(
-                (
+            role_value = (
+                user_context.get("role")
+                if isinstance(
+                    user_context,
+                    dict,
+                )
+                else None
+            )
+
+            if hasattr(
+                role_value,
+                "value",
+            ):
+                role_value = (
+                    role_value.value
+                )
+
+            role = str(
+                role_value
+                or ""
+            ).strip().upper()
+
+            if role == "OWNER":
+                # OWNER reporting includes historical
+                # legacy rows that predate user attribution.
+                statement = statement.where(
+                    (
+                        TradeJournal.user_id
+                        == user_id
+                    )
+                    |
+                    TradeJournal.user_id.is_(
+                        None
+                    )
+                )
+
+            else:
+                # Non-OWNER users may see only rows
+                # explicitly attributed to themselves.
+                statement = statement.where(
                     TradeJournal.user_id
                     == user_id
                 )
-                |
-                TradeJournal.user_id.is_(
-                    None
-                )
-            )
 
         return (
             session.execute(

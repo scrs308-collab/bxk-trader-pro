@@ -8,6 +8,7 @@ from bxk_app.brokers.tastytrade import (
 )
 
 from bxk_app.authorization import (
+    get_authenticated_user,
     require_owner_or_auth_disabled,
 )
 
@@ -30,7 +31,7 @@ router = APIRouter(
 @router.get("/summary")
 def trade_journal_summary(
     user_context: dict = Depends(
-        require_owner_or_auth_disabled
+        get_authenticated_user
     ),
 ):
     return get_trade_journal_summary(
@@ -43,7 +44,7 @@ def trade_journal_trades(
     limit: int = 25,
     include_open: bool = False,
     user_context: dict = Depends(
-        require_owner_or_auth_disabled
+        get_authenticated_user
     ),
 ):
     return get_trade_journal_trades(
