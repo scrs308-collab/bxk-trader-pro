@@ -80,11 +80,21 @@ def get_positions_summary():
     }
 
 
-def get_account_summary():
-    connected = tastytrade_api.authenticate()
+def get_account_summary(
+    *,
+    broker_client=None,
+):
+    active_broker = (
+        broker_client
+        or tastytrade_api
+    )
+
+    connected = (
+        active_broker.authenticate()
+    )
 
     account = (
-        tastytrade_api.get_account_summary()
+        active_broker.get_account_summary()
         if connected
         else None
     )

@@ -135,7 +135,6 @@ def clear_overrides():
     "path",
     [
         "/api/positions-summary",
-        "/api/account-summary",
         "/api/test-tastytrade",
         "/api/test-tastytrade-rest",
         "/api/test-tastytrade-balances",
@@ -207,6 +206,124 @@ def test_beta_position_monitor_requires_own_broker(
     )
 
     assert response.status_code == 409
+
+def test_beta_account_summary_requires_own_broker(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_account",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def override_get_db():
+        session = factory()
+
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[
+        get_db
+    ] = override_get_db
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.get(
+        "/api/account-summary"
+    )
+
+    assert response.status_code == 409
+
+def test_beta_account_summary_uses_own_broker(
+    monkeypatch,
+):
+    from bxk_app.routes import broker as broker_route
+
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_account_connected",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def override_get_db():
+        session = factory()
+
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[
+        get_db
+    ] = override_get_db
+
+    class FakeBroker:
+        def authenticate(self):
+            return True
+
+        def get_account_summary(self):
+            return {
+                "account_number":
+                    "BETA-ONLY",
+                "net_liquidating_value":
+                    12345.67,
+            }
+
+    fake_broker = FakeBroker()
+
+    monkeypatch.setattr(
+        broker_route,
+        "get_broker_connection_status",
+        lambda session, *, user_context: {
+            "source":
+                "user_connection",
+            "connected":
+                True,
+        },
+    )
+
+    monkeypatch.setattr(
+        broker_route,
+        "resolve_tastytrade_broker",
+        lambda session, *, user_context:
+            fake_broker,
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.get(
+        "/api/account-summary"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["connected"] is True
+    assert (
+        data["account"]["account_number"]
+        == "BETA-ONLY"
+    )
 
 def test_market_header_hides_owner_context():
     data = MarketData()
