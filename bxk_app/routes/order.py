@@ -2405,14 +2405,6 @@ def order_dry_run_api(
     )
 
 
-@router.get(
-    "/order-status",
-    dependencies=[
-        Depends(
-            require_owner_or_auth_disabled
-        )
-    ],
-)
 def order_status(
     order_id: str = Query(
         ...,
@@ -2420,10 +2412,17 @@ def order_status(
         max_length=100,
         pattern=r"^[A-Za-z0-9-]+$",
     ),
+    broker_client=None,
 ):
     """Independently reconcile one Tastytrade order."""
 
-    account_number = broker.get_first_account_number()
+
+    active_broker = (
+        broker_client
+        or broker
+    )
+
+    account_number = active_broker.get_first_account_number()
 
     if not account_number:
         return {
@@ -2432,12 +2431,12 @@ def order_status(
                 "Tastytrade account verification failed."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "No Tastytrade account available."
             ],
         }
 
-    broker_order = broker.get_order(
+    broker_order = active_broker.get_order(
         order_id,
         account_number=account_number,
     )
@@ -2451,7 +2450,7 @@ def order_status(
                 "for independent verification yet."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "Order reconciliation failed."
             ],
         }
@@ -2477,6 +2476,62 @@ def order_status(
         ),
         **_order_reconciliation(broker_order),
     }
+
+
+
+@router.get("/order-status")
+def order_status_api(
+    order_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9-]+$",
+    ),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    role_value = user_context.get(
+        "role"
+    )
+
+    if hasattr(
+        role_value,
+        "value",
+    ):
+        role_value = role_value.value
+
+    role = str(
+        role_value
+        or ""
+    ).strip().upper()
+
+    if role not in {
+        "OWNER",
+        "BETA",
+    }:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "BXK order-status access requires "
+                "OWNER or BETA permission."
+            ),
+        )
+
+    broker_client = (
+        _resolve_request_broker(
+            session,
+            user_context,
+        )
+    )
+
+    return order_status(
+        order_id=order_id,
+        broker_client=broker_client,
+    )
 
 
 def order_submit(

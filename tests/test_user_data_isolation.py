@@ -1127,3 +1127,152 @@ def test_beta_order_submit_uses_own_broker_and_db_audit(
             audit.account_masked
             == "***5678"
         )
+
+
+def test_beta_order_status_without_broker_returns_409(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    beta_id = add_user(
+        session_factory,
+        username="beta_status_none",
+        role=UserRole.BETA,
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.get(
+        "/api/order-status?order_id=ORDER-77"
+    )
+
+    assert response.status_code == 409
+
+
+def test_beta_order_status_uses_own_broker(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    beta_id = add_user(
+        session_factory,
+        username="beta_status_own",
+        role=UserRole.BETA,
+    )
+
+    class BetaBroker:
+        last_error = None
+
+        def get_first_account_number(
+            self,
+        ):
+            return "BETA1234"
+
+        def get_order(
+            self,
+            order_id,
+            account_number=None,
+        ):
+            assert (
+                account_number
+                == "BETA1234"
+            )
+
+            return {
+                "id": order_id,
+                "status": "Filled",
+                "filled-quantity": "1",
+                "remaining-quantity": "0",
+                "average-fill-price": "3.25",
+            }
+
+    beta_broker = BetaBroker()
+
+    monkeypatch.setattr(
+        order_route,
+        "_resolve_request_broker",
+        lambda session, user_context:
+            beta_broker,
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.get(
+        "/api/order-status?order_id=ORDER-77"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["status"]
+        == "RECONCILED"
+    )
+
+    assert (
+        payload["order_id"]
+        == "ORDER-77"
+    )
+
+
+def test_viewer_cannot_use_order_status(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    viewer_id = add_user(
+        session_factory,
+        username="viewer_status",
+        role=UserRole.VIEWER,
+    )
+
+    def resolver_must_not_run(
+        *args,
+        **kwargs,
+    ):
+        raise AssertionError(
+            "VIEWER must be rejected before "
+            "broker resolution."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "_resolve_request_broker",
+        resolver_must_not_run,
+    )
+
+    client = client_with_user(
+        viewer_id
+    )
+
+    response = client.get(
+        "/api/order-status?order_id=ORDER-77"
+    )
+
+    assert response.status_code == 403
