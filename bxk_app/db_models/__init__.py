@@ -1,3 +1,6 @@
+from bxk_app.db_models.broker_connection import (
+    BrokerConnection,
+)
 from bxk_app.db_models.overnight_alert_state import (
     OvernightAlertState,
 )
@@ -9,6 +12,7 @@ from bxk_app.db_models.trade_journal import TradeJournal
 
 
 __all__ = [
+    "BrokerConnection",
     "TradeJournal",
     "OvernightAlertState",
     "SmsConsent",

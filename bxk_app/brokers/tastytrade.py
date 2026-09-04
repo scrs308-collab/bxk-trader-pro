@@ -21,11 +21,84 @@ ACCESS_TOKEN_REFRESH_SECONDS = 13 * 60
 
 
 class TastytradeBroker(BrokerBase):
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        client_secret: str | None = None,
+        refresh_token: str | None = None,
+        account_number: str | None = None,
+        base_url: str | None = None,
+        live_trading_enabled: bool | None = None,
+    ):
+        self.client_secret = (
+            None
+            if client_secret is None
+            else str(client_secret).strip()
+        )
+
+        self.refresh_token = (
+            None
+            if refresh_token is None
+            else str(refresh_token).strip()
+        )
+
+        self.account_number = (
+            None
+            if account_number is None
+            else str(account_number).strip()
+        )
+
+        self.base_url = (
+            None
+            if base_url is None
+            else str(base_url).strip()
+        )
+
+        # Existing global OWNER broker preserves its
+        # historical behavior. Per-user broker instances
+        # can additionally disable live execution.
+        self.live_trading_enabled = (
+            True
+            if live_trading_enabled is None
+            else bool(live_trading_enabled)
+        )
+
         self.access_token: str | None = None
         self.token_created_at: float = 0.0
         self.last_error: str | None = None
         self.session = requests.Session()
+
+    def _resolved_client_secret(self) -> str:
+        if self.client_secret is not None:
+            return self.client_secret
+
+        return str(
+            TASTYTRADE_CLIENT_SECRET or ""
+        ).strip()
+
+    def _resolved_refresh_token(self) -> str:
+        if self.refresh_token is not None:
+            return self.refresh_token
+
+        return str(
+            TASTYTRADE_REFRESH_TOKEN or ""
+        ).strip()
+
+    def _resolved_account_number(self) -> str:
+        if self.account_number is not None:
+            return self.account_number
+
+        return str(
+            TASTYTRADE_ACCOUNT_NUMBER or ""
+        ).strip()
+
+    def _resolved_base_url(self) -> str:
+        if self.base_url is not None:
+            return self.base_url
+
+        return str(
+            TASTYTRADE_BASE_URL or ""
+        ).strip()
 
     def reset_authentication(self):
         """
@@ -61,11 +134,11 @@ class TastytradeBroker(BrokerBase):
 
         try:
             response = self.session.post(
-                f"{TASTYTRADE_BASE_URL}/oauth/token",
+                f"{self._resolved_base_url()}/oauth/token",
                 json={
                     "grant_type": "refresh_token",
-                    "refresh_token": TASTYTRADE_REFRESH_TOKEN,
-                    "client_secret": TASTYTRADE_CLIENT_SECRET,
+                    "refresh_token": self._resolved_refresh_token(),
+                    "client_secret": self._resolved_client_secret(),
                 },
                 timeout=15,
             )
@@ -153,7 +226,7 @@ class TastytradeBroker(BrokerBase):
         if not headers:
             return None
 
-        url = f"{TASTYTRADE_BASE_URL}{path}"
+        url = f"{self._resolved_base_url()}{path}"
 
         try:
             response = self.session.request(
@@ -244,9 +317,9 @@ class TastytradeBroker(BrokerBase):
         return self._items_from_response(response)
 
     def get_first_account_number(self):
-        target_account = str(
-            TASTYTRADE_ACCOUNT_NUMBER or ""
-        ).strip()
+        target_account = (
+            self._resolved_account_number()
+        )
 
         if not target_account:
             self.last_error = (
@@ -1286,7 +1359,10 @@ class TastytradeBroker(BrokerBase):
         BXK_LIVE_TRADING_ENABLED is explicitly enabled.
         """
 
-        if not BXK_LIVE_TRADING_ENABLED:
+        if (
+            not BXK_LIVE_TRADING_ENABLED
+            or not self.live_trading_enabled
+        ):
             self.last_error = (
                 "BXK live trading is disabled."
             )
