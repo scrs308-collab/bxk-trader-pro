@@ -1130,43 +1130,6 @@ def order_validate_api(
         broker_client=broker_client,
     )
 
-@router.get(
-    "/order-validate",
-)
-def order_validate_api(
-    strategy: str = Query("auto"),
-    dte: int = Query(
-        1,
-        ge=0,
-        le=_MAX_ORDER_DTE,
-    ),
-    wing_width: int = Query(25),
-    contracts: int = Query(
-        1,
-        ge=1,
-        le=10,
-    ),
-    user_context: dict = Depends(
-        get_authenticated_user
-    ),
-    session: Session = Depends(
-        get_db
-    ),
-):
-    broker_client = (
-        _resolve_request_broker(
-            session,
-            user_context,
-        )
-    )
-
-    return order_validate(
-        strategy=strategy,
-        dte=dte,
-        wing_width=wing_width,
-        contracts=contracts,
-        broker_client=broker_client,
-    )
 
 def _check_existing_position_overlap(
     order: dict,
@@ -2183,50 +2146,6 @@ def order_dry_run_api(
         ),
     )
 
-@router.post(
-    "/order-dry-run",
-)
-def order_dry_run_api(
-    strategy: str = Query("auto"),
-    dte: int = Query(
-        1,
-        ge=0,
-        le=_MAX_ORDER_DTE,
-    ),
-    wing_width: int = Query(25),
-    contracts: int = Query(
-        1,
-        ge=1,
-        le=10,
-    ),
-    review_id: str | None = Query(None),
-    user_context: dict = Depends(
-        get_authenticated_user
-    ),
-    session: Session = Depends(
-        get_db
-    ),
-):
-    broker_client = (
-        _resolve_request_broker(
-            session,
-            user_context,
-        )
-    )
-
-    return order_dry_run(
-        strategy=strategy,
-        dte=dte,
-        wing_width=wing_width,
-        contracts=contracts,
-        review_id=review_id,
-        broker_client=broker_client,
-        write_execution_audit=(
-            _user_is_owner(
-                user_context
-            )
-        ),
-    )
 
 @router.get(
     "/order-status",
