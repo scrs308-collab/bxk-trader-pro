@@ -201,3 +201,10 @@ if not BXK_ORDER_AUDIT_FILE:
     raise ValueError(
         "BXK_ORDER_AUDIT_FILE cannot be empty."
     )
+
+# Encryption key for per-user broker credentials.
+# Store only in runtime environment / Railway secrets.
+BXK_BROKER_CREDENTIAL_KEY = os.getenv(
+    "BXK_BROKER_CREDENTIAL_KEY",
+    "",
+).strip()

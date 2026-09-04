@@ -7,3 +7,4 @@ tastytrade
 SQLAlchemy
 psycopg[binary]
 alembic
+cryptography==50.0.1
