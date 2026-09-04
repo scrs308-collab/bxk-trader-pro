@@ -38,6 +38,9 @@ from bxk_app.services.execution_audit import (
 from bxk_app.services.trade_journal_service import (
     record_submitted_trade,
 )
+from bxk_app.services.user_execution_audit_service import (
+    write_user_order_audit,
+)
 from bxk_app.services.order_builder import build_order
 
 def _write_execution_audit(
@@ -57,6 +60,44 @@ def _write_execution_audit(
         return str(exc)
 
     return None
+
+
+
+def _write_user_execution_audit_safely(
+    *,
+    session: Session,
+    user_context: dict,
+    event,
+    **details,
+):
+    """
+    Write the durable per-user execution audit.
+
+    Return None on success, matching the historical
+    file-audit helper contract used by order_submit.
+    """
+
+    try:
+        write_user_order_audit(
+            session,
+            user_context=user_context,
+            event=event,
+            **details,
+        )
+
+        return None
+
+    except Exception as exc:
+        try:
+            session.rollback()
+        except Exception:
+            pass
+
+        return (
+            type(exc).__name__
+            + ": "
+            + str(exc)
+        )
 
 def _record_trade_journal_safely(
     **details,
@@ -2438,14 +2479,6 @@ def order_status(
     }
 
 
-@router.post(
-    "/order-submit",
-    dependencies=[
-        Depends(
-            require_owner_or_auth_disabled
-        )
-    ],
-)
 def order_submit(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
@@ -2456,6 +2489,9 @@ def order_submit(
     user_context: dict = Depends(
         require_owner_or_auth_disabled
     ),
+    broker_client=None,
+    execution_audit_writer=None,
+    write_preflight_audit: bool = True,
 ):
     """
     Submit the current approved BXK order to Tastytrade.
@@ -2464,6 +2500,17 @@ def order_submit(
     Requires explicit confirmation and the BXK
     live-trading master switch to be enabled.
     """
+
+
+    active_broker = (
+        broker_client
+        or broker
+    )
+
+    audit_writer = (
+        execution_audit_writer
+        or _write_execution_audit
+    )
 
     if not confirm_live:
         return {
@@ -2484,6 +2531,10 @@ def order_submit(
         wing_width=wing_width,
         contracts=contracts,
         review_id=review_id,
+        broker_client=active_broker,
+        write_execution_audit=(
+            write_preflight_audit
+        ),
         review_scope=(
             _execution_scope_key(
                 user_context
@@ -2495,7 +2546,7 @@ def order_submit(
         return preflight
 
     if not BXK_LIVE_TRADING_ENABLED:
-        audit_error = _write_execution_audit(
+        audit_error = audit_writer(
             "SUBMISSION_BLOCKED",
             status="LIVE_TRADING_DISABLED",
             reason_code=
@@ -2529,7 +2580,7 @@ def order_submit(
             "order": preflight.get("order"),
         }
 
-    account_number = broker.get_first_account_number()
+    account_number = active_broker.get_first_account_number()
 
     if not account_number:
         return {
@@ -2540,16 +2591,16 @@ def order_submit(
                 "failed before submission."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "No Tastytrade account available."
             ],
         }
 
-    positions = broker.get_positions(
+    positions = active_broker.get_positions(
         account_number=account_number,
     )
 
-    if broker.last_error:
+    if active_broker.last_error:
         return {
             "status": "BLOCKED",
             "live_submission_enabled": True,
@@ -2559,7 +2610,7 @@ def order_submit(
                 "submission."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "Position verification failed."
             ],
         }
@@ -2590,11 +2641,11 @@ def order_submit(
             "order": order,
         }
 
-    live_orders = broker.get_live_orders(
+    live_orders = active_broker.get_live_orders(
         account_number=account_number,
     )
 
-    if broker.last_error:
+    if active_broker.last_error:
         return {
             "status": "BLOCKED",
             "reason_code":
@@ -2606,7 +2657,7 @@ def order_submit(
                 "submission."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or (
                     "Working-order verification "
                     "failed."
@@ -2733,7 +2784,15 @@ def order_submit(
 
     order = locked_order
 
-    if not _reserve_order_submission(order):
+    if not _reserve_order_submission(
+        order,
+        scope_key=(
+            _execution_scope_key(
+                user_context
+            )
+        ),
+        account_number=account_number,
+    ):
         return {
             "status": "BLOCKED",
             "reason_code":
@@ -2750,7 +2809,7 @@ def order_submit(
             "order": order,
         }
 
-    audit_error = _write_execution_audit(
+    audit_error = audit_writer(
         "SUBMISSION_ATTEMPT",
         status="PENDING",
         review_id=review_id,
@@ -2759,7 +2818,15 @@ def order_submit(
     )
 
     if audit_error:
-        _release_order_submission(order)
+        _release_order_submission(
+            order,
+            scope_key=(
+                _execution_scope_key(
+                    user_context
+                )
+            ),
+            account_number=account_number,
+        )
         return {
             "status": "BLOCKED",
             "reason_code":
@@ -2781,13 +2848,13 @@ def order_submit(
             "order": order,
         }
 
-    live_order = broker.submit_live_order(
+    live_order = active_broker.submit_live_order(
         order,
         account_number=account_number,
     )
 
     if live_order is None:
-        audit_error = _write_execution_audit(
+        audit_error = audit_writer(
             "SUBMISSION_UNCONFIRMED",
             status="SUBMISSION_UNCONFIRMED",
             reason_code=
@@ -2813,7 +2880,7 @@ def order_submit(
                 "Verify the broker account first."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or (
                     "No confirmed broker response "
                     "was received."
@@ -2851,7 +2918,7 @@ def order_submit(
     )
 
     if not submission_confirmed:
-        audit_error = _write_execution_audit(
+        audit_error = audit_writer(
             "SUBMISSION_UNCONFIRMED",
             status="SUBMISSION_UNCONFIRMED",
             reason_code=
@@ -2892,7 +2959,7 @@ def order_submit(
             "order": order,
         }
 
-    audit_error = _write_execution_audit(
+    audit_error = audit_writer(
         "SUBMITTED",
         status="SUBMITTED",
         review_id=review_id,
@@ -2923,11 +2990,11 @@ def order_submit(
         else "***"
     )
 
-    reconciled_order = broker.get_order(
+    reconciled_order = active_broker.get_order(
         order_id,
         account_number=account_number,
     )
-    reconciliation_error = broker.last_error
+    reconciliation_error = active_broker.last_error
     reconciliation = (
         {
             "status": "RECONCILED",
@@ -2973,3 +3040,137 @@ def order_submit(
         "order": order,
         "broker_order": submitted_order,
     }
+
+
+@router.post("/order-submit")
+def order_submit_api(
+    strategy: str = Query("auto"),
+    dte: int = Query(
+        1,
+        ge=0,
+        le=_MAX_ORDER_DTE,
+    ),
+    wing_width: int = Query(25),
+    contracts: int = Query(
+        1,
+        ge=1,
+        le=10,
+    ),
+    confirm_live: bool = Query(False),
+    review_id: str | None = Query(None),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    role_value = user_context.get(
+        "role"
+    )
+
+    if hasattr(
+        role_value,
+        "value",
+    ):
+        role_value = role_value.value
+
+    role = str(
+        role_value
+        or ""
+    ).strip().upper()
+
+    if role == "OWNER":
+        active_broker = (
+            _resolve_request_broker(
+                session,
+                user_context,
+            )
+        )
+
+        audit_writer = (
+            _write_execution_audit
+        )
+        write_preflight_audit = True
+
+    elif role == "BETA":
+        active_broker = (
+            _resolve_request_broker(
+                session,
+                user_context,
+            )
+        )
+
+        if not bool(
+            getattr(
+                active_broker,
+                "live_trading_enabled",
+                False,
+            )
+        ):
+            return {
+                "status":
+                    "LIVE_TRADING_DISABLED",
+                "reason_code":
+                    "USER_LIVE_TRADING_DISABLED",
+                "live_submission_enabled":
+                    False,
+                "global_live_trading_enabled":
+                    bool(
+                        BXK_LIVE_TRADING_ENABLED
+                    ),
+                "user_live_trading_enabled":
+                    False,
+                "message": (
+                    "Live trading is not enabled "
+                    "for this BXK user."
+                ),
+                "errors": [
+                    (
+                        "An OWNER must enable live "
+                        "trading for this user's "
+                        "Tastytrade connection."
+                    )
+                ],
+            }
+
+        def audit_writer(
+            event,
+            **details,
+        ):
+            return (
+                _write_user_execution_audit_safely(
+                    session=session,
+                    user_context=user_context,
+                    event=event,
+                    **details,
+                )
+            )
+
+        write_preflight_audit = False
+
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "BXK live order access requires "
+                "OWNER or BETA permission."
+            ),
+        )
+
+    return order_submit(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+        confirm_live=confirm_live,
+        review_id=review_id,
+        user_context=user_context,
+        broker_client=active_broker,
+        execution_audit_writer=(
+            audit_writer
+        ),
+        write_preflight_audit=(
+            write_preflight_audit
+        ),
+    )

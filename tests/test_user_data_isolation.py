@@ -1,4 +1,5 @@
 import pytest
+import bxk_app.routes.order as order_route
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import (
@@ -11,6 +12,9 @@ from bxk_app import config
 from bxk_app.database import (
     Base,
     get_db,
+)
+from bxk_app.db_models.execution_audit import (
+    ExecutionAudit,
 )
 from bxk_app.db_models.user import (
     User,
@@ -857,7 +861,7 @@ def test_beta_cannot_run_order_submit(
         "/api/order-submit?confirm_live=true"
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 409
 
 
 def test_owner_can_reach_order_validate(
@@ -896,3 +900,230 @@ def test_owner_can_reach_order_validate(
         response.json()["status"]
         == "BLOCKED"
     )
+
+
+def test_beta_order_submit_requires_live_permission(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    beta_id = add_user(
+        session_factory,
+        username="beta_submit_disabled",
+        role=UserRole.BETA,
+    )
+
+    class DisabledBroker:
+        live_trading_enabled = False
+
+    monkeypatch.setattr(
+        order_route,
+        "_resolve_request_broker",
+        lambda session, user_context:
+            DisabledBroker(),
+    )
+
+    def must_not_submit(**kwargs):
+        raise AssertionError(
+            "Internal live submit must not run "
+            "when user live trading is disabled."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "order_submit",
+        must_not_submit,
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.post(
+        (
+            "/api/order-submit"
+            "?confirm_live=true"
+            "&review_id=beta-disabled-review"
+        )
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["reason_code"]
+        == "USER_LIVE_TRADING_DISABLED"
+    )
+
+    assert (
+        payload[
+            "user_live_trading_enabled"
+        ]
+        is False
+    )
+
+
+def test_beta_order_submit_uses_own_broker_and_db_audit(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    beta_id = add_user(
+        session_factory,
+        username="beta_submit_enabled",
+        role=UserRole.BETA,
+    )
+
+    class EnabledBroker:
+        live_trading_enabled = True
+
+    beta_broker = EnabledBroker()
+
+    monkeypatch.setattr(
+        order_route,
+        "_resolve_request_broker",
+        lambda session, user_context:
+            beta_broker,
+    )
+
+    def global_audit_must_not_run(
+        *args,
+        **kwargs,
+    ):
+        raise AssertionError(
+            "BETA submission must not write "
+            "to OWNER execution audit."
+        )
+
+    monkeypatch.setattr(
+        order_route,
+        "_write_execution_audit",
+        global_audit_must_not_run,
+    )
+
+    captured = {}
+
+    def fake_internal_submit(
+        **kwargs,
+    ):
+        captured.update(
+            kwargs
+        )
+
+        audit_error = (
+            kwargs[
+                "execution_audit_writer"
+            ](
+                "SUBMISSION_ATTEMPT",
+                status="PENDING",
+                review_id=
+                    "beta-review-123456",
+                account=
+                    "BETA12345678",
+                order={
+                    "strategy":
+                        "SPX Iron Condor",
+                    "symbol":
+                        "SPX",
+                    "quantity":
+                        1,
+                },
+            )
+        )
+
+        assert audit_error is None
+
+        return {
+            "status": "SUBMITTED",
+            "test": True,
+        }
+
+    monkeypatch.setattr(
+        order_route,
+        "order_submit",
+        fake_internal_submit,
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.post(
+        (
+            "/api/order-submit"
+            "?confirm_live=true"
+            "&review_id=beta-review-123456"
+        )
+    )
+
+    assert response.status_code == 200
+
+    assert (
+        response.json()["status"]
+        == "SUBMITTED"
+    )
+
+    assert (
+        captured[
+            "broker_client"
+        ]
+        is beta_broker
+    )
+
+    assert (
+        captured[
+            "write_preflight_audit"
+        ]
+        is False
+    )
+
+    assert (
+        str(
+            captured[
+                "user_context"
+            ]["user_id"]
+        )
+        == beta_id
+    )
+
+    with session_factory() as session:
+        rows = (
+            session.query(
+                ExecutionAudit
+            )
+            .all()
+        )
+
+        assert len(rows) == 1
+
+        audit = rows[0]
+
+        assert (
+            str(audit.user_id)
+            == beta_id
+        )
+
+        assert (
+            audit.event
+            == "SUBMISSION_ATTEMPT"
+        )
+
+        assert (
+            audit.account_masked
+            == "***5678"
+        )
