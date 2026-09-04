@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from bxk_app.routes.broker import (
     router as broker_router,
 )
+from bxk_app.routes.broker_connection import (
+    router as broker_connection_router,
+)
 from bxk_app.routes.health import (
     router as health_router,
 )
@@ -53,6 +56,7 @@ router.include_router(health_router)
 router.include_router(market_router)
 router.include_router(recommendation_router)
 router.include_router(broker_router)
+router.include_router(broker_connection_router)
 router.include_router(positions_router)
 router.include_router(options_router)
 router.include_router(scanner_router)
