@@ -470,6 +470,7 @@ def connect_tastytrade_account(
 
         connection.is_active = True
         connection.is_verified = True
+        connection.live_trading_enabled = False
         connection.last_verified_at = now
 
     session.commit()

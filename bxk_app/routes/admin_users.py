@@ -19,6 +19,7 @@ from bxk_app.services.admin_user_service import (
     create_user,
     list_users,
     set_user_active,
+    set_user_broker_live_trading,
 )
 
 
@@ -34,6 +35,14 @@ class AdminUserStatusUpdate(BaseModel):
     )
 
     is_active: bool
+
+
+class AdminBrokerLiveTradingUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    enabled: bool
 
 
 class AdminUserCreate(BaseModel):
@@ -134,3 +143,43 @@ def admin_set_user_status(
     return {
         "user": user,
     }
+
+
+@router.patch(
+    "/{user_id}/broker-live-trading"
+)
+def admin_set_broker_live_trading(
+    user_id: str,
+    request_data: AdminBrokerLiveTradingUpdate,
+    _owner: dict = Depends(
+        require_owner
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    try:
+        broker_status = (
+            set_user_broker_live_trading(
+                session,
+                user_id=user_id,
+                enabled=request_data.enabled,
+            )
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "broker": broker_status,
+    }
+

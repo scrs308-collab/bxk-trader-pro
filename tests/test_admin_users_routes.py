@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import (
     Session,
     sessionmaker,
@@ -11,6 +11,9 @@ from sqlalchemy.pool import StaticPool
 
 from bxk_app import config
 from bxk_app.database import Base, get_db
+from bxk_app.db_models.broker_connection import (
+    BrokerConnection,
+)
 from bxk_app.db_models.user import User, UserRole
 from bxk_app.main import app
 from bxk_app.services import auth_service
@@ -516,3 +519,184 @@ def test_admin_status_update_returns_404_for_missing_user(
     )
 
     assert response.status_code == 404
+
+
+def test_owner_can_enable_beta_broker_live_trading(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner_live",
+        email="owner_live@example.com",
+        role=UserRole.OWNER,
+    )
+
+    beta_id = add_user(
+        factory,
+        username="beta_live",
+        email="beta_live@example.com",
+        role=UserRole.BETA,
+    )
+
+    with factory() as session:
+        connection = BrokerConnection(
+            user_id=uuid.UUID(
+                beta_id
+            ),
+            broker="tastytrade",
+            client_secret_encrypted="encrypted-secret",
+            refresh_token_encrypted="encrypted-refresh",
+            account_number="BETA1234",
+            is_active=True,
+            is_verified=True,
+            live_trading_enabled=False,
+        )
+
+        session.add(
+            connection
+        )
+        session.commit()
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta_id}"
+            "/broker-live-trading"
+        ),
+        json={
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    broker_status = (
+        response.json()["broker"]
+    )
+
+    assert (
+        broker_status[
+            "live_trading_enabled"
+        ]
+        is True
+    )
+
+    assert (
+        broker_status["user_id"]
+        == beta_id
+    )
+
+    with factory() as session:
+        connection = session.scalar(
+            select(
+                BrokerConnection
+            ).where(
+                BrokerConnection.user_id
+                == uuid.UUID(beta_id)
+            )
+        )
+
+        assert connection is not None
+
+        assert (
+            connection.live_trading_enabled
+            is True
+        )
+
+
+def test_beta_cannot_enable_broker_live_trading(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta1_id = add_user(
+        factory,
+        username="beta_live_1",
+        email="beta_live_1@example.com",
+        role=UserRole.BETA,
+    )
+
+    beta2_id = add_user(
+        factory,
+        username="beta_live_2",
+        email="beta_live_2@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        beta1_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta2_id}"
+            "/broker-live-trading"
+        ),
+        json={
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_live_trading_requires_broker_connection(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner_no_broker",
+        email="owner_no_broker@example.com",
+        role=UserRole.OWNER,
+    )
+
+    beta_id = add_user(
+        factory,
+        username="beta_no_broker",
+        email="beta_no_broker@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta_id}"
+            "/broker-live-trading"
+        ),
+        json={
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 404
+
+    assert (
+        "Tastytrade connection"
+        in response.json()["detail"]
+    )
+

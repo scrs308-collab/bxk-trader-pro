@@ -525,3 +525,104 @@ def test_disconnect_removes_only_current_user_connection(
         )
 
         assert connection is None
+
+
+def test_reconnect_resets_live_trading_permission(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    beta_id = add_user(
+        session_factory,
+        username="beta_reconnect",
+        email="beta_reconnect@example.com",
+    )
+
+    monkeypatch.setattr(
+        broker_connection_service,
+        "verify_tastytrade_credentials",
+        lambda **kwargs: [
+            {
+                "account_number":
+                    "BETA9999",
+                "nickname":
+                    "Beta Account",
+            }
+        ],
+    )
+
+    client = client_with_user(
+        beta_id
+    )
+
+    first = client.post(
+        "/api/broker-connection/connect",
+        json={
+            "client_secret":
+                "secret-one",
+            "refresh_token":
+                "refresh-one",
+            "account_number":
+                "BETA9999",
+        },
+    )
+
+    assert first.status_code == 200
+
+    with session_factory() as session:
+        connection = session.scalar(
+            select(
+                BrokerConnection
+            ).where(
+                BrokerConnection.user_id
+                == uuid.UUID(beta_id)
+            )
+        )
+
+        connection.live_trading_enabled = True
+
+        session.commit()
+
+    second = client.post(
+        "/api/broker-connection/connect",
+        json={
+            "client_secret":
+                "secret-two",
+            "refresh_token":
+                "refresh-two",
+            "account_number":
+                "BETA9999",
+        },
+    )
+
+    assert second.status_code == 200
+
+    assert (
+        second.json()[
+            "user_live_trading_enabled"
+        ]
+        is False
+    )
+
+    with session_factory() as session:
+        connection = session.scalar(
+            select(
+                BrokerConnection
+            ).where(
+                BrokerConnection.user_id
+                == uuid.UUID(beta_id)
+            )
+        )
+
+        assert (
+            connection.live_trading_enabled
+            is False
+        )
+
