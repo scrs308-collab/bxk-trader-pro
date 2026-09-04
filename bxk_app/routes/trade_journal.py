@@ -1,15 +1,18 @@
 from fastapi import (
     APIRouter,
     Depends,
+    HTTPException,
 )
-
-from bxk_app.brokers.tastytrade import (
-    broker,
-)
+from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
     get_authenticated_user,
-    require_owner_or_auth_disabled,
+)
+from bxk_app.database import get_db
+from bxk_app.services.broker_connection_service import (
+    BrokerConnectionInvalid,
+    BrokerConnectionRequired,
+    resolve_tastytrade_broker,
 )
 
 from bxk_app.services.trade_journal_backfill_service import (
@@ -58,11 +61,60 @@ def trade_journal_backfill(
     days: int = 30,
     dry_run: bool = True,
     user_context: dict = Depends(
-        require_owner_or_auth_disabled
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
     ),
 ):
+    role_value = user_context.get(
+        "role"
+    )
+
+    if hasattr(
+        role_value,
+        "value",
+    ):
+        role_value = role_value.value
+
+    role = str(
+        role_value or ""
+    ).strip().upper()
+
+    if role not in {
+        "OWNER",
+        "BETA",
+    }:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Trade-journal backfill requires "
+                "OWNER or BETA permission."
+            ),
+        )
+
+    try:
+        broker_client = (
+            resolve_tastytrade_broker(
+                session,
+                user_context=user_context,
+            )
+        )
+
+    except BrokerConnectionRequired as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    except BrokerConnectionInvalid as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
     return backfill_trade_journal(
-        broker_client=broker,
+        broker_client=broker_client,
         user_context=user_context,
         days=days,
         dry_run=dry_run,
