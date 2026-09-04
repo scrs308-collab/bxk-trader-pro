@@ -560,6 +560,7 @@ def observe_open_position(
     *,
     observed_at=None,
     session_factory=None,
+    user_context=None,
 ):
     """
     Preserve meaningful live extremes for a linked
@@ -643,7 +644,45 @@ def observe_open_position(
                 TradeJournal.broker_order_id
                 == broker_order_id
             )
-            .with_for_update()
+        )
+
+        user_id = _user_id(
+            user_context
+        )
+
+        if user_id is not None:
+            role = str(
+                (
+                    user_context
+                    or {}
+                ).get(
+                    "role"
+                )
+                or ""
+            ).strip().upper()
+
+            if role == "OWNER":
+                # OWNER retains access to legacy journal
+                # rows created before user attribution.
+                statement = statement.where(
+                    (
+                        TradeJournal.user_id
+                        == user_id
+                    )
+                    |
+                    TradeJournal.user_id.is_(
+                        None
+                    )
+                )
+
+            else:
+                statement = statement.where(
+                    TradeJournal.user_id
+                    == user_id
+                )
+
+        statement = (
+            statement.with_for_update()
         )
 
         journal = session.execute(
@@ -832,6 +871,7 @@ def observe_linked_positions(
     *,
     observed_at=None,
     session_factory=None,
+    user_context=None,
 ):
     """
     Observe every broker-linked position independently.
@@ -872,6 +912,8 @@ def observe_linked_positions(
                         observed_at,
                     session_factory=
                         session_factory,
+                    user_context=
+                        user_context,
                 )
             )
 
@@ -1560,6 +1602,7 @@ def reconcile_missing_trade_journals(
     *,
     broker_client,
     session_factory=None,
+    user_context=None,
 ):
     """
     Reconcile journal rows that are no longer present
@@ -1603,19 +1646,56 @@ def reconcile_missing_trade_journals(
     )
 
     with factory() as session:
-        candidates = (
-            session.execute(
-                select(
-                    TradeJournal
-                )
-                .where(
-                    TradeJournal.status.in_(
-                        (
-                            "SUBMITTED",
-                            "OPEN",
-                        )
+        statement = (
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.status.in_(
+                    (
+                        "SUBMITTED",
+                        "OPEN",
                     )
                 )
+            )
+        )
+
+        user_id = _user_id(
+            user_context
+        )
+
+        if user_id is not None:
+            role = str(
+                (
+                    user_context
+                    or {}
+                ).get(
+                    "role"
+                )
+                or ""
+            ).strip().upper()
+
+            if role == "OWNER":
+                statement = statement.where(
+                    (
+                        TradeJournal.user_id
+                        == user_id
+                    )
+                    |
+                    TradeJournal.user_id.is_(
+                        None
+                    )
+                )
+
+            else:
+                statement = statement.where(
+                    TradeJournal.user_id
+                    == user_id
+                )
+
+        candidates = (
+            session.execute(
+                statement
             )
             .scalars()
             .all()
@@ -3609,6 +3689,7 @@ def get_trade_journal_trades(
 def get_open_trade_journal_candidates(
     *,
     session_factory=None,
+    user_context=None,
 ):
     """
     Return open journal rows suitable for exact-symbol
@@ -3632,18 +3713,56 @@ def get_open_trade_journal_candidates(
     )
 
     with factory() as session:
-        journals = (
-            session.execute(
-                select(
-                    TradeJournal
-                ).where(
-                    TradeJournal.status.in_(
-                        (
-                            "SUBMITTED",
-                            "OPEN",
-                        )
+        statement = (
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.status.in_(
+                    (
+                        "SUBMITTED",
+                        "OPEN",
                     )
                 )
+            )
+        )
+
+        user_id = _user_id(
+            user_context
+        )
+
+        if user_id is not None:
+            role = str(
+                (
+                    user_context
+                    or {}
+                ).get(
+                    "role"
+                )
+                or ""
+            ).strip().upper()
+
+            if role == "OWNER":
+                statement = statement.where(
+                    (
+                        TradeJournal.user_id
+                        == user_id
+                    )
+                    |
+                    TradeJournal.user_id.is_(
+                        None
+                    )
+                )
+
+            else:
+                statement = statement.where(
+                    TradeJournal.user_id
+                    == user_id
+                )
+
+        journals = (
+            session.execute(
+                statement
             )
             .scalars()
             .all()

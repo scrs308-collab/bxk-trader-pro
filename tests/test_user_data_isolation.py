@@ -8,7 +8,10 @@ from sqlalchemy.orm import (
 from sqlalchemy.pool import StaticPool
 
 from bxk_app import config
-from bxk_app.database import Base
+from bxk_app.database import (
+    Base,
+    get_db,
+)
 from bxk_app.db_models.user import (
     User,
     UserRole,
@@ -131,7 +134,6 @@ def clear_overrides():
 @pytest.mark.parametrize(
     "path",
     [
-        "/api/position-monitor",
         "/api/positions-summary",
         "/api/account-summary",
         "/api/test-tastytrade",
@@ -167,6 +169,44 @@ def test_beta_cannot_access_owner_private_routes(
 
     assert response.status_code == 403
 
+
+def test_beta_position_monitor_requires_own_broker(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_position",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    def override_get_db():
+        session = factory()
+
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[
+        get_db
+    ] = override_get_db
+
+    client = client_with_user(
+        beta_id
+    )
+
+    response = client.get(
+        "/api/position-monitor"
+    )
+
+    assert response.status_code == 409
 
 def test_market_header_hides_owner_context():
     data = MarketData()

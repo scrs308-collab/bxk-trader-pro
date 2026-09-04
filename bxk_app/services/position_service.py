@@ -60,11 +60,32 @@ def _journal_reconcile_interval_seconds():
     )
 
 
+
+def _invoke_reconcile_missing_trade_journals(
+    positions,
+    *,
+    broker_client,
+    user_context=None,
+):
+    if user_context is None:
+        return reconcile_missing_trade_journals(
+            positions,
+            broker_client=broker_client,
+        )
+
+    return reconcile_missing_trade_journals(
+        positions,
+        broker_client=broker_client,
+        user_context=user_context,
+    )
+
+
 def _reconcile_trade_journal_closures(
     positions,
     *,
     broker_client=None,
     now_monotonic=None,
+    user_context=None,
 ):
     """
     Throttled, failure-isolated closing-order check.
@@ -100,12 +121,14 @@ def _reconcile_trade_journal_closures(
         )
 
     try:
-        return reconcile_missing_trade_journals(
+        return _invoke_reconcile_missing_trade_journals(
             positions,
             broker_client=(
                 broker_client
                 or order_broker
             ),
+            user_context=
+                user_context,
         )
 
     except Exception as exc:
@@ -393,7 +416,58 @@ def _attach_provisional_carry_risk(
 
 
 
-def get_position_monitor():
+
+def _invoke_position_reconcile(
+    positions,
+    *,
+    broker_client=None,
+    user_context=None,
+):
+    if user_context is None:
+        return _reconcile_trade_journal_closures(
+            positions
+        )
+
+    return _reconcile_trade_journal_closures(
+        positions,
+        broker_client=broker_client,
+        user_context=user_context,
+    )
+
+
+def _get_open_journal_candidates_for_context(
+    *,
+    user_context=None,
+):
+    if user_context is None:
+        return get_open_trade_journal_candidates()
+
+    return get_open_trade_journal_candidates(
+        user_context=user_context,
+    )
+
+
+def _observe_linked_positions_for_context(
+    positions,
+    *,
+    user_context=None,
+):
+    if user_context is None:
+        return observe_linked_positions(
+            positions
+        )
+
+    return observe_linked_positions(
+        positions,
+        user_context=user_context,
+    )
+
+
+def get_position_monitor(
+    *,
+    broker_client=None,
+    user_context=None,
+):
     """
     Return open SPX option legs grouped into separate
     Iron Condor position summaries.
@@ -401,18 +475,32 @@ def get_position_monitor():
 
     try:
 
-        connected = tastytrade_api.authenticate()
+        active_broker = (
+            broker_client
+            or tastytrade_api
+        )
+
+        connected = (
+            active_broker.authenticate()
+        )
 
         positions = (
-            tastytrade_api.get_position_summary()
+            active_broker
+            .get_position_summary()
             if connected
             else []
         )
 
         if not positions:
             if connected:
-                _reconcile_trade_journal_closures(
-                    []
+                _invoke_position_reconcile(
+                    [],
+                    broker_client=(
+                        broker_client
+                        or order_broker
+                    ),
+                    user_context=
+                        user_context,
                 )
 
             return {
@@ -500,14 +588,36 @@ def get_position_monitor():
             )
         )
 
-        summaries = link_positions_to_submissions(
-            summaries,
-            read_recent_submitted_orders(),
-        )
+        role = str(
+            (
+                user_context
+                or {}
+            ).get(
+                "role"
+            )
+            or ""
+        ).strip().upper()
+
+        # The execution audit is currently one global
+        # OWNER file. Until it becomes user-scoped,
+        # non-OWNER users must never read/link against it.
+        if (
+            user_context is None
+            or role == "OWNER"
+        ):
+            summaries = (
+                link_positions_to_submissions(
+                    summaries,
+                    read_recent_submitted_orders(),
+                )
+            )
 
         try:
             journal_candidates = (
-                get_open_trade_journal_candidates()
+                _get_open_journal_candidates_for_context(
+                    user_context=
+                        user_context,
+                )
             )
         except Exception:
             journal_candidates = []
@@ -521,19 +631,33 @@ def get_position_monitor():
         # downstream of live position construction.
         # It must never block Position Monitor.
         try:
-            observe_linked_positions(
-                summaries
+            _observe_linked_positions_for_context(
+                summaries,
+                user_context=
+                    user_context,
             )
         except Exception:
             pass
 
-        _reconcile_trade_journal_closures(
-            summaries
+        _invoke_position_reconcile(
+            summaries,
+            broker_client=(
+                broker_client
+                or order_broker
+            ),
+            user_context=
+                user_context,
         )
 
         if not summaries:
-            _reconcile_trade_journal_closures(
-                []
+            _invoke_position_reconcile(
+                [],
+                broker_client=(
+                    broker_client
+                    or order_broker
+                ),
+                user_context=
+                    user_context,
             )
 
             return {
