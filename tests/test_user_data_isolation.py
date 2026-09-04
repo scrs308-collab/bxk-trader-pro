@@ -82,6 +82,17 @@ def configure_auth(
         lambda: factory,
     )
 
+    def override_get_db():
+        session = factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[
+        get_db
+    ] = override_get_db
+
 
 def add_user(
     factory,
@@ -494,9 +505,13 @@ def test_beta_can_still_use_order_preview(
     )
 
 
-def test_beta_cannot_run_order_validate(
+def test_beta_order_validate_requires_own_broker(
     monkeypatch,
 ):
+    from bxk_app.services.broker_connection_service import (
+        BrokerConnectionRequired,
+    )
+
     factory = make_session_factory()
 
     beta_id = add_user(
@@ -510,10 +525,24 @@ def test_beta_cannot_run_order_validate(
         factory,
     )
 
+    def missing_broker(
+        session,
+        *,
+        user_context,
+    ):
+        raise BrokerConnectionRequired(
+            "BETA broker connection required."
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order.resolve_tastytrade_broker",
+        missing_broker,
+    )
+
     def forbidden_body(*args, **kwargs):
         raise AssertionError(
             "order_validate body executed "
-            "for BETA user"
+            "without a BETA broker"
         )
 
     monkeypatch.setattr(
@@ -527,12 +556,16 @@ def test_beta_cannot_run_order_validate(
         "/api/order-validate"
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 409
 
 
-def test_beta_cannot_run_order_dry_run(
+def test_beta_order_dry_run_requires_own_broker(
     monkeypatch,
 ):
+    from bxk_app.services.broker_connection_service import (
+        BrokerConnectionRequired,
+    )
+
     factory = make_session_factory()
 
     beta_id = add_user(
@@ -546,10 +579,24 @@ def test_beta_cannot_run_order_dry_run(
         factory,
     )
 
+    def missing_broker(
+        session,
+        *,
+        user_context,
+    ):
+        raise BrokerConnectionRequired(
+            "BETA broker connection required."
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order.resolve_tastytrade_broker",
+        missing_broker,
+    )
+
     def forbidden_body():
         raise AssertionError(
             "order_dry_run body executed "
-            "for BETA user"
+            "without a BETA broker"
         )
 
     monkeypatch.setattr(
@@ -563,8 +610,219 @@ def test_beta_cannot_run_order_dry_run(
         "/api/order-dry-run"
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 409
 
+
+def test_beta_order_validate_uses_own_broker(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_validate_connected",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    class FakeBroker:
+        last_error = None
+
+        def authenticate(self):
+            return True
+
+        def get_first_account_number(self):
+            return "BETA1234"
+
+    fake_broker = FakeBroker()
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order.resolve_tastytrade_broker",
+        lambda session, *, user_context:
+            fake_broker,
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._build_current_order",
+        lambda *args, **kwargs: (
+            {"strategy": "TEST"},
+            {
+                "strategy": "TEST",
+                "symbol": "SPX",
+                "legs": [],
+            },
+        ),
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._validate_order",
+        lambda *args, **kwargs: (
+            [],
+            [],
+        ),
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.get(
+        "/api/order-validate"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "VALIDATED"
+    assert data["account"] == "***1234"
+
+
+def test_beta_order_dry_run_uses_own_broker(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_dryrun_connected",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    class FakeBroker:
+        last_error = None
+
+        def authenticate(self):
+            return True
+
+        def get_first_account_number(self):
+            return "BETA5678"
+
+        def get_positions(
+            self,
+            *,
+            account_number,
+        ):
+            assert account_number == "BETA5678"
+            return []
+
+        def dry_run_order(
+            self,
+            order,
+            *,
+            account_number,
+        ):
+            assert account_number == "BETA5678"
+
+            return {
+                "test": "beta-only-dry-run",
+            }
+
+    fake_broker = FakeBroker()
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order.resolve_tastytrade_broker",
+        lambda session, *, user_context:
+            fake_broker,
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._execution_session_gate",
+        lambda: {
+            "passed": True,
+            "reason_code": "REGULAR_SESSION",
+            "message": "Regular session.",
+            "policy": {},
+        },
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._get_order_review_lock",
+        lambda review_id: (
+            {
+                "review_id": "beta-review",
+                "trade": {
+                    "strategy": "TEST",
+                },
+                "order": {
+                    "strategy": "TEST",
+                    "symbol": "SPX",
+                    "legs": [],
+                },
+                "request": {
+                    "dte": 1,
+                    "wing_width": 25,
+                    "contracts": 1,
+                },
+            },
+            None,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._validate_order",
+        lambda *args, **kwargs: (
+            [],
+            [],
+        ),
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._check_existing_position_overlap",
+        lambda *args, **kwargs: {
+            "passed": True,
+            "overlaps": [],
+            "message": "No overlap.",
+        },
+    )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._evaluate_broker_dry_run",
+        lambda *args, **kwargs: {
+            "passed": True,
+            "errors": [],
+            "checks": [],
+        },
+    )
+
+    def forbidden_owner_audit(
+        *args,
+        **kwargs,
+    ):
+        raise AssertionError(
+            "BETA dry-run wrote OWNER "
+            "execution audit"
+        )
+
+    monkeypatch.setattr(
+        "bxk_app.routes.order._write_execution_audit",
+        forbidden_owner_audit,
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.post(
+        "/api/order-dry-run"
+        "?review_id=beta-review"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert (
+        data["status"]
+        == "BROKER_PREFLIGHT_PASSED"
+    )
+
+    assert data["account"] == "***5678"
 
 def test_beta_cannot_run_order_submit(
     monkeypatch,

@@ -6,10 +6,23 @@ import threading
 import time
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+)
+from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
+    get_authenticated_user,
     require_owner_or_auth_disabled,
+)
+from bxk_app.database import get_db
+from bxk_app.services.broker_connection_service import (
+    BrokerConnectionInvalid,
+    BrokerConnectionRequired,
+    resolve_tastytrade_broker,
 )
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.config import (
@@ -72,6 +85,52 @@ router = APIRouter(
     prefix="/api",
     tags=["Orders"],
 )
+
+
+def _resolve_request_broker(
+    session: Session,
+    user_context: dict,
+):
+    """
+    Resolve only the authenticated user's broker.
+
+    OWNER retains the established legacy fallback.
+    Non-owner users never fall back to OWNER credentials.
+    """
+    try:
+        return resolve_tastytrade_broker(
+            session,
+            user_context=user_context,
+        )
+
+    except BrokerConnectionRequired as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    except BrokerConnectionInvalid as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+def _user_is_owner(
+    user_context: dict,
+) -> bool:
+    role = user_context.get("role")
+
+    role = getattr(
+        role,
+        "value",
+        role,
+    )
+
+    return (
+        str(role or "").strip().upper()
+        == "OWNER"
+    )
 
 
 _MAX_ORDER_DTE = 10
@@ -918,25 +977,23 @@ def order_preview(
     }
 
 
-@router.get(
-    "/order-validate",
-    dependencies=[
-        Depends(
-            require_owner_or_auth_disabled
-        )
-    ],
-)
 def order_validate(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
+    broker_client=None,
 ):
     """
     Rebuild and validate the proposed order server-side.
 
     SAFETY: This endpoint cannot submit an order.
     """
+
+    active_broker = (
+        broker_client
+        or broker
+    )
 
     trade, order = _build_current_order(
         strategy,
@@ -962,10 +1019,10 @@ def order_validate(
         requested_contracts=contracts,
     )
 
-    authenticated = broker.authenticate()
+    authenticated = active_broker.authenticate()
 
     account_number = (
-        broker.get_first_account_number()
+        active_broker.get_first_account_number()
         if authenticated
         else None
     )
@@ -976,7 +1033,7 @@ def order_validate(
         "message": (
             "Tastytrade authentication confirmed."
             if authenticated
-            else broker.last_error
+            else active_broker.last_error
             or "Tastytrade authentication failed."
         ),
     })
@@ -987,20 +1044,20 @@ def order_validate(
         "message": (
             "Tastytrade account verified."
             if account_number
-            else broker.last_error
+            else active_broker.last_error
             or "No Tastytrade account was available."
         ),
     })
 
     if not authenticated:
         errors.append(
-            broker.last_error
+            active_broker.last_error
             or "Tastytrade authentication failed."
         )
 
     if not account_number:
         errors.append(
-            broker.last_error
+            active_broker.last_error
             or "No Tastytrade account was available."
         )
 
@@ -1034,6 +1091,82 @@ def order_validate(
         "order": order,
     }
 
+
+@router.get(
+    "/order-validate",
+)
+def order_validate_api(
+    strategy: str = Query("auto"),
+    dte: int = Query(
+        1,
+        ge=0,
+        le=_MAX_ORDER_DTE,
+    ),
+    wing_width: int = Query(25),
+    contracts: int = Query(
+        1,
+        ge=1,
+        le=10,
+    ),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    broker_client = (
+        _resolve_request_broker(
+            session,
+            user_context,
+        )
+    )
+
+    return order_validate(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+        broker_client=broker_client,
+    )
+
+@router.get(
+    "/order-validate",
+)
+def order_validate_api(
+    strategy: str = Query("auto"),
+    dte: int = Query(
+        1,
+        ge=0,
+        le=_MAX_ORDER_DTE,
+    ),
+    wing_width: int = Query(25),
+    contracts: int = Query(
+        1,
+        ge=1,
+        le=10,
+    ),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    broker_client = (
+        _resolve_request_broker(
+            session,
+            user_context,
+        )
+    )
+
+    return order_validate(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+        broker_client=broker_client,
+    )
 
 def _check_existing_position_overlap(
     order: dict,
@@ -1703,20 +1836,14 @@ def _execution_session_gate() -> dict:
     }
 
 
-@router.post(
-    "/order-dry-run",
-    dependencies=[
-        Depends(
-            require_owner_or_auth_disabled
-        )
-    ],
-)
 def order_dry_run(
     strategy: str = Query("auto"),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     review_id: str | None = Query(None),
+    broker_client=None,
+    write_execution_audit: bool = True,
 ):
     """
     Run the current BXK order through Tastytrade broker preflight.
@@ -1724,6 +1851,11 @@ def order_dry_run(
     SAFETY:
     This endpoint cannot submit a live order.
     """
+
+    active_broker = (
+        broker_client
+        or broker
+    )
 
     session_gate = _execution_session_gate()
 
@@ -1801,7 +1933,7 @@ def order_dry_run(
             "order": order,
         }
 
-    authenticated = broker.authenticate()
+    authenticated = active_broker.authenticate()
 
     if not authenticated:
         return {
@@ -1811,14 +1943,14 @@ def order_dry_run(
                 "Tastytrade authentication failed."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "Tastytrade authentication failed."
             ],
             "checks": checks,
         }
 
     account_number = (
-        broker.get_first_account_number()
+        active_broker.get_first_account_number()
     )
 
     if not account_number:
@@ -1829,17 +1961,17 @@ def order_dry_run(
                 "Tastytrade account verification failed."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "No Tastytrade account available."
             ],
             "checks": checks,
         }
 
-    positions = broker.get_positions(
+    positions = active_broker.get_positions(
         account_number=account_number,
     )
 
-    if broker.last_error:
+    if active_broker.last_error:
         return {
             "status": "BLOCKED",
             "live_submission_enabled": False,
@@ -1848,7 +1980,7 @@ def order_dry_run(
                 "Tastytrade positions."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "Position verification failed."
             ],
             "checks": checks,
@@ -1890,7 +2022,7 @@ def order_dry_run(
             "order": order,
         }
 
-    dry_run = broker.dry_run_order(
+    dry_run = active_broker.dry_run_order(
         order,
         account_number=account_number,
     )
@@ -1903,7 +2035,7 @@ def order_dry_run(
                 "Tastytrade dry-run failed."
             ),
             "errors": [
-                broker.last_error
+                active_broker.last_error
                 or "Tastytrade dry-run failed."
             ],
             "checks": checks,
@@ -1948,13 +2080,16 @@ def order_dry_run(
             "dry_run": dry_run,
         }
 
-    audit_error = _write_execution_audit(
-        "PREFLIGHT_PASSED",
-        status="BROKER_PREFLIGHT_PASSED",
-        review_id=review["review_id"],
-        account=account_number,
-        order=order,
-    )
+    audit_error = None
+
+    if write_execution_audit:
+        audit_error = _write_execution_audit(
+            "PREFLIGHT_PASSED",
+            status="BROKER_PREFLIGHT_PASSED",
+            review_id=review["review_id"],
+            account=account_number,
+            order=order,
+        )
 
     if audit_error:
         return {
@@ -2002,6 +2137,96 @@ def order_dry_run(
         "order": order,
         "dry_run": dry_run,
     }
+
+@router.post(
+    "/order-dry-run",
+)
+def order_dry_run_api(
+    strategy: str = Query("auto"),
+    dte: int = Query(
+        1,
+        ge=0,
+        le=_MAX_ORDER_DTE,
+    ),
+    wing_width: int = Query(25),
+    contracts: int = Query(
+        1,
+        ge=1,
+        le=10,
+    ),
+    review_id: str | None = Query(None),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    broker_client = (
+        _resolve_request_broker(
+            session,
+            user_context,
+        )
+    )
+
+    return order_dry_run(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+        review_id=review_id,
+        broker_client=broker_client,
+        write_execution_audit=(
+            _user_is_owner(
+                user_context
+            )
+        ),
+    )
+
+@router.post(
+    "/order-dry-run",
+)
+def order_dry_run_api(
+    strategy: str = Query("auto"),
+    dte: int = Query(
+        1,
+        ge=0,
+        le=_MAX_ORDER_DTE,
+    ),
+    wing_width: int = Query(25),
+    contracts: int = Query(
+        1,
+        ge=1,
+        le=10,
+    ),
+    review_id: str | None = Query(None),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    broker_client = (
+        _resolve_request_broker(
+            session,
+            user_context,
+        )
+    )
+
+    return order_dry_run(
+        strategy=strategy,
+        dte=dte,
+        wing_width=wing_width,
+        contracts=contracts,
+        review_id=review_id,
+        broker_client=broker_client,
+        write_execution_audit=(
+            _user_is_owner(
+                user_context
+            )
+        ),
+    )
 
 @router.get(
     "/order-status",
