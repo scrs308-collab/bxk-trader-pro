@@ -1152,6 +1152,299 @@ function renderPositionMonitor(
   `;
 }
 
+function renderBrokerConnectionForm(
+  container,
+  message = "Connect your Tastytrade account to use Position Monitor.",
+) {
+  container.innerHTML = `
+    <div class="position-empty">
+      <div class="position-empty-title">
+        Connect Tastytrade
+      </div>
+
+      <div class="position-empty-text">
+        ${message}
+      </div>
+
+      <div style="max-width:520px;margin:18px auto;display:grid;gap:12px;text-align:left;">
+        <label>
+          Client Secret
+          <input
+            id="brokerClientSecret"
+            type="password"
+            autocomplete="off"
+            style="width:100%;box-sizing:border-box;padding:10px;"
+          >
+        </label>
+
+        <label>
+          Refresh Token
+          <input
+            id="brokerRefreshToken"
+            type="password"
+            autocomplete="off"
+            style="width:100%;box-sizing:border-box;padding:10px;"
+          >
+        </label>
+
+        <button
+          id="verifyBrokerButton"
+          type="button"
+        >
+          VERIFY TASTYTRADE
+        </button>
+
+        <label
+          id="brokerAccountWrap"
+          hidden
+        >
+          Account
+          <select
+            id="brokerAccountNumber"
+            style="width:100%;box-sizing:border-box;padding:10px;"
+          ></select>
+        </label>
+
+        <button
+          id="connectBrokerButton"
+          type="button"
+          hidden
+        >
+          CONNECT ACCOUNT
+        </button>
+
+        <div
+          id="brokerConnectionMessage"
+          class="position-empty-text"
+        ></div>
+      </div>
+    </div>
+  `;
+
+  const secret =
+    document.getElementById(
+      "brokerClientSecret",
+    );
+
+  const token =
+    document.getElementById(
+      "brokerRefreshToken",
+    );
+
+  const verify =
+    document.getElementById(
+      "verifyBrokerButton",
+    );
+
+  const connect =
+    document.getElementById(
+      "connectBrokerButton",
+    );
+
+  const accountWrap =
+    document.getElementById(
+      "brokerAccountWrap",
+    );
+
+  const account =
+    document.getElementById(
+      "brokerAccountNumber",
+    );
+
+  const status =
+    document.getElementById(
+      "brokerConnectionMessage",
+    );
+
+  const setStatus = (value) => {
+    if (status) {
+      status.textContent = value || "";
+    }
+  };
+
+  verify?.addEventListener(
+    "click",
+    async () => {
+      const clientSecret =
+        secret?.value?.trim() || "";
+
+      const refreshToken =
+        token?.value?.trim() || "";
+
+      if (!clientSecret || !refreshToken) {
+        setStatus(
+          "Enter both credentials first.",
+        );
+        return;
+      }
+
+      verify.disabled = true;
+
+      setStatus(
+        "Verifying Tastytrade...",
+      );
+
+      try {
+        const response = await fetch(
+          "/api/broker-connection/verify",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              client_secret:
+                clientSecret,
+              refresh_token:
+                refreshToken,
+            }),
+          },
+        );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.detail ||
+            "Tastytrade verification failed.",
+          );
+        }
+
+        const accounts =
+          Array.isArray(data.accounts)
+            ? data.accounts
+            : [];
+
+        if (!accounts.length) {
+          throw new Error(
+            "No Tastytrade accounts were returned.",
+          );
+        }
+
+        account.innerHTML = "";
+
+        accounts.forEach(
+          (item) => {
+            const option =
+              document.createElement(
+                "option",
+              );
+
+            option.value =
+              item.account_number;
+
+            option.textContent =
+              item.nickname
+                ? `${item.nickname} (${item.account_number})`
+                : item.account_number;
+
+            account.appendChild(
+              option,
+            );
+          },
+        );
+
+        accountWrap.hidden = false;
+        connect.hidden = false;
+
+        setStatus(
+          "Verified. Select your account and connect.",
+        );
+
+      } catch (error) {
+        setStatus(
+          error.message ||
+          "Verification failed.",
+        );
+
+      } finally {
+        verify.disabled = false;
+      }
+    },
+  );
+
+  connect?.addEventListener(
+    "click",
+    async () => {
+      const clientSecret =
+        secret?.value?.trim() || "";
+
+      const refreshToken =
+        token?.value?.trim() || "";
+
+      const accountNumber =
+        account?.value?.trim() || "";
+
+      if (
+        !clientSecret ||
+        !refreshToken ||
+        !accountNumber
+      ) {
+        setStatus(
+          "Verify credentials and select an account.",
+        );
+        return;
+      }
+
+      connect.disabled = true;
+
+      setStatus(
+        "Connecting account...",
+      );
+
+      try {
+        const response = await fetch(
+          "/api/broker-connection/connect",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              client_secret:
+                clientSecret,
+              refresh_token:
+                refreshToken,
+              account_number:
+                accountNumber,
+            }),
+          },
+        );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.detail ||
+            "Unable to connect account.",
+          );
+        }
+
+        secret.value = "";
+        token.value = "";
+
+        setStatus(
+          "Connected. Loading positions...",
+        );
+
+        await loadPositions();
+
+      } catch (error) {
+        connect.disabled = false;
+
+        setStatus(
+          error.message ||
+          "Unable to connect account.",
+        );
+      }
+    },
+  );
+}
+
 export async function loadPositions() {
   const container = el("positionMonitor");
 
@@ -1168,6 +1461,28 @@ export async function loadPositions() {
     );
 
     if (!response.ok) {
+      if (response.status === 409) {
+        let detail =
+          "Connect your Tastytrade account to use Position Monitor.";
+
+        try {
+          const errorData =
+            await response.json();
+
+          detail =
+            errorData.detail || detail;
+        } catch {
+          // Keep default message.
+        }
+
+        renderBrokerConnectionForm(
+          container,
+          detail,
+        );
+
+        return;
+      }
+
       throw new Error(
         `Positions API error ${response.status}`,
       );

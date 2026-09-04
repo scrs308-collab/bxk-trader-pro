@@ -34,7 +34,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js";
+} from "./position.js?v=3";
 
 import {
   initializeSystemSettings,
@@ -1477,6 +1477,8 @@ async function fetchLiveMarketSummary() {
 }
 
 
+let positionAccessEnabled = false;
+
 async function refreshDashboard() {
   if (dashboardRefreshInProgress) {
     return;
@@ -1496,7 +1498,7 @@ async function refreshDashboard() {
         loadBestTrade(),
       ];
 
-      if (hasOwnerAccess()) {
+      if (positionAccessEnabled) {
         refreshTasks.push(
           loadPositions(),
         );
@@ -1517,11 +1519,11 @@ async function refreshDashboard() {
       fetchLiveMarketSummary(),
     ];
 
-    if (hasOwnerAccess()) {
-      refreshTasks.push(
-        loadPositions(),
-      );
-    }
+    if (positionAccessEnabled) {
+        refreshTasks.push(
+          loadPositions(),
+        );
+      }
 
     await Promise.allSettled(
       refreshTasks
@@ -2402,6 +2404,27 @@ function initializeDashboardTabs() {
   });
 }
 
+function applyAuthenticatedVisibility(authStatus) {
+  const authenticatedAccess = Boolean(
+    authStatus &&
+    (
+      authStatus.enabled === false ||
+      authStatus.authenticated === true
+    )
+  );
+
+  document
+    .querySelectorAll(
+      '[data-authenticated-only="true"]',
+    )
+    .forEach((element) => {
+      element.hidden = !authenticatedAccess;
+    });
+
+  return authenticatedAccess;
+}
+
+
 function applyOwnerVisibility() {
   const ownerAccess =
     hasOwnerAccess();
@@ -2446,6 +2469,11 @@ async function initializeDashboardApplication() {
   setAccessContext(
     authStatus
   );
+
+  positionAccessEnabled =
+    applyAuthenticatedVisibility(
+      authStatus
+    );
 
   applyOwnerVisibility();
 
