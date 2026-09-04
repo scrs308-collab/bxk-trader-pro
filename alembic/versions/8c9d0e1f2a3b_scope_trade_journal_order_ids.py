@@ -47,6 +47,9 @@ def upgrade():
         postgresql_where=sa.text(
             "user_id IS NOT NULL"
         ),
+        sqlite_where=sa.text(
+            "user_id IS NOT NULL"
+        ),
     )
 
     op.create_index(
@@ -55,6 +58,9 @@ def upgrade():
         ["broker_order_id"],
         unique=True,
         postgresql_where=sa.text(
+            "user_id IS NULL"
+        ),
+        sqlite_where=sa.text(
             "user_id IS NULL"
         ),
     )
@@ -68,6 +74,10 @@ def upgrade():
             "user_id IS NOT NULL "
             "AND closing_broker_order_id IS NOT NULL"
         ),
+        sqlite_where=sa.text(
+            "user_id IS NOT NULL "
+            "AND closing_broker_order_id IS NOT NULL"
+        ),
     )
 
     op.create_index(
@@ -76,6 +86,10 @@ def upgrade():
         ["closing_broker_order_id"],
         unique=True,
         postgresql_where=sa.text(
+            "user_id IS NULL "
+            "AND closing_broker_order_id IS NOT NULL"
+        ),
+        sqlite_where=sa.text(
             "user_id IS NULL "
             "AND closing_broker_order_id IS NOT NULL"
         ),
