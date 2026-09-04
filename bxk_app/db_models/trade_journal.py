@@ -8,9 +8,11 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     JSON,
+    Index,
     String,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -22,6 +24,59 @@ from bxk_app.database import Base
 
 class TradeJournal(Base):
     __tablename__ = "trade_journals"
+
+    __table_args__ = (
+        Index(
+            "uq_trade_journals_user_broker_order_id",
+            "user_id",
+            "broker_order_id",
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NOT NULL"
+            ),
+            sqlite_where=text(
+                "user_id IS NOT NULL"
+            ),
+        ),
+        Index(
+            "uq_trade_journals_legacy_broker_order_id",
+            "broker_order_id",
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NULL"
+            ),
+            sqlite_where=text(
+                "user_id IS NULL"
+            ),
+        ),
+        Index(
+            "uq_trade_journals_user_closing_order_id",
+            "user_id",
+            "closing_broker_order_id",
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NOT NULL "
+                "AND closing_broker_order_id IS NOT NULL"
+            ),
+            sqlite_where=text(
+                "user_id IS NOT NULL "
+                "AND closing_broker_order_id IS NOT NULL"
+            ),
+        ),
+        Index(
+            "uq_trade_journals_legacy_closing_order_id",
+            "closing_broker_order_id",
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NULL "
+                "AND closing_broker_order_id IS NOT NULL"
+            ),
+            sqlite_where=text(
+                "user_id IS NULL "
+                "AND closing_broker_order_id IS NOT NULL"
+            ),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -44,7 +99,6 @@ class TradeJournal(Base):
     broker_order_id: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
-        unique=True,
         index=True,
     )
 
@@ -351,7 +405,6 @@ class TradeJournal(Base):
     ] = mapped_column(
         String(100),
         nullable=True,
-        unique=True,
         index=True,
     )
 

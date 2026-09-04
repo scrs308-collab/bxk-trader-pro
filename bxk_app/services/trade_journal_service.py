@@ -131,6 +131,185 @@ def _user_id(context):
         return None
 
 
+
+def _context_role(context):
+    if not isinstance(
+        context,
+        dict,
+    ):
+        return ""
+
+    value = context.get(
+        "role"
+    )
+
+    if hasattr(
+        value,
+        "value",
+    ):
+        value = value.value
+
+    return str(
+        value or ""
+    ).strip().upper()
+
+
+def _scope_journal_statement(
+    statement,
+    user_context,
+):
+    user_id = _user_id(
+        user_context
+    )
+
+    if user_id is None:
+        return statement.where(
+            TradeJournal.user_id.is_(
+                None
+            )
+        )
+
+    if (
+        _context_role(
+            user_context
+        )
+        == "OWNER"
+    ):
+        return statement.where(
+            (
+                TradeJournal.user_id
+                == user_id
+            )
+            |
+            TradeJournal.user_id.is_(
+                None
+            )
+        )
+
+    return statement.where(
+        TradeJournal.user_id
+        == user_id
+    )
+
+
+def _find_trade_journal(
+    session,
+    broker_order_id,
+    *,
+    user_context=None,
+    statuses=None,
+    for_update=False,
+    allow_unique_unscoped=False,
+):
+    clean_order_id = str(
+        broker_order_id or ""
+    ).strip()
+
+    if not clean_order_id:
+        return None
+
+    def build_statement():
+        statement = (
+            select(
+                TradeJournal
+            )
+            .where(
+                TradeJournal.broker_order_id
+                == clean_order_id
+            )
+        )
+
+        if statuses:
+            statement = statement.where(
+                TradeJournal.status.in_(
+                    tuple(statuses)
+                )
+            )
+
+        if for_update:
+            statement = (
+                statement.with_for_update()
+            )
+
+        return statement
+
+    user_id = _user_id(
+        user_context
+    )
+
+    if user_id is not None:
+        rows = (
+            session.execute(
+                build_statement().where(
+                    TradeJournal.user_id
+                    == user_id
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        if len(rows) == 1:
+            return rows[0]
+
+        if len(rows) > 1:
+            return None
+
+        if (
+            _context_role(
+                user_context
+            )
+            == "OWNER"
+        ):
+            legacy = (
+                session.execute(
+                    build_statement().where(
+                        TradeJournal.user_id.is_(
+                            None
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if len(legacy) == 1:
+                return legacy[0]
+
+        return None
+
+    if allow_unique_unscoped:
+        rows = (
+            session.execute(
+                build_statement()
+            )
+            .scalars()
+            .all()
+        )
+
+        if len(rows) == 1:
+            return rows[0]
+
+        return None
+
+    legacy = (
+        session.execute(
+            build_statement().where(
+                TradeJournal.user_id.is_(
+                    None
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    if len(legacy) == 1:
+        return legacy[0]
+
+    return None
+
+
 def _json_safe(value):
     try:
         return json.loads(
@@ -372,19 +551,21 @@ def record_submitted_trade(
     )
 
     with factory() as session:
-        journal = session.execute(
-            select(
-                TradeJournal
-            ).where(
-                TradeJournal.broker_order_id
-                == clean_order_id
-            )
-        ).scalar_one_or_none()
+        parsed_user_id = _user_id(
+            user_context
+        )
+
+        journal = _find_trade_journal(
+            session,
+            clean_order_id,
+            user_context=user_context,
+        )
 
         created = journal is None
 
         if journal is None:
             journal = TradeJournal(
+                user_id=parsed_user_id,
                 broker_order_id=
                     clean_order_id,
                 status=incoming_status,
@@ -392,11 +573,14 @@ def record_submitted_trade(
 
             session.add(journal)
 
-        parsed_user_id = _user_id(
-            user_context
-        )
-
-        if parsed_user_id is not None:
+        elif (
+            parsed_user_id is not None
+            and journal.user_id is None
+            and _context_role(
+                user_context
+            )
+            == "OWNER"
+        ):
             journal.user_id = (
                 parsed_user_id
             )
@@ -1393,6 +1577,7 @@ def finalize_closed_trade(
     closing_order,
     opening_order=None,
     session_factory=None,
+    user_context=None,
 ):
     """
     Finalize one journal only from a confirmed,
@@ -1424,16 +1609,12 @@ def finalize_closed_trade(
     )
 
     with factory() as session:
-        journal = session.execute(
-            select(
-                TradeJournal
-            )
-            .where(
-                TradeJournal.broker_order_id
-                == clean_order_id
-            )
-            .with_for_update()
-        ).scalar_one_or_none()
+        journal = _find_trade_journal(
+            session,
+            clean_order_id,
+            user_context=user_context,
+            for_update=True,
+        )
 
         if journal is None:
             return {
@@ -1911,15 +2092,11 @@ def reconcile_missing_trade_journals(
         journal_ids
     ):
         with factory() as session:
-            journal = session.execute(
-                select(
-                    TradeJournal
-                ).where(
-                    TradeJournal.
-                    broker_order_id
-                    == opening_order_id
-                )
-            ).scalar_one_or_none()
+            journal = _find_trade_journal(
+                session,
+                opening_order_id,
+                user_context=user_context,
+            )
 
             if journal is None:
                 continue
@@ -1990,6 +2167,8 @@ def reconcile_missing_trade_journals(
                                 opening_order,
                             session_factory=
                                 factory,
+                            user_context=
+                                user_context,
                         )
                     )
 
@@ -2077,6 +2256,8 @@ def reconcile_missing_trade_journals(
                     opening_order,
                 session_factory=
                     factory,
+                user_context=
+                    user_context,
             )
         )
 
@@ -2493,6 +2674,7 @@ def finalize_expired_trade(
     transactions,
     opening_order=None,
     session_factory=None,
+    user_context=None,
 ):
     """
     Finalize an SPXW journal from complete Tastytrade
@@ -2526,16 +2708,12 @@ def finalize_expired_trade(
     )
 
     with factory() as session:
-        journal = session.execute(
-            select(
-                TradeJournal
-            )
-            .where(
-                TradeJournal.broker_order_id
-                == clean_order_id
-            )
-            .with_for_update()
-        ).scalar_one_or_none()
+        journal = _find_trade_journal(
+            session,
+            clean_order_id,
+            user_context=user_context,
+            for_update=True,
+        )
 
         if journal is None:
             return {
@@ -3855,6 +4033,7 @@ def record_overnight_carry_snapshot(
     vix=None,
     held_overnight=None,
     session_factory=None,
+    user_context=None,
 ):
     """
     Persist one frozen overnight carry-risk evaluation
@@ -3916,18 +4095,20 @@ def record_overnight_carry_snapshot(
             return None
 
     with factory() as session:
-        journal = (
-            session.execute(
-                select(TradeJournal).where(
-                    TradeJournal.broker_order_id
-                    == order_id,
-                    TradeJournal.status.in_(
-                        ("SUBMITTED", "OPEN")
-                    ),
+        journal = _find_trade_journal(
+            session,
+            order_id,
+            user_context=user_context,
+            statuses=(
+                "SUBMITTED",
+                "OPEN",
+            ),
+            allow_unique_unscoped=(
+                _user_id(
+                    user_context
                 )
-            )
-            .scalars()
-            .first()
+                is None
+            ),
         )
 
         if journal is None:

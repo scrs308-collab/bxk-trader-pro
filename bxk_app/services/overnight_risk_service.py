@@ -144,6 +144,7 @@ def _record_carry_learning(
     session,
     vix1d,
     vix,
+    user_context=None,
 ):
     """
     Persist the frozen close-of-session carry evaluation
@@ -257,6 +258,7 @@ def _record_carry_learning(
             vix1d=vix1d,
             vix=vix,
             held_overnight=held_overnight,
+            user_context=user_context,
         )
     except Exception:
         return {
@@ -273,6 +275,7 @@ def get_live_overnight_risk(
     *,
     prior_spx_close=None,
     es_anchor_price=None,
+    user_context=None,
 ):
     """
     Build one live observation-only overnight
@@ -644,6 +647,7 @@ def get_live_overnight_risk(
                 session=session,
                 vix1d=carry_vix1d,
                 vix=carry_vix,
+                user_context=user_context,
             )
         )
 

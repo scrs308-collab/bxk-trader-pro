@@ -845,6 +845,7 @@ def _build_plan(
 def _existing_order_ids(
     *,
     session_factory=None,
+    user_context=None,
 ):
     factory = (
         session_factory
@@ -853,14 +854,23 @@ def _existing_order_ids(
     )
 
     with factory() as session:
+        statement = select(
+            TradeJournal.broker_order_id
+        )
+
+        statement = (
+            journal_service.
+            _scope_journal_statement(
+                statement,
+                user_context,
+            )
+        )
+
         return {
             str(value).strip()
             for value in (
                 session.execute(
-                    select(
-                        TradeJournal.
-                        broker_order_id
-                    )
+                    statement
                 )
                 .scalars()
                 .all()
@@ -873,6 +883,7 @@ def _normalize_imported_row(
     *,
     opening,
     session_factory=None,
+    user_context=None,
 ):
     factory = (
         session_factory
@@ -881,15 +892,14 @@ def _normalize_imported_row(
     )
 
     with factory() as session:
-        journal = session.execute(
-            select(
-                TradeJournal
-            ).where(
-                TradeJournal.
-                broker_order_id
-                == opening["id"]
+        journal = (
+            journal_service.
+            _find_trade_journal(
+                session,
+                opening["id"],
+                user_context=user_context,
             )
-        ).scalar_one_or_none()
+        )
 
         if journal is None:
             return
@@ -1209,6 +1219,8 @@ def backfill_trade_journal(
         _existing_order_ids(
             session_factory=
                 session_factory,
+            user_context=
+                user_context,
         )
     )
 
@@ -1355,6 +1367,7 @@ def backfill_trade_journal(
         _normalize_imported_row(
             opening=opening,
             session_factory=factory,
+            user_context=user_context,
         )
 
         if (
@@ -1378,6 +1391,8 @@ def backfill_trade_journal(
                         ],
                     session_factory=
                         factory,
+                    user_context=
+                        user_context,
                 )
             )
 
@@ -1418,6 +1433,8 @@ def backfill_trade_journal(
                         ],
                     session_factory=
                         factory,
+                    user_context=
+                        user_context,
                 )
             )
 
