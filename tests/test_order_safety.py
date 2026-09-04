@@ -911,7 +911,10 @@ def test_order_dry_run_allows_gth_to_reach_review_lock(
         "checks": [],
     }
 
-    def fake_review_lock(review_id):
+    def fake_review_lock(review_id,
+        *,
+        scope_key=None,
+    ):
         reached["review_lock"] = True
 
         assert review_id == "review-1"
@@ -2571,3 +2574,107 @@ def test_debit_strategy_remains_blocked():
         strategy_check["passed"]
         is False
     )
+
+
+def test_order_review_lock_is_user_scoped():
+    preflight = ready_preflight()
+
+    review_id = (
+        order_route
+        ._create_order_review_lock(
+            trade=preflight["trade"],
+            order=preflight["order"],
+            strategy="iron_condor",
+            dte=1,
+            wing_width=25,
+            contracts=1,
+            scope_key="USER:alpha",
+        )
+    )
+
+    foreign_review, foreign_error = (
+        order_route
+        ._get_order_review_lock(
+            review_id,
+            scope_key="USER:bravo",
+        )
+    )
+
+    assert foreign_review is None
+    assert foreign_error is not None
+
+    assert (
+        foreign_error["reason_code"]
+        == "REVIEW_LOCK_NOT_FOUND"
+    )
+
+    own_review, own_error = (
+        order_route
+        ._get_order_review_lock(
+            review_id,
+            scope_key="USER:alpha",
+        )
+    )
+
+    assert own_error is None
+    assert own_review is not None
+
+    consumed, consume_error = (
+        order_route
+        ._consume_order_review_lock(
+            review_id,
+            scope_key="USER:bravo",
+        )
+    )
+
+    assert consumed is None
+    assert consume_error is not None
+
+    own_review_after, own_error_after = (
+        order_route
+        ._get_order_review_lock(
+            review_id,
+            scope_key="USER:alpha",
+        )
+    )
+
+    assert own_error_after is None
+    assert own_review_after is not None
+
+
+def test_submission_reservation_is_user_and_account_scoped():
+    order = ready_preflight()[
+        "order"
+    ]
+
+    first_alpha = (
+        order_route
+        ._reserve_order_submission(
+            order,
+            scope_key="USER:alpha",
+            account_number="ALPHA1234",
+        )
+    )
+
+    second_alpha = (
+        order_route
+        ._reserve_order_submission(
+            order,
+            scope_key="USER:alpha",
+            account_number="ALPHA1234",
+        )
+    )
+
+    first_bravo = (
+        order_route
+        ._reserve_order_submission(
+            order,
+            scope_key="USER:bravo",
+            account_number="BRAVO5678",
+        )
+    )
+
+    assert first_alpha is True
+    assert second_alpha is False
+    assert first_bravo is True
+

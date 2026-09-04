@@ -171,9 +171,128 @@ def _order_fingerprint(order: dict) -> str:
     ).hexdigest()
 
 
-def _reserve_order_submission(order: dict) -> bool:
+def _execution_scope_key(
+    user_context=None,
+) -> str:
+    """
+    Stable private namespace for order-review and
+    submission guards.
+
+    Direct Python safety tests and auth-disabled
+    historical calls retain the LEGACY namespace.
+    """
+
+    if not isinstance(
+        user_context,
+        dict,
+    ):
+        return "LEGACY"
+
+    user_id = str(
+        user_context.get(
+            "user_id"
+        )
+        or ""
+    ).strip()
+
+    if user_id:
+        return f"USER:{user_id}"
+
+    role = str(
+        user_context.get(
+            "role"
+        )
+        or ""
+    ).strip().upper()
+
+    username = str(
+        user_context.get(
+            "username"
+        )
+        or ""
+    ).strip().casefold()
+
+    auth_source = str(
+        user_context.get(
+            "auth_source"
+        )
+        or ""
+    ).strip().upper()
+
+    identity = ":".join(
+        value
+        for value in (
+            role,
+            username,
+            auth_source,
+        )
+        if value
+    )
+
+    if identity:
+        return (
+            "AUTH_CONTEXT:"
+            + identity
+        )
+
+    return "LEGACY"
+
+
+def _normalized_execution_scope(
+    scope_key=None,
+) -> str:
+    value = str(
+        scope_key
+        or ""
+    ).strip()
+
+    return value or "LEGACY"
+
+
+def _submission_reservation_key(
+    order: dict,
+    *,
+    scope_key=None,
+    account_number=None,
+):
+    scope = (
+        _normalized_execution_scope(
+            scope_key
+        )
+    )
+
+    account = str(
+        account_number
+        or ""
+    ).strip()
+
+    if not account:
+        account = "NO_ACCOUNT"
+
+    return (
+        scope,
+        account,
+        _order_fingerprint(
+            order
+        ),
+    )
+
+
+def _reserve_order_submission(
+    order: dict,
+    *,
+    scope_key=None,
+    account_number=None,
+) -> bool:
     now = time.monotonic()
-    fingerprint = _order_fingerprint(order)
+
+    reservation_key = (
+        _submission_reservation_key(
+            order,
+            scope_key=scope_key,
+            account_number=account_number,
+        )
+    )
 
     with _ORDER_SUBMISSION_RESERVATIONS_GUARD:
         expired = [
@@ -182,25 +301,46 @@ def _reserve_order_submission(order: dict) -> bool:
             in _ORDER_SUBMISSION_RESERVATIONS.items()
             if now >= expires_at
         ]
+
         for key in expired:
             _ORDER_SUBMISSION_RESERVATIONS.pop(
                 key,
                 None,
             )
 
-        if fingerprint in _ORDER_SUBMISSION_RESERVATIONS:
+        if (
+            reservation_key
+            in _ORDER_SUBMISSION_RESERVATIONS
+        ):
             return False
 
-        _ORDER_SUBMISSION_RESERVATIONS[fingerprint] = (
-            now + _ORDER_SUBMISSION_RESERVATION_SECONDS
+        _ORDER_SUBMISSION_RESERVATIONS[
+            reservation_key
+        ] = (
+            now
+            + _ORDER_SUBMISSION_RESERVATION_SECONDS
         )
+
         return True
 
 
-def _release_order_submission(order: dict):
+def _release_order_submission(
+    order: dict,
+    *,
+    scope_key=None,
+    account_number=None,
+):
+    reservation_key = (
+        _submission_reservation_key(
+            order,
+            scope_key=scope_key,
+            account_number=account_number,
+        )
+    )
+
     with _ORDER_SUBMISSION_RESERVATIONS_GUARD:
         _ORDER_SUBMISSION_RESERVATIONS.pop(
-            _order_fingerprint(order),
+            reservation_key,
             None,
         )
 
@@ -282,12 +422,18 @@ def _create_order_review_lock(
     dte: int,
     wing_width: int,
     contracts: int,
+    scope_key: str | None = None,
 ):
     review_id = secrets.token_urlsafe(24)
     now = time.monotonic()
 
     review = {
         "review_id": review_id,
+        "scope_key": (
+            _normalized_execution_scope(
+                scope_key
+            )
+        ),
         "created_at": datetime.now().isoformat(),
         "expires_at_monotonic": (
             now
@@ -318,6 +464,8 @@ def _create_order_review_lock(
 
 def _get_order_review_lock(
     review_id,
+    *,
+    scope_key: str | None = None,
 ):
     if not review_id:
         return (
@@ -353,6 +501,32 @@ def _get_order_review_lock(
         )
 
         if review is None:
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_NOT_FOUND",
+                    (
+                        "BXK order review lock "
+                        "was not found."
+                    ),
+                ),
+            )
+
+        expected_scope = (
+            _normalized_execution_scope(
+                scope_key
+            )
+        )
+
+        stored_scope = (
+            _normalized_execution_scope(
+                review.get(
+                    "scope_key"
+                )
+            )
+        )
+
+        if stored_scope != expected_scope:
             return (
                 None,
                 _review_lock_error(
@@ -408,6 +582,8 @@ def _get_order_review_lock(
 
 def _consume_order_review_lock(
     review_id,
+    *,
+    scope_key: str | None = None,
 ):
     if not review_id:
         return (
@@ -430,6 +606,32 @@ def _consume_order_review_lock(
         )
 
         if review is None:
+            return (
+                None,
+                _review_lock_error(
+                    "REVIEW_LOCK_NOT_FOUND",
+                    (
+                        "BXK order review lock "
+                        "was not found."
+                    ),
+                ),
+            )
+
+        expected_scope = (
+            _normalized_execution_scope(
+                scope_key
+            )
+        )
+
+        stored_scope = (
+            _normalized_execution_scope(
+                review.get(
+                    "scope_key"
+                )
+            )
+        )
+
+        if stored_scope != expected_scope:
             return (
                 None,
                 _review_lock_error(
@@ -930,6 +1132,9 @@ def order_preview(
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
+    user_context: dict = Depends(
+        get_authenticated_user
+    ),
 ):
     """
     Build a broker-independent preview from the current best trade.
@@ -956,6 +1161,11 @@ def order_preview(
         dte=dte,
         wing_width=wing_width,
         contracts=contracts,
+        scope_key=(
+            _execution_scope_key(
+                user_context
+            )
+        ),
     )
 
     return {
@@ -1807,6 +2017,7 @@ def order_dry_run(
     review_id: str | None = Query(None),
     broker_client=None,
     write_execution_audit: bool = True,
+    review_scope: str | None = None,
 ):
     """
     Run the current BXK order through Tastytrade broker preflight.
@@ -1836,6 +2047,7 @@ def order_dry_run(
     review, review_error = (
         _get_order_review_lock(
             review_id,
+            scope_key=review_scope,
         )
     )
 
@@ -2139,6 +2351,11 @@ def order_dry_run_api(
         contracts=contracts,
         review_id=review_id,
         broker_client=broker_client,
+        review_scope=(
+            _execution_scope_key(
+                user_context
+            )
+        ),
         write_execution_audit=(
             _user_is_owner(
                 user_context
@@ -2267,6 +2484,11 @@ def order_submit(
         wing_width=wing_width,
         contracts=contracts,
         review_id=review_id,
+        review_scope=(
+            _execution_scope_key(
+                user_context
+            )
+        ),
     )
 
     if preflight.get("status") != "BROKER_PREFLIGHT_PASSED":
@@ -2467,6 +2689,11 @@ def order_submit(
     consumed_review, consume_error = (
         _consume_order_review_lock(
             review_id,
+            scope_key=(
+                _execution_scope_key(
+                    user_context
+                )
+            ),
         )
     )
 

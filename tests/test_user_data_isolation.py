@@ -745,7 +745,7 @@ def test_beta_order_dry_run_uses_own_broker(
 
     monkeypatch.setattr(
         "bxk_app.routes.order._get_order_review_lock",
-        lambda review_id: (
+        lambda review_id, **_kwargs: (
             {
                 "review_id": "beta-review",
                 "trade": {
