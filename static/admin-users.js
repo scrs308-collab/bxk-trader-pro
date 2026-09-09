@@ -1,4 +1,4 @@
-﻿const USERS_URL = "/api/admin/users";
+const USERS_URL = "/api/admin/users";
 const AUTH_STATUS_URL = "/api/auth/status";
 
 let initialized = false;
@@ -204,6 +204,20 @@ function renderUsers(users) {
       const isActive =
         user.is_active === true;
 
+      const isBeta =
+        String(
+          user.role || ""
+        ).toUpperCase() === "BETA";
+
+      const broker =
+        user.broker || {};
+
+      const brokerConnected =
+        broker.connected === true;
+
+      const liveTradingEnabled =
+        broker.live_trading_enabled === true;
+
       const action = isOwner
         ? `
           <span class="bxk-admin-owner-protected">
@@ -226,6 +240,56 @@ function renderUsers(users) {
         user.must_change_password
           ? "PASSWORD CHANGE REQUIRED"
           : "PASSWORD SET";
+
+      let brokerStatus = "";
+
+      if (isBeta) {
+        brokerStatus = `
+          <span class="bxk-admin-broker-status">
+            TASTYTRADE:
+            ${brokerConnected ? "CONNECTED" : "NOT CONNECTED"}
+          </span>
+
+          <span
+            class="bxk-admin-live-status
+              ${liveTradingEnabled ? "active" : "disabled"}"
+          >
+            LIVE TRADING:
+            ${liveTradingEnabled ? "ON" : "OFF"}
+          </span>
+        `;
+      }
+
+      let liveTradingAction = "";
+
+      if (isBeta) {
+        const canEnable =
+          brokerConnected &&
+          isActive;
+
+        const disabled =
+          !liveTradingEnabled &&
+          !canEnable;
+
+        liveTradingAction = `
+          <button
+            class="bxk-admin-users-button
+              ${liveTradingEnabled ? "danger" : "secondary"}"
+            type="button"
+            data-live-user-id="${escapeHtml(user.id)}"
+            data-live-enabled="${liveTradingEnabled ? "true" : "false"}"
+            ${disabled ? "disabled" : ""}
+          >
+            ${
+              liveTradingEnabled
+                ? "DISABLE LIVE TRADING"
+                : brokerConnected
+                  ? "ENABLE LIVE TRADING"
+                  : "BROKER REQUIRED"
+            }
+          </button>
+        `;
+      }
 
       return `
         <div class="bxk-admin-user-row">
@@ -255,10 +319,13 @@ function renderUsers(users) {
             <span class="bxk-admin-password-status">
               ${passwordStatus}
             </span>
+
+            ${brokerStatus}
           </div>
 
           <div class="bxk-admin-user-action">
             ${action}
+            ${liveTradingAction}
           </div>
 
         </div>
@@ -286,6 +353,89 @@ function renderUsers(users) {
         },
       );
     });
+  container
+    .querySelectorAll(
+      "button[data-live-user-id]"
+    )
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        async () => {
+          const userId =
+            button.dataset.liveUserId;
+
+          const currentlyEnabled =
+            button.dataset.liveEnabled === "true";
+
+          await setBrokerLiveTrading(
+            userId,
+            !currentlyEnabled,
+          );
+        },
+      );
+    });
+}
+
+
+async function setBrokerLiveTrading(
+  userId,
+  enabled,
+) {
+  const action =
+    enabled ? "enable" : "disable";
+
+  if (
+    enabled &&
+    !window.confirm(
+      "Enable LIVE trading for this BETA user? " +
+      "This permits real broker order submission " +
+      "when the global BXK live-trading switch is also enabled."
+    )
+  ) {
+    return;
+  }
+
+  try {
+    const response =
+      await fetch(
+        `${USERS_URL}/${userId}/broker-live-trading`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            enabled,
+          }),
+        },
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+        `Unable to ${action} live trading.`
+      );
+    }
+
+    setMessage(
+      enabled
+        ? "Live trading enabled for BETA user."
+        : "Live trading disabled for BETA user.",
+      "success",
+    );
+
+    await loadUsers();
+
+  } catch (error) {
+    setMessage(
+      error.message,
+      "error",
+    );
+  }
 }
 
 

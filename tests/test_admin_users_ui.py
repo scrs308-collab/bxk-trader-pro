@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 def test_system_tab_contains_admin_users_card():
@@ -20,7 +20,7 @@ def test_dashboard_initializes_admin_users():
     )
 
     assert "initializeAdminUsers" in text
-    assert "./admin-users.js?v=1" in text
+    assert "./admin-users.js?v=2" in text
 
 
 def test_admin_users_checks_owner_role():
@@ -56,3 +56,19 @@ def test_admin_users_supports_temporary_password():
     assert "temporary_password" in text
     assert "generateTemporaryPassword" in text
     assert "crypto.getRandomValues" in text
+
+
+def test_admin_users_supports_beta_live_trading_control():
+    text = Path(
+        "static/admin-users.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert "live_trading_enabled" in text
+    assert "broker-live-trading" in text
+    assert "setBrokerLiveTrading" in text
+    assert "ENABLE LIVE TRADING" in text
+    assert "DISABLE LIVE TRADING" in text
+    assert "BROKER REQUIRED" in text
+    assert "window.confirm" in text

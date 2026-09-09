@@ -43,7 +43,7 @@ import {
 
 import {
   initializeAdminUsers,
-} from "./admin-users.js?v=1";
+} from "./admin-users.js?v=2";
 
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;

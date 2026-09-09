@@ -65,10 +65,53 @@ def list_users(
         )
     ).all()
 
-    return [
-        serialize_user(user)
-        for user in users
-    ]
+    connections = session.scalars(
+        select(BrokerConnection).where(
+            BrokerConnection.broker
+            == "tastytrade"
+        )
+    ).all()
+
+    broker_by_user = {
+        connection.user_id:
+            connection
+        for connection in connections
+    }
+
+    results = []
+
+    for user in users:
+        payload = serialize_user(
+            user
+        )
+
+        connection = (
+            broker_by_user.get(
+                user.id
+            )
+        )
+
+        payload["broker"] = {
+            "connected": bool(
+                connection is not None
+                and connection.is_active
+                and connection.is_verified
+            ),
+            "verified": bool(
+                connection is not None
+                and connection.is_verified
+            ),
+            "live_trading_enabled": bool(
+                connection is not None
+                and connection.live_trading_enabled
+            ),
+        }
+
+        results.append(
+            payload
+        )
+
+    return results
 
 
 def create_user(
