@@ -2,8 +2,9 @@ import { initializeAuthUi } from "./auth-ui.js?v=3";
 
 import {
   hasOwnerAccess,
+  hasTradingAccess,
   setAccessContext,
-} from "./access-control.js?v=1";
+} from "./access-control.js?v=2";
 console.log("BXK Trader Pro Dashboard - V10");
 
 import {
@@ -30,7 +31,7 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=14";
+} from "./best-trade.js?v=15";
 
 import {
   loadPositions,
@@ -2218,7 +2219,7 @@ function renderTradeJournalTrades(
 async function loadTradeJournalPerformance(
   force = false,
 ) {
-  if (!hasOwnerAccess()) {
+  if (!hasTradingAccess()) {
     return;
   }
 
@@ -2396,7 +2397,7 @@ function initializeDashboardTabs() {
 
       if (
         targetId === "performanceTab"
-        && hasOwnerAccess()
+        && hasTradingAccess()
       ) {
         loadTradeJournalPerformance();
       }
@@ -2422,6 +2423,20 @@ function applyAuthenticatedVisibility(authStatus) {
     });
 
   return authenticatedAccess;
+}
+
+
+function applyTradingVisibility() {
+  const tradingAccess =
+    hasTradingAccess();
+
+  document
+    .querySelectorAll(
+      '[data-trading-only="true"]',
+    )
+    .forEach((element) => {
+      element.hidden = !tradingAccess;
+    });
 }
 
 
@@ -2832,6 +2847,7 @@ async function initializeDashboardApplication() {
       authStatus
     );
 
+  applyTradingVisibility();
   applyOwnerVisibility();
 
   await initializeAccountStatusBanner(

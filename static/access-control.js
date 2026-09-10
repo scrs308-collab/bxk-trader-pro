@@ -30,3 +30,28 @@ export function hasOwnerAccess() {
     ).trim().toUpperCase() === "OWNER"
   );
 }
+
+
+
+export function hasTradingAccess() {
+  if (!authStatus) {
+    return false;
+  }
+
+  if (authStatus.enabled === false) {
+    return true;
+  }
+
+  if (authStatus.authenticated !== true) {
+    return false;
+  }
+
+  const role = String(
+    authStatus.role || "",
+  ).trim().toUpperCase();
+
+  return (
+    role === "OWNER" ||
+    role === "BETA"
+  );
+}

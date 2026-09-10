@@ -1,4 +1,4 @@
-import { hasOwnerAccess } from "./access-control.js?v=1";
+import { hasOwnerAccess, hasTradingAccess } from "./access-control.js?v=2";
 import { BEST_TRADE_URL } from "./config.js";
 import {
   el,
@@ -2052,17 +2052,48 @@ function renderOrderPreview({
     },
   );
 
-  if (!hasOwnerAccess()) {
+  if (!hasTradingAccess()) {
     if (confirmButton) {
       confirmButton.disabled = true;
       confirmButton.textContent =
-        "OWNER EXECUTION ONLY";
+        "TRADING ACCESS REQUIRED";
     }
 
     setBrokerMessage(
       "Informational trade preview only. " +
       "Broker validation and order execution " +
-      "are restricted to the OWNER account.",
+      "require OWNER or BETA trading access.",
+    );
+
+    overlay
+      .querySelector("#closeOrderPreview")
+      ?.focus();
+
+    return;
+  }
+
+  if (!liveSubmissionEnabled) {
+    updateReadinessCard(
+      submissionReadiness,
+      {
+        state: "pending",
+        icon: "LOCK",
+        detail:
+          "SAFE MODE - live submission disabled",
+      },
+    );
+
+    if (confirmButton) {
+      confirmButton.disabled = true;
+      confirmButton.textContent =
+        "SAFE MODE - LIVE OFF";
+    }
+
+    setBrokerMessage(
+      "SAFE MODE is active. " +
+      "This trade may be reviewed, but real orders " +
+      "cannot be submitted. Live trading must be " +
+      "enabled before broker execution preflight runs.",
     );
 
     overlay
