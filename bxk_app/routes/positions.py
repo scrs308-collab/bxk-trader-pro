@@ -6,7 +6,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
-    get_authenticated_user,
+    require_owner_or_beta,
 )
 from bxk_app.database import get_db
 from bxk_app.services.broker_connection_service import (
@@ -28,7 +28,7 @@ router = APIRouter(
 
 def _position_user_context(
     request_user: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
 ):
     return request_user

@@ -1342,3 +1342,125 @@ def test_beta_preview_respects_per_user_live_trading_flag(
     assert data["user_live_trading_enabled"] is False
     assert data["live_submission_enabled"] is False
     assert data["trading_mode"] == "TEST"
+
+
+
+@pytest.mark.parametrize(
+    "method,path,payload",
+    [
+        (
+            "GET",
+            "/api/broker-connection/status",
+            None,
+        ),
+        (
+            "POST",
+            "/api/broker-connection/verify",
+            {
+                "client_secret": "viewer-secret",
+                "refresh_token": "viewer-token",
+            },
+        ),
+        (
+            "POST",
+            "/api/broker-connection/connect",
+            {
+                "client_secret": "viewer-secret",
+                "refresh_token": "viewer-token",
+                "account_number": "VIEWER123",
+            },
+        ),
+        (
+            "DELETE",
+            "/api/broker-connection",
+            None,
+        ),
+        (
+            "GET",
+            "/api/account-summary",
+            None,
+        ),
+        (
+            "GET",
+            "/api/position-monitor",
+            None,
+        ),
+        (
+            "GET",
+            "/api/trade-journal/summary",
+            None,
+        ),
+        (
+            "GET",
+            "/api/trade-journal/trades",
+            None,
+        ),
+        (
+            "POST",
+            "/api/trade-journal/backfill",
+            None,
+        ),
+        (
+            "GET",
+            "/api/order-preview",
+            None,
+        ),
+        (
+            "GET",
+            "/api/order-validate",
+            None,
+        ),
+        (
+            "POST",
+            "/api/order-dry-run",
+            None,
+        ),
+        (
+            "GET",
+            "/api/order-status?order_id=VIEWER-ORDER-1",
+            None,
+        ),
+        (
+            "POST",
+            "/api/order-submit",
+            None,
+        ),
+    ],
+)
+def test_viewer_private_trading_permission_matrix(
+    monkeypatch,
+    method,
+    path,
+    payload,
+):
+    factory = make_session_factory()
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    viewer_id = add_user(
+        factory,
+        username=(
+            "viewer_matrix_"
+            + method.lower()
+            + "_"
+            + str(
+                abs(hash(path))
+            )
+        ),
+        role=UserRole.VIEWER,
+    )
+
+    client = client_with_user(
+        viewer_id
+    )
+
+    response = client.request(
+        method,
+        path,
+        json=payload,
+    )
+
+    assert response.status_code == 403

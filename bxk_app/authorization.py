@@ -68,6 +68,44 @@ def require_owner(
 
     return user
 
+def require_owner_or_beta(
+    request: Request,
+) -> dict:
+    """
+    Require an authenticated BXK user with access
+    to private brokerage and trading operations.
+
+    VIEWER users are intentionally excluded.
+    """
+
+    user = get_authenticated_user(
+        request
+    )
+
+    role = user.get("role")
+
+    if isinstance(role, UserRole):
+        role = role.value
+
+    normalized_role = str(
+        role or ""
+    ).strip().upper()
+
+    if normalized_role not in {
+        UserRole.OWNER.value,
+        UserRole.BETA.value,
+    }:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "BXK trading access requires "
+                "OWNER or BETA permission."
+            ),
+        )
+
+    return user
+
+
 def require_owner_or_auth_disabled(
     request: Request,
 ) -> dict:

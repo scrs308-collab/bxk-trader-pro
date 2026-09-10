@@ -6,7 +6,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
-    get_authenticated_user,
+    require_owner_or_beta,
     require_owner_or_auth_disabled,
 )
 from bxk_app.database import get_db
@@ -83,7 +83,7 @@ def positions_summary():
 @router.get("/account-summary")
 def account_summary(
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db

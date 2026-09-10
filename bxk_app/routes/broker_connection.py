@@ -10,7 +10,7 @@ from pydantic import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
-    get_authenticated_user,
+    require_owner_or_beta,
 )
 from bxk_app.database import get_db
 from bxk_app.services import (
@@ -49,7 +49,7 @@ class TastytradeConnectRequest(
 @router.get("/status")
 def broker_connection_status(
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -75,7 +75,7 @@ def broker_connection_status(
 def verify_tastytrade_connection(
     request_data: TastytradeVerifyRequest,
     _user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
 ):
     try:
@@ -109,7 +109,7 @@ def verify_tastytrade_connection(
 def connect_tastytrade(
     request_data: TastytradeConnectRequest,
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -149,7 +149,7 @@ def connect_tastytrade(
 @router.delete("")
 def disconnect_tastytrade(
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db

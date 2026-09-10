@@ -22,7 +22,7 @@ def make_client(
     )
 
     app.dependency_overrides[
-        route_module.get_authenticated_user
+        route_module.require_owner_or_beta
     ] = lambda: {
         "user_id":
             "00000000-0000-0000-0000-000000000123",

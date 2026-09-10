@@ -305,8 +305,7 @@ def test_trade_journal_api_routes(
     )
 
     app.dependency_overrides[
-        route_module.
-        get_authenticated_user
+        route_module.require_owner_or_beta
     ] = lambda: {
         "role": "OWNER",
     }
@@ -524,7 +523,7 @@ def test_trade_journal_summary_and_trades_use_authenticated_user(
     )
 
     app.dependency_overrides[
-        route_module.get_authenticated_user
+        route_module.require_owner_or_beta
     ] = lambda: {
         "user_id": "beta-user-id",
         "role": "BETA",

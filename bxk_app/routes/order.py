@@ -15,7 +15,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
-    get_authenticated_user,
+    require_owner_or_beta,
     require_owner_or_auth_disabled,
 )
 from bxk_app.database import get_db
@@ -1174,7 +1174,7 @@ def order_preview(
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -1417,7 +1417,7 @@ def order_validate_api(
         le=10,
     ),
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -2429,7 +2429,7 @@ def order_dry_run_api(
     ),
     review_id: str | None = Query(None),
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -2545,7 +2545,7 @@ def order_status_api(
         pattern=r"^[A-Za-z0-9-]+$",
     ),
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
@@ -3171,7 +3171,7 @@ def order_submit_api(
     confirm_live: bool = Query(False),
     review_id: str | None = Query(None),
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db

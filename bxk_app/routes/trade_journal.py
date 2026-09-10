@@ -6,7 +6,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
-    get_authenticated_user,
+    require_owner_or_beta,
 )
 from bxk_app.database import get_db
 from bxk_app.services.broker_connection_service import (
@@ -34,7 +34,7 @@ router = APIRouter(
 @router.get("/summary")
 def trade_journal_summary(
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
 ):
     return get_trade_journal_summary(
@@ -47,7 +47,7 @@ def trade_journal_trades(
     limit: int = 25,
     include_open: bool = False,
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
 ):
     return get_trade_journal_trades(
@@ -61,7 +61,7 @@ def trade_journal_backfill(
     days: int = 30,
     dry_run: bool = True,
     user_context: dict = Depends(
-        get_authenticated_user
+        require_owner_or_beta
     ),
     session: Session = Depends(
         get_db
