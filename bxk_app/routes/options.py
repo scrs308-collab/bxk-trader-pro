@@ -1,5 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 from bxk_app.broker_tastytrade import tastytrade_api
 from bxk_app.option_scanner import get_spxw_chain_item
 
@@ -7,6 +10,11 @@ from bxk_app.option_scanner import get_spxw_chain_item
 router = APIRouter(
     prefix="/api",
     tags=["Options"],
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
 )
 
 

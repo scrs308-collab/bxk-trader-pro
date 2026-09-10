@@ -1,4 +1,4 @@
-import { hasOwnerAccess, hasTradingAccess } from "./access-control.js?v=2";
+import { hasTradingAccess } from "./access-control.js?v=2";
 import { BEST_TRADE_URL } from "./config.js";
 import {
   el,
@@ -585,15 +585,6 @@ const buyingPower =
 
             const preview =
               await previewResponse.json();
-
-            console.log(
-              "BXK order preview:",
-              preview,
-            );
-            
- 
-
-
 
             renderOrderPreview({
               preview,
@@ -1481,11 +1472,6 @@ function renderOrderPreview({
 
       const result = await response.json();
 
-      console.log(
-        "BXK broker preflight:",
-        result,
-      );
-
       if (
         result?.status ===
         "BROKER_PREFLIGHT_PASSED"
@@ -1919,11 +1905,6 @@ function renderOrderPreview({
         }
 
         const result = await response.json();
-
-        console.log(
-          "BXK order submission:",
-          result,
-        );
 
         if (
           result?.status ===

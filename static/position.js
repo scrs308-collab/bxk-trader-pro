@@ -168,7 +168,7 @@ function renderNoOpenPosition(container, message) {
   container.innerHTML = `
     <div class="position-empty">
       <div class="position-empty-title">
-        No Open SPX Position
+        No Open Supported Position
       </div>
 
       <div class="position-empty-text">

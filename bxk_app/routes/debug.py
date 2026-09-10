@@ -1,7 +1,10 @@
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 from bxk_app.market_data import market_data
 from bxk_app.market_engine import market_engine
 
@@ -9,6 +12,11 @@ from bxk_app.market_engine import market_engine
 router = APIRouter(
     prefix="/api",
     tags=["Debug"],
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
 )
 
 

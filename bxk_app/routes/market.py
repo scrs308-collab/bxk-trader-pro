@@ -189,7 +189,14 @@ def overnight_risk(
     )
 
 
-@router.get("/debug/market")
+@router.get(
+    "/debug/market",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def debug_market():
     return get_debug_market()
 

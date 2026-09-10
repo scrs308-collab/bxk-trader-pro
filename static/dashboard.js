@@ -5,7 +5,6 @@ import {
   hasTradingAccess,
   setAccessContext,
 } from "./access-control.js?v=2";
-console.log("BXK Trader Pro Dashboard - V10");
 
 import {
   API_URL,
@@ -31,11 +30,11 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=15";
+} from "./best-trade.js?v=16";
 
 import {
   loadPositions,
-} from "./position.js?v=5";
+} from "./position.js?v=6";
 
 import {
   initializeSystemSettings,

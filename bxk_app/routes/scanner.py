@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 from bxk_app.services.scanner_service import (
     get_best_bear_call,
     get_best_bull_put,
@@ -19,27 +22,62 @@ router = APIRouter(
 )
 
 
-@router.get("/test-wing-optimizer")
+@router.get(
+    "/test-wing-optimizer",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_wing_optimizer():
     return get_test_wing_optimizer()
 
 
-@router.get("/test-scanner-engine")
+@router.get(
+    "/test-scanner-engine",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_scanner_engine():
     return get_test_scanner_engine()
 
 
-@router.get("/test-candidates")
+@router.get(
+    "/test-candidates",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_candidates():
     return get_test_candidates()
 
 
-@router.get("/test-first-candidate-credit")
+@router.get(
+    "/test-first-candidate-credit",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_first_candidate_credit():
     return get_test_first_candidate_credit()
 
 
-@router.get("/test-candidate-grid")
+@router.get(
+    "/test-candidate-grid",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_candidate_grid():
     return get_test_candidate_grid()
 

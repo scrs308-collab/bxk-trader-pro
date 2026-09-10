@@ -1,6 +1,10 @@
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from bxk_app.authorization import (
+    require_owner_or_auth_disabled,
+)
 
 from bxk_app.database import (
     database_health_status,
@@ -42,7 +46,14 @@ def api_health():
     }
 
 
-@router.get("/api/test-env")
+@router.get(
+    "/api/test-env",
+    dependencies=[
+        Depends(
+            require_owner_or_auth_disabled
+        )
+    ],
+)
 def test_environment():
     """
     Confirm that required environment variables are loaded.
