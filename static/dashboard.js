@@ -34,7 +34,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js?v=4";
+} from "./position.js?v=5";
 
 import {
   initializeSystemSettings,
@@ -2462,6 +2462,363 @@ function initializeUnderlyingSelector() {
 }
 
 
+
+let accountStatusAuth = null;
+let accountStatusListenerBound = false;
+
+
+function hasPrivateTradingAccess(
+  authStatus,
+) {
+  if (!authStatus) {
+    return false;
+  }
+
+  if (authStatus.enabled === false) {
+    return true;
+  }
+
+  if (authStatus.authenticated !== true) {
+    return false;
+  }
+
+  const role = String(
+    authStatus.role || "",
+  ).trim().toUpperCase();
+
+  return (
+    role === "OWNER" ||
+    role === "BETA"
+  );
+}
+
+
+function accountStatusMetric(
+  label,
+  value,
+) {
+  return `
+    <div
+      style="
+        padding:12px 14px;
+        border:1px solid rgba(148,163,184,.28);
+        border-radius:10px;
+        min-width:0;
+      "
+    >
+      <div
+        style="
+          font-size:11px;
+          font-weight:700;
+          opacity:.68;
+          margin-bottom:5px;
+          text-transform:uppercase;
+          letter-spacing:.05em;
+        "
+      >
+        ${htmlSafe(label)}
+      </div>
+
+      <div
+        style="
+          font-size:15px;
+          font-weight:800;
+          overflow-wrap:anywhere;
+        "
+      >
+        ${htmlSafe(value)}
+      </div>
+    </div>
+  `;
+}
+
+
+function ensureAccountStatusBanner() {
+  let banner =
+    document.getElementById(
+      "accountStatusBanner",
+    );
+
+  if (banner) {
+    return banner;
+  }
+
+  banner =
+    document.createElement(
+      "section",
+    );
+
+  banner.id =
+    "accountStatusBanner";
+
+  banner.className = "card";
+
+  banner.style.marginBottom =
+    "14px";
+
+  const tabs =
+    document.querySelector(
+      ".dashboard-tabs",
+    );
+
+  if (tabs) {
+    tabs.insertAdjacentElement(
+      "beforebegin",
+      banner,
+    );
+
+    return banner;
+  }
+
+  const firstPanel =
+    document.querySelector(
+      ".dashboard-tab-panel",
+    );
+
+  if (
+    firstPanel &&
+    firstPanel.parentElement
+  ) {
+    firstPanel.parentElement.insertBefore(
+      banner,
+      firstPanel,
+    );
+
+    return banner;
+  }
+
+  const main =
+    document.querySelector("main");
+
+  if (main) {
+    main.prepend(banner);
+    return banner;
+  }
+
+  document.body.prepend(banner);
+
+  return banner;
+}
+
+
+async function refreshAccountStatusBanner() {
+  const authStatus =
+    accountStatusAuth;
+
+  if (
+    !hasPrivateTradingAccess(
+      authStatus,
+    )
+  ) {
+    return;
+  }
+
+  const banner =
+    ensureAccountStatusBanner();
+
+  banner.innerHTML = `
+    <div class="card-label">
+      Account & Trading Status
+    </div>
+
+    <div
+      style="
+        margin-top:10px;
+        opacity:.72;
+        font-size:13px;
+      "
+    >
+      Checking your BXK account...
+    </div>
+  `;
+
+  try {
+    const response = await fetch(
+      `/api/broker-connection/status?_=${Date.now()}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Broker status HTTP ${response.status}`,
+      );
+    }
+
+    const broker =
+      await response.json();
+
+    const role = String(
+      authStatus.role || "OWNER",
+    ).trim().toUpperCase();
+
+    const username = String(
+      authStatus.username || "",
+    ).trim();
+
+    const connected =
+      broker.connected === true &&
+      broker.verified === true;
+
+    const live =
+      connected &&
+      broker.live_trading_enabled === true;
+
+    const brokerState =
+      connected
+        ? "CONNECTED"
+        : "SETUP REQUIRED";
+
+    const account =
+      connected
+        ? (
+            broker.account_number_masked ||
+            "Connected"
+          )
+        : "--";
+
+    const tradingState =
+      live
+        ? "LIVE ENABLED"
+        : "SAFE MODE";
+
+    let nextStep = "";
+
+    if (!connected) {
+      nextStep =
+        "Open Position Monitor and connect your " +
+        "Tastytrade account. Verify the credentials " +
+        "and select the account BXK should use.";
+    } else if (live) {
+      nextStep =
+        "Live order submission is enabled. Review " +
+        "every order carefully before submitting it " +
+        "to Tastytrade.";
+    } else if (role === "BETA") {
+      nextStep =
+        "Your Tastytrade account is connected. " +
+        "SAFE MODE is active, so real orders cannot " +
+        "be submitted. Live access must be enabled " +
+        "by the BXK OWNER.";
+    } else {
+      nextStep =
+        "Your Tastytrade account is connected. " +
+        "SAFE MODE is active, so real orders cannot " +
+        "be submitted while live trading is disabled.";
+    }
+
+    banner.innerHTML = `
+      <div class="card-label">
+        Account & Trading Status
+      </div>
+
+      <div
+        style="
+          margin-top:5px;
+          margin-bottom:12px;
+          opacity:.72;
+          font-size:13px;
+        "
+      >
+        ${
+          username
+            ? `Signed in as ${htmlSafe(username)}`
+            : "BXK Trader Pro"
+        }
+      </div>
+
+      <div
+        style="
+          display:grid;
+          grid-template-columns:
+            repeat(auto-fit,minmax(145px,1fr));
+          gap:10px;
+        "
+      >
+        ${accountStatusMetric(
+          "Access",
+          role,
+        )}
+
+        ${accountStatusMetric(
+          "Tastytrade",
+          brokerState,
+        )}
+
+        ${accountStatusMetric(
+          "Account",
+          account,
+        )}
+
+        ${accountStatusMetric(
+          "Trading",
+          tradingState,
+        )}
+      </div>
+
+      <div
+        style="
+          margin-top:12px;
+          padding:11px 13px;
+          border:1px solid rgba(148,163,184,.22);
+          border-radius:10px;
+          font-size:13px;
+          line-height:1.5;
+        "
+      >
+        <strong>Next step:</strong>
+        ${htmlSafe(nextStep)}
+      </div>
+    `;
+
+  } catch (error) {
+    console.error(
+      "Account status failed:",
+      error,
+    );
+
+    banner.innerHTML = `
+      <div class="card-label">
+        Account & Trading Status
+      </div>
+
+      <div style="margin-top:10px;font-size:13px;">
+        Account status is temporarily unavailable.
+        Trading permissions have not changed.
+      </div>
+    `;
+  }
+}
+
+
+async function initializeAccountStatusBanner(
+  authStatus,
+) {
+  accountStatusAuth =
+    authStatus;
+
+  if (
+    !hasPrivateTradingAccess(
+      authStatus,
+    )
+  ) {
+    return;
+  }
+
+  if (!accountStatusListenerBound) {
+    window.addEventListener(
+      "bxk:broker-connection-changed",
+      refreshAccountStatusBanner,
+    );
+
+    accountStatusListenerBound = true;
+  }
+
+  await refreshAccountStatusBanner();
+}
+
+
 async function initializeDashboardApplication() {
   const authStatus =
     await initializeAuthUi();
@@ -2476,6 +2833,10 @@ async function initializeDashboardApplication() {
     );
 
   applyOwnerVisibility();
+
+  await initializeAccountStatusBanner(
+    authStatus,
+  );
 
   initializeTradeBuilder();
   initializeDashboardTabs();

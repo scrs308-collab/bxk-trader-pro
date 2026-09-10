@@ -1170,6 +1170,22 @@ function renderBrokerConnectionForm(
         ${message}
       </div>
 
+      <div
+        class="position-empty-text"
+        style="
+          max-width:520px;
+          margin:12px auto 0;
+          text-align:left;
+          line-height:1.55;
+        "
+      >
+        <strong>Setup:</strong>
+        Enter your Tastytrade API Client Secret and
+        Refresh Token, verify them, then select the
+        account BXK should use. Broker credentials are
+        encrypted and scoped to your BXK user account.
+      </div>
+
       <div style="max-width:520px;margin:18px auto;display:grid;gap:12px;text-align:left;">
         <label>
           Client Secret
@@ -1435,6 +1451,12 @@ function renderBrokerConnectionForm(
           "Connected. Loading positions...",
         );
 
+        window.dispatchEvent(
+          new CustomEvent(
+            "bxk:broker-connection-changed",
+          ),
+        );
+
         await loadPositions();
 
         brokerConnectionFlowActive = false;
@@ -1513,7 +1535,8 @@ export async function loadPositions() {
       renderNoOpenPosition(
         container,
         data.message ||
-        "No open SPX Iron Condor was found.",
+        "No open supported positions were found " +
+        "in your connected Tastytrade account.",
       );
       return;
     }
