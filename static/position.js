@@ -8,6 +8,8 @@ import {
   formatSignedNumber,
 } from "./utils.js";
 
+let brokerConnectionFlowActive = false;
+
 function getPositionStatusClass(pnl) {
   const value = Number(pnl);
 
@@ -1156,6 +1158,8 @@ function renderBrokerConnectionForm(
   container,
   message = "Connect your Tastytrade account to use Position Monitor.",
 ) {
+  brokerConnectionFlowActive = true;
+
   container.innerHTML = `
     <div class="position-empty">
       <div class="position-empty-title">
@@ -1433,6 +1437,8 @@ function renderBrokerConnectionForm(
 
         await loadPositions();
 
+        brokerConnectionFlowActive = false;
+
       } catch (error) {
         connect.disabled = false;
 
@@ -1462,6 +1468,10 @@ export async function loadPositions() {
 
     if (!response.ok) {
       if (response.status === 409) {
+        if (brokerConnectionFlowActive) {
+          return;
+        }
+
         let detail =
           "Connect your Tastytrade account to use Position Monitor.";
 

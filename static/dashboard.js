@@ -34,7 +34,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js?v=3";
+} from "./position.js?v=4";
 
 import {
   initializeSystemSettings,
