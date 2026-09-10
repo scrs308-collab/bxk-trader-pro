@@ -686,8 +686,7 @@ def find_best_candidate(
             live.get("call_credit", 0)
         )
 
-        # Temporary until live delta-based POP is added.
-        candidate["pop"] = 85
+        candidate["pop"] = live.get("pop")
 
         candidate["wing_width"] = int(
             candidate["sell_put"]["strike"]
@@ -1030,8 +1029,7 @@ def find_best_ranked_iron_condor(
         else:
             trade["return_on_risk"] = 0
 
-        # Temporary until live delta-based POP is added.
-        trade["pop"] = 85
+        trade["pop"] = live.get("pop")
 
         trade["score"] = score_candidate(
             trade

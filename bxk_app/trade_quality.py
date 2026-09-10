@@ -5,7 +5,16 @@ def score_candidate(candidate: dict) -> int:
     score = 100
 
     credit = candidate.get("credit", 0)
-    pop = candidate.get("pop", 0)
+    raw_pop = candidate.get("pop")
+
+    try:
+        pop = (
+            float(raw_pop)
+            if raw_pop is not None
+            else 0.0
+        )
+    except (TypeError, ValueError):
+        pop = 0.0
     buffer = min(
         candidate.get("put_buffer", 0),
         candidate.get("call_buffer", 0),

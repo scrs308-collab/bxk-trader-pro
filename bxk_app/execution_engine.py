@@ -33,6 +33,7 @@ This engine will feed:
 =========================================================
 """
 
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -142,10 +143,22 @@ class ExecutionEngine:
         trade: dict,
     ) -> tuple[bool, str]:
 
-        pop = trade.get(
-            "pop",
-            0,
-        )
+        raw_pop = trade.get("pop")
+
+        if raw_pop is None or raw_pop == "":
+            return False, "POP unavailable"
+
+        try:
+            pop = float(raw_pop)
+        except (TypeError, ValueError):
+            return False, "POP unavailable"
+
+        if (
+            not math.isfinite(pop)
+            or pop < 0
+            or pop > 100
+        ):
+            return False, "POP unavailable"
 
         if pop < 60:
             return False, "POP below minimum"

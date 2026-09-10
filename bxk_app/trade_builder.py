@@ -129,7 +129,7 @@ def build_demo_trade(
             if max_profit
             else None
         ),
-        "pop": 84,
+        "pop": None,
         "timestamp": datetime.now().isoformat(
             timespec="seconds"
         ),
@@ -373,7 +373,7 @@ def build_best_trade(
             "candidate_rank_score": (
                 candidate_rank_score
             ),
-            "pop": 84,
+            "pop": None,
             "market_score": market.score,
             "market_regime": (
                 market.market_regime

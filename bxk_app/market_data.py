@@ -143,7 +143,7 @@ class MarketData:
                 "max_profit": 230,
                 "max_risk": 2270,
                 "risk_reward": "9.9 : 1",
-                "pop": 84,
+                "pop": None,
             },
             "market_status": self.market_status(),
             "server_time": datetime.now(EASTERN_TIME).strftime("%I:%M:%S %p"),

@@ -136,7 +136,19 @@ def build_opportunity(market: MarketDecision) -> dict:
         "live_credit": target_credit,
         "put_credit": live_credit_data.get("put_credit") if live_credit_data else None,
         "call_credit": live_credit_data.get("call_credit") if live_credit_data else None,
-        "pop": 85,
+        "pop": (
+            live_credit_data.get("pop")
+            if (
+                live_credit_data
+                and live_credit_data.get("pop")
+                is not None
+            )
+            else (
+                chain_trade.get("pop")
+                if chain_trade
+                else None
+            )
+        ),
         "risk_level": "LOW" if trade_score >= 75 else "MEDIUM",
         "trade_score": trade_score,
         "confidence": confidence,

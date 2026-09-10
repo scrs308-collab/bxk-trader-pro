@@ -34,7 +34,7 @@ def enrich_candidate(trade: dict) -> dict:
         else 0
     )
 
-    trade["pop"] = 85
+    trade["pop"] = live.get("pop")
     trade["score"] = score_candidate(trade)
     trade["trade_score"] = trade["score"]
 

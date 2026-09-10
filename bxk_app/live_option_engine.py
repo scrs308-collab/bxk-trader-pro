@@ -290,10 +290,20 @@ def calculate_probability_metrics(
         1,
     )
 
+    # Delta-based estimate that both short options
+    # expire OTM. This is an estimate, not a guarantee.
     pop = round(
-        min(
-            put_probability_otm,
-            call_probability_otm,
+        max(
+            0.0,
+            min(
+                100.0,
+                (
+                    1
+                    - put_delta
+                    - call_delta
+                )
+                * 100,
+            ),
         ),
         1,
     )
