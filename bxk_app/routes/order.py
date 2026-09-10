@@ -1176,6 +1176,9 @@ def order_preview(
     user_context: dict = Depends(
         get_authenticated_user
     ),
+    session: Session = Depends(
+        get_db
+    ),
 ):
     """
     Build a broker-independent preview from the current best trade.
@@ -1209,6 +1212,54 @@ def order_preview(
         ),
     )
 
+    role_value = user_context.get(
+        "role"
+    )
+
+    if hasattr(
+        role_value,
+        "value",
+    ):
+        role_value = role_value.value
+
+    role = str(
+        role_value
+        or ""
+    ).strip().upper()
+
+    user_live_trading_enabled = False
+
+    if role == "OWNER":
+        user_live_trading_enabled = True
+
+    elif role == "BETA":
+        try:
+            active_broker = (
+                _resolve_request_broker(
+                    session,
+                    user_context,
+                )
+            )
+
+            user_live_trading_enabled = bool(
+                getattr(
+                    active_broker,
+                    "live_trading_enabled",
+                    False,
+                )
+            )
+
+        except (
+            BrokerConnectionRequired,
+            BrokerConnectionInvalid,
+        ):
+            user_live_trading_enabled = False
+
+    effective_live_submission_enabled = bool(
+        BXK_LIVE_TRADING_ENABLED
+        and user_live_trading_enabled
+    )
+
     return {
         "status": "READY",
         "review_id": review_id,
@@ -1216,11 +1267,17 @@ def order_preview(
             _ORDER_REVIEW_TTL_SECONDS
         ),
         "live_submission_enabled": (
+            effective_live_submission_enabled
+        ),
+        "global_live_trading_enabled": bool(
             BXK_LIVE_TRADING_ENABLED
+        ),
+        "user_live_trading_enabled": (
+            user_live_trading_enabled
         ),
         "trading_mode": (
             "LIVE"
-            if BXK_LIVE_TRADING_ENABLED
+            if effective_live_submission_enabled
             else "TEST"
         ),
         "trade": trade,

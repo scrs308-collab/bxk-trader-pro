@@ -1276,3 +1276,69 @@ def test_viewer_cannot_use_order_status(
     )
 
     assert response.status_code == 403
+
+
+
+def test_beta_preview_respects_per_user_live_trading_flag(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+    from bxk_app.routes import order as order_route
+
+    factory = make_session_factory()
+
+    beta_id = add_user(
+        factory,
+        username="beta_preview_live_flag",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "BXK_LIVE_TRADING_ENABLED",
+        True,
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_build_current_order",
+        lambda *args, **kwargs: (
+            {"strategy": "IRON_CONDOR"},
+            {"test_order": True},
+        ),
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_create_order_review_lock",
+        lambda **kwargs: "beta-review-id",
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "_resolve_request_broker",
+        lambda session, user_context: SimpleNamespace(
+            live_trading_enabled=False,
+        ),
+    )
+
+    client = client_with_user(beta_id)
+
+    response = client.get(
+        "/api/order-preview"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "READY"
+    assert data["global_live_trading_enabled"] is True
+    assert data["user_live_trading_enabled"] is False
+    assert data["live_submission_enabled"] is False
+    assert data["trading_mode"] == "TEST"
