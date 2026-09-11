@@ -317,7 +317,7 @@ def test_beta_account_summary_uses_own_broker(
 
     monkeypatch.setattr(
         broker_route,
-        "resolve_tastytrade_broker",
+        "resolve_broker",
         lambda session, *, user_context:
             fake_broker,
     )

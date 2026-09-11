@@ -14,7 +14,7 @@ from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
     get_broker_connection_status,
-    resolve_tastytrade_broker,
+    resolve_broker,
 )
 from bxk_app.services.broker_service import (
     get_account_summary,
@@ -104,7 +104,7 @@ def account_summary(
             return get_account_summary()
 
         broker_client = (
-            resolve_tastytrade_broker(
+            resolve_broker(
                 session,
                 user_context=user_context,
             )
