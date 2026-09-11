@@ -21,6 +21,20 @@ ACCESS_TOKEN_REFRESH_SECONDS = 13 * 60
 
 
 class TastytradeBroker(BrokerBase):
+    broker_name = "tastytrade"
+
+    capabilities = frozenset({
+        "accounts",
+        "balances",
+        "positions",
+        "quotes",
+        "order_lookup",
+        "order_history",
+        "live_orders",
+        "transactions",
+        "order_preview",
+        "order_submission",
+    })
     def __init__(
         self,
         *,
@@ -1415,6 +1429,24 @@ class TastytradeBroker(BrokerBase):
             "payload": payload,
             "broker_response": broker_response,
         }
+
+    def preview_order(self, order: dict, account_number=None):
+        """
+        Broker-neutral alias for Tastytrade dry-run validation.
+        """
+        return self.dry_run_order(
+            order,
+            account_number=account_number,
+        )
+
+    def submit_order(self, order: dict, account_number=None):
+        """
+        Broker-neutral alias for Tastytrade live submission.
+        """
+        return self.submit_live_order(
+            order,
+            account_number=account_number,
+        )
 
     def get_quote(self, symbol: str):
         clean_symbol = (
