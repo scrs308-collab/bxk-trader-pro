@@ -29,6 +29,7 @@ PUBLIC_PATHS = {
     "/api/auth/status",
     "/api/auth/forgot-password",
     "/api/sms/opt-in",
+    "/api/broker-connection/schwab/callback",
 }
 
 
