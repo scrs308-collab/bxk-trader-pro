@@ -516,6 +516,52 @@ def disconnect_tastytrade_account(
     return True
 
 
+
+SUPPORTED_BROKERS = frozenset({
+    "tastytrade",
+})
+
+
+def normalize_broker_name(broker_name: str | None) -> str:
+    """
+    Normalize a broker identifier used by Trader Pro.
+    """
+
+    if broker_name is None:
+        return ""
+
+    return str(broker_name).strip().lower()
+
+
+def resolve_broker(
+    session: Session,
+    *,
+    user_context: dict,
+    broker_name: str = "tastytrade",
+):
+    """
+    Resolve the requested broker for the authenticated user.
+
+    This is the broker-neutral entry point for Trader Pro.
+    Broker-specific resolution remains delegated to each
+    broker implementation.
+    """
+
+    normalized_broker = normalize_broker_name(
+        broker_name
+    )
+
+    if normalized_broker == "tastytrade":
+        return resolve_tastytrade_broker(
+            session,
+            user_context=user_context,
+        )
+
+    raise BrokerConnectionRequired(
+        f"Broker '{normalized_broker or broker_name}' "
+        "is not currently supported."
+    )
+
 def resolve_tastytrade_broker(
     session: Session,
     *,
