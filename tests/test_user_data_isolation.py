@@ -717,7 +717,7 @@ def test_beta_order_dry_run_uses_own_broker(
             assert account_number == "BETA5678"
             return []
 
-        def dry_run_order(
+        def preview_order(
             self,
             order,
             *,

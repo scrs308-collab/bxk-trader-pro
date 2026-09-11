@@ -2295,7 +2295,7 @@ def order_dry_run(
             "order": order,
         }
 
-    dry_run = active_broker.dry_run_order(
+    dry_run = active_broker.preview_order(
         order,
         account_number=account_number,
     )
@@ -2960,7 +2960,7 @@ def order_submit(
             "order": order,
         }
 
-    live_order = active_broker.submit_live_order(
+    live_order = active_broker.submit_order(
         order,
         account_number=account_number,
     )
