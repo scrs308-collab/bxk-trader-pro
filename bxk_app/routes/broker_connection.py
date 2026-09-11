@@ -490,3 +490,69 @@ def select_schwab_account(
         },
     }
 
+
+@router.get("/brokers")
+def broker_preferences(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    try:
+        return (
+            broker_connection_service
+            .get_user_broker_preferences(
+                session,
+                user_context=user_context,
+            )
+        )
+
+    except (
+        BrokerConnectionInvalid
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/brokers/{broker_name}/select"
+)
+def select_preferred_broker(
+    broker_name: str,
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    try:
+        return (
+            broker_connection_service
+            .set_user_preferred_broker(
+                session,
+                user_context=user_context,
+                broker_name=broker_name,
+            )
+        )
+
+    except (
+        BrokerConnectionRequired
+    ) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        BrokerConnectionInvalid
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+

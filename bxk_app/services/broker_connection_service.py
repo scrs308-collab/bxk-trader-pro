@@ -534,6 +534,316 @@ def normalize_broker_name(broker_name: str | None) -> str:
     return str(broker_name).strip().lower()
 
 
+def _get_database_user(
+    session: Session,
+    *,
+    user_context: dict,
+):
+    from bxk_app.db_models.user import User
+
+    if not isinstance(
+        user_context,
+        dict,
+    ):
+        raise BrokerConnectionInvalid(
+            "Authenticated user context is invalid."
+        )
+
+    user_id = _normalized_user_id(
+        user_context
+    )
+
+    if user_id is None:
+        raise BrokerConnectionInvalid(
+            "A database-backed user account is required."
+        )
+
+    user = session.get(
+        User,
+        user_id,
+    )
+
+    if (
+        user is None
+        or not user.is_active
+    ):
+        raise BrokerConnectionInvalid(
+            "Authenticated user account is unavailable."
+        )
+
+    return user
+
+
+def get_user_preferred_broker_name(
+    session: Session,
+    *,
+    user_context: dict,
+) -> str:
+    """
+    Return the user's preferred broker.
+
+    Existing users with no explicit preference retain
+    Tastytrade as the backward-compatible default.
+    """
+    user_id = _normalized_user_id(
+        user_context
+    )
+
+    if user_id is None:
+        role = _normalized_role(
+            user_context
+        )
+
+        if role == UserRole.OWNER.value:
+            return "tastytrade"
+
+        raise BrokerConnectionInvalid(
+            "A database-backed user account is required."
+        )
+
+    user = _get_database_user(
+        session,
+        user_context=user_context,
+    )
+
+    preferred = normalize_broker_name(
+        user.preferred_broker
+    )
+
+    if not preferred:
+        return "tastytrade"
+
+    if preferred not in SUPPORTED_BROKERS:
+        raise BrokerConnectionInvalid(
+            "Stored preferred broker is unsupported."
+        )
+
+    return preferred
+
+
+def _legacy_owner_tastytrade_available(
+    user_context: dict,
+) -> bool:
+    if (
+        _normalized_role(
+            user_context
+        )
+        != UserRole.OWNER.value
+    ):
+        return False
+
+    return bool(
+        str(
+            config.TASTYTRADE_CLIENT_SECRET
+            or ""
+        ).strip()
+        and str(
+            config.TASTYTRADE_REFRESH_TOKEN
+            or ""
+        ).strip()
+        and str(
+            config.TASTYTRADE_ACCOUNT_NUMBER
+            or ""
+        ).strip()
+    )
+
+
+def _broker_available_for_selection(
+    session: Session,
+    *,
+    user_context: dict,
+    broker_name: str,
+) -> bool:
+    normalized = normalize_broker_name(
+        broker_name
+    )
+
+    user_id = _normalized_user_id(
+        user_context
+    )
+
+    if user_id is None:
+        return (
+            normalized == "tastytrade"
+            and _legacy_owner_tastytrade_available(
+                user_context
+            )
+        )
+
+    if normalized == "tastytrade":
+        connection = (
+            get_user_tastytrade_connection(
+                session,
+                user_id=user_id,
+            )
+        )
+
+        if (
+            connection is not None
+            and connection.is_verified
+            and str(
+                connection.account_number
+                or ""
+            ).strip()
+        ):
+            return True
+
+        return (
+            _legacy_owner_tastytrade_available(
+                user_context
+            )
+        )
+
+    if normalized == "schwab":
+        from sqlalchemy import select
+
+        from bxk_app.db_models.broker_account import (
+            BrokerAccount,
+        )
+
+        connection = session.scalar(
+            select(BrokerConnection)
+            .where(
+                BrokerConnection.user_id
+                == user_id,
+                BrokerConnection.broker
+                == "schwab",
+                BrokerConnection.is_active
+                .is_(True),
+                BrokerConnection.is_verified
+                .is_(True),
+            )
+        )
+
+        if connection is None:
+            return False
+
+        account_number = str(
+            connection.account_number
+            or ""
+        ).strip()
+
+        if not account_number:
+            return False
+
+        account = session.scalar(
+            select(BrokerAccount)
+            .where(
+                BrokerAccount
+                .broker_connection_id
+                == connection.id,
+                BrokerAccount.account_number
+                == account_number,
+                BrokerAccount.is_active
+                .is_(True),
+            )
+        )
+
+        return account is not None
+
+    return False
+
+
+def get_user_broker_preferences(
+    session: Session,
+    *,
+    user_context: dict,
+) -> dict:
+    preferred = (
+        get_user_preferred_broker_name(
+            session,
+            user_context=user_context,
+        )
+    )
+
+    brokers = []
+
+    for broker_name in (
+        "tastytrade",
+        "schwab",
+    ):
+        brokers.append({
+            "broker":
+                broker_name,
+            "selected":
+                broker_name
+                == preferred,
+            "available":
+                _broker_available_for_selection(
+                    session,
+                    user_context=user_context,
+                    broker_name=broker_name,
+                ),
+        })
+
+    return {
+        "preferred_broker":
+            preferred,
+        "brokers":
+            brokers,
+    }
+
+
+def set_user_preferred_broker(
+    session: Session,
+    *,
+    user_context: dict,
+    broker_name: str,
+) -> dict:
+    normalized = normalize_broker_name(
+        broker_name
+    )
+
+    if normalized not in SUPPORTED_BROKERS:
+        raise BrokerConnectionInvalid(
+            f"Broker '{normalized or broker_name}' "
+            "is not currently supported."
+        )
+
+    user = _get_database_user(
+        session,
+        user_context=user_context,
+    )
+
+    if not _broker_available_for_selection(
+        session,
+        user_context=user_context,
+        broker_name=normalized,
+    ):
+        raise BrokerConnectionRequired(
+            f"{normalized.title()} is not ready "
+            "to be selected for this user."
+        )
+
+    user.preferred_broker = normalized
+
+    session.commit()
+
+    return get_user_broker_preferences(
+        session,
+        user_context=user_context,
+    )
+
+
+def resolve_preferred_broker(
+    session: Session,
+    *,
+    user_context: dict,
+):
+    broker_name = (
+        get_user_preferred_broker_name(
+            session,
+            user_context=user_context,
+        )
+    )
+
+    return resolve_broker(
+        session,
+        user_context=user_context,
+        broker_name=broker_name,
+    )
+
+
 def resolve_broker(
     session: Session,
     *,

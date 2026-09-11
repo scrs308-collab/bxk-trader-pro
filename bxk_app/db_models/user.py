@@ -62,6 +62,11 @@ class User(Base):
         default=UserRole.BETA,
     )
 
+    preferred_broker: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
