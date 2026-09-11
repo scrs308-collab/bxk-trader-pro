@@ -376,6 +376,265 @@ class SchwabBroker(BrokerBase):
 
         return positions
 
+    @staticmethod
+    def _summary_number(
+        value,
+        default=0.0,
+    ):
+        try:
+            return float(value)
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return float(default)
+
+    def get_position_summary(self):
+        """
+        Normalize Schwab positions into Trader Pro's
+        broker-neutral position-leg shape.
+        """
+        positions = self.get_positions()
+        summary = []
+
+        for position in positions:
+            if not isinstance(
+                position,
+                dict,
+            ):
+                continue
+
+            instrument = (
+                position.get(
+                    "instrument"
+                )
+                or {}
+            )
+
+            if not isinstance(
+                instrument,
+                dict,
+            ):
+                instrument = {}
+
+            long_quantity = max(
+                self._summary_number(
+                    position.get(
+                        "longQuantity"
+                    )
+                ),
+                0.0,
+            )
+
+            short_quantity = max(
+                self._summary_number(
+                    position.get(
+                        "shortQuantity"
+                    )
+                ),
+                0.0,
+            )
+
+            net_quantity = (
+                long_quantity
+                - short_quantity
+            )
+
+            if net_quantity == 0:
+                continue
+
+            direction = (
+                "LONG"
+                if net_quantity > 0
+                else "SHORT"
+            )
+
+            quantity = abs(
+                net_quantity
+            )
+
+            multiplier = (
+                self._summary_number(
+                    instrument.get(
+                        "multiplier"
+                    ),
+                    100.0,
+                )
+            )
+
+            if multiplier <= 0:
+                multiplier = 100.0
+
+            market_value = (
+                self._summary_number(
+                    position.get(
+                        "marketValue"
+                    )
+                )
+            )
+
+            close_price = 0.0
+
+            if (
+                quantity > 0
+                and multiplier > 0
+                and market_value != 0
+            ):
+                close_price = (
+                    abs(
+                        market_value
+                    )
+                    / (
+                        quantity
+                        * multiplier
+                    )
+                )
+
+            average_price = (
+                self._summary_number(
+                    position.get(
+                        "averagePrice"
+                    )
+                )
+            )
+
+            summary.append({
+                "symbol":
+                    str(
+                        instrument.get(
+                            "symbol"
+                        )
+                        or ""
+                    ),
+                "underlying":
+                    str(
+                        instrument.get(
+                            "underlyingSymbol"
+                        )
+                        or ""
+                    ),
+                "instrument_type":
+                    str(
+                        instrument.get(
+                            "assetType"
+                        )
+                        or ""
+                    ),
+                "quantity":
+                    quantity,
+                "direction":
+                    direction,
+                "average_open_price":
+                    average_price,
+                "close_price":
+                    close_price,
+                "cost_effect": (
+                    "Debit"
+                    if direction == "LONG"
+                    else "Credit"
+                ),
+                "expires_at":
+                    str(
+                        instrument.get(
+                            "expirationDate"
+                        )
+                        or ""
+                    ),
+                "multiplier":
+                    multiplier,
+                "market_value":
+                    market_value,
+                "day_pnl":
+                    self._summary_number(
+                        position.get(
+                            "currentDayProfitLoss"
+                        )
+                    ),
+            })
+
+        return summary
+
+    def get_account_summary(self):
+        """
+        Normalize Schwab balances into Trader Pro's
+        common account-summary shape.
+        """
+        balances = self.get_balances()
+
+        if not balances:
+            return None
+
+        positions = (
+            self.get_position_summary()
+        )
+
+        def money(
+            key,
+            *,
+            fallback=None,
+        ):
+            value = balances.get(
+                key
+            )
+
+            if (
+                value is None
+                and fallback
+            ):
+                value = balances.get(
+                    fallback
+                )
+
+            return round(
+                self._summary_number(
+                    value
+                ),
+                2,
+            )
+
+        account_number = (
+            self.get_default_account_number()
+            or self.account_number
+            or None
+        )
+
+        return {
+            "number":
+                account_number,
+            "net_liquidation":
+                money(
+                    "liquidationValue"
+                ),
+            "cash":
+                money(
+                    "cashBalance"
+                ),
+            "buying_power":
+                money(
+                    "buyingPower",
+                    fallback="availableFunds",
+                ),
+            "derivative_buying_power":
+                money(
+                    "buyingPower",
+                    fallback="availableFunds",
+                ),
+            "maintenance":
+                money(
+                    "maintenanceRequirement"
+                ),
+            "margin_equity":
+                money(
+                    "equity",
+                    fallback="liquidationValue",
+                ),
+            "open_positions":
+                len(
+                    positions
+                ),
+        }
+
+
     def get_quote(self, symbol: str):
         raise NotImplementedError(
             "Schwab market data is handled "
