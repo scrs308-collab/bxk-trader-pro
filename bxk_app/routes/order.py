@@ -22,7 +22,7 @@ from bxk_app.database import get_db
 from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
-    resolve_tastytrade_broker,
+    resolve_broker,
 )
 from bxk_app.brokers.tastytrade import broker
 from bxk_app.config import (
@@ -139,7 +139,7 @@ def _resolve_request_broker(
     Non-owner users never fall back to OWNER credentials.
     """
     try:
-        return resolve_tastytrade_broker(
+        return resolve_broker(
             session,
             user_context=user_context,
         )

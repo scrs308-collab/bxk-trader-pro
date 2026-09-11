@@ -539,7 +539,7 @@ def test_beta_order_validate_requires_own_broker(
         )
 
     monkeypatch.setattr(
-        "bxk_app.routes.order.resolve_tastytrade_broker",
+        "bxk_app.routes.order.resolve_broker",
         missing_broker,
     )
 
@@ -593,7 +593,7 @@ def test_beta_order_dry_run_requires_own_broker(
         )
 
     monkeypatch.setattr(
-        "bxk_app.routes.order.resolve_tastytrade_broker",
+        "bxk_app.routes.order.resolve_broker",
         missing_broker,
     )
 
@@ -645,7 +645,7 @@ def test_beta_order_validate_uses_own_broker(
     fake_broker = FakeBroker()
 
     monkeypatch.setattr(
-        "bxk_app.routes.order.resolve_tastytrade_broker",
+        "bxk_app.routes.order.resolve_broker",
         lambda session, *, user_context:
             fake_broker,
     )
@@ -732,7 +732,7 @@ def test_beta_order_dry_run_uses_own_broker(
     fake_broker = FakeBroker()
 
     monkeypatch.setattr(
-        "bxk_app.routes.order.resolve_tastytrade_broker",
+        "bxk_app.routes.order.resolve_broker",
         lambda session, *, user_context:
             fake_broker,
     )
