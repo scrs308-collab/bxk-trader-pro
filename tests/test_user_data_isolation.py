@@ -639,7 +639,7 @@ def test_beta_order_validate_uses_own_broker(
         def authenticate(self):
             return True
 
-        def get_first_account_number(self):
+        def get_default_account_number(self):
             return "BETA1234"
 
     fake_broker = FakeBroker()
@@ -706,7 +706,7 @@ def test_beta_order_dry_run_uses_own_broker(
         def authenticate(self):
             return True
 
-        def get_first_account_number(self):
+        def get_default_account_number(self):
             return "BETA5678"
 
         def get_positions(
@@ -1179,7 +1179,7 @@ def test_beta_order_status_uses_own_broker(
     class BetaBroker:
         last_error = None
 
-        def get_first_account_number(
+        def get_default_account_number(
             self,
         ):
             return "BETA1234"

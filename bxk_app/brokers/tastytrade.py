@@ -1430,6 +1430,9 @@ class TastytradeBroker(BrokerBase):
             "broker_response": broker_response,
         }
 
+    def get_default_account_number(self):
+        return self.get_first_account_number()
+
     def preview_order(self, order: dict, account_number=None):
         """
         Broker-neutral alias for Tastytrade dry-run validation.

@@ -1330,7 +1330,7 @@ def order_validate(
     authenticated = active_broker.authenticate()
 
     account_number = (
-        active_broker.get_first_account_number()
+        active_broker.get_default_account_number()
         if authenticated
         else None
     )
@@ -2223,7 +2223,7 @@ def order_dry_run(
         }
 
     account_number = (
-        active_broker.get_first_account_number()
+        active_broker.get_default_account_number()
     )
 
     if not account_number:
@@ -2479,7 +2479,7 @@ def order_status(
         or broker
     )
 
-    account_number = active_broker.get_first_account_number()
+    account_number = active_broker.get_default_account_number()
 
     if not account_number:
         return {
@@ -2692,7 +2692,7 @@ def order_submit(
             "order": preflight.get("order"),
         }
 
-    account_number = active_broker.get_first_account_number()
+    account_number = active_broker.get_default_account_number()
 
     if not account_number:
         return {

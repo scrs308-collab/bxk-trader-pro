@@ -40,6 +40,22 @@ class BrokerBase(ABC):
     def get_quote(self, symbol: str):
         pass
 
+    def get_default_account_number(self):
+        """
+        Return the account selected for broker operations.
+        """
+        raise NotImplementedError(
+            f"{self.broker_name} does not support default account selection"
+        )
+
+    def get_order(self, order_id, account_number=None):
+        """
+        Fetch one broker order by ID.
+        """
+        raise NotImplementedError(
+            f"{self.broker_name} does not support order lookup"
+        )
+
     def preview_order(self, order: dict, account_number=None):
         """
         Validate/preview an order without submitting it.

@@ -34,6 +34,18 @@ def test_broker_base_capability_defaults():
 
     with pytest.raises(
         NotImplementedError,
+        match="dummy does not support default account selection",
+    ):
+        broker.get_default_account_number()
+
+    with pytest.raises(
+        NotImplementedError,
+        match="dummy does not support order lookup",
+    ):
+        broker.get_order("TEST123")
+
+    with pytest.raises(
+        NotImplementedError,
         match="dummy does not support order preview",
     ):
         broker.preview_order({})
@@ -43,6 +55,23 @@ def test_broker_base_capability_defaults():
         match="dummy does not support order submission",
     ):
         broker.submit_order({})
+
+
+def test_tastytrade_default_account_delegates_to_legacy_selector(
+    monkeypatch,
+):
+    broker = TastytradeBroker()
+
+    monkeypatch.setattr(
+        broker,
+        "get_first_account_number",
+        lambda: "TEST123",
+    )
+
+    assert (
+        broker.get_default_account_number()
+        == "TEST123"
+    )
 
 
 def test_tastytrade_declares_universal_capabilities():
