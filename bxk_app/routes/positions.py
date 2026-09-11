@@ -13,7 +13,7 @@ from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
     get_broker_connection_status,
-    resolve_tastytrade_broker,
+    resolve_broker,
 )
 from bxk_app.services.position_service import (
     get_position_monitor,
@@ -65,7 +65,7 @@ def position_monitor(
             )
 
         broker_client = (
-            resolve_tastytrade_broker(
+            resolve_broker(
                 session,
                 user_context=
                     user_context,
