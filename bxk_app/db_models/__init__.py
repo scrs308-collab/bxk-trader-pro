@@ -1,6 +1,9 @@
 from bxk_app.db_models.broker_connection import (
     BrokerConnection,
 )
+from bxk_app.db_models.broker_account import (
+    BrokerAccount,
+)
 from bxk_app.db_models.execution_audit import (
     ExecutionAudit,
 )
@@ -16,6 +19,7 @@ from bxk_app.db_models.trade_journal import TradeJournal
 
 __all__ = [
     "BrokerConnection",
+    "BrokerAccount",
     "ExecutionAudit",
     "TradeJournal",
     "OvernightAlertState",
