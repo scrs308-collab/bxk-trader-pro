@@ -12,7 +12,7 @@ from bxk_app.database import get_db
 from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
-    resolve_tastytrade_broker,
+    resolve_broker,
 )
 
 from bxk_app.services.trade_journal_backfill_service import (
@@ -95,7 +95,7 @@ def trade_journal_backfill(
 
     try:
         broker_client = (
-            resolve_tastytrade_broker(
+            resolve_broker(
                 session,
                 user_context=user_context,
             )

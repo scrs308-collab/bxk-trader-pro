@@ -35,7 +35,7 @@ def make_client(
 
     monkeypatch.setattr(
         route_module,
-        "resolve_tastytrade_broker",
+        "resolve_broker",
         resolver,
     )
 
