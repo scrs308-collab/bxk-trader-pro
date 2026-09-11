@@ -51,14 +51,41 @@ class BrokerConnection(Base):
         default="tastytrade",
     )
 
-    client_secret_encrypted: Mapped[str] = mapped_column(
+    client_secret_encrypted: Mapped[str | None] = mapped_column(
         Text,
-        nullable=False,
+        nullable=True,
     )
 
-    refresh_token_encrypted: Mapped[str] = mapped_column(
+    refresh_token_encrypted: Mapped[str | None] = mapped_column(
         Text,
-        nullable=False,
+        nullable=True,
+    )
+
+    access_token_encrypted: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    access_token_expires_at: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    refresh_token_expires_at: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    oauth_state_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    oauth_state_expires_at: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     account_number: Mapped[str | None] = mapped_column(
