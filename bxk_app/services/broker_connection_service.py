@@ -519,6 +519,7 @@ def disconnect_tastytrade_account(
 
 SUPPORTED_BROKERS = frozenset({
     "tastytrade",
+    "schwab",
 })
 
 
@@ -557,10 +558,289 @@ def resolve_broker(
             user_context=user_context,
         )
 
+    if normalized_broker == "schwab":
+        return resolve_schwab_broker(
+            session,
+            user_context=user_context,
+        )
+
     raise BrokerConnectionRequired(
         f"Broker '{normalized_broker or broker_name}' "
         "is not currently supported."
     )
+
+def resolve_schwab_broker(
+    session: Session,
+    *,
+    user_context: dict,
+):
+    """
+    Resolve the authenticated user's read-only Schwab broker.
+
+    Schwab never falls back to the OWNER/global broker.
+    Access tokens are refreshed shortly before expiration.
+    """
+    from datetime import (
+        datetime,
+        timedelta,
+        timezone,
+    )
+
+    from sqlalchemy import select
+
+    from bxk_app.brokers.schwab import SchwabBroker
+    from bxk_app.db_models.broker_account import (
+        BrokerAccount,
+    )
+    from bxk_app.services import schwab_oauth_service
+
+    if not isinstance(
+        user_context,
+        dict,
+    ):
+        raise BrokerConnectionInvalid(
+            "Authenticated user context is invalid."
+        )
+
+    user_id = _normalized_user_id(
+        user_context
+    )
+
+    if user_id is None:
+        raise BrokerConnectionInvalid(
+            "A database-backed user account is required."
+        )
+
+    connection = session.scalar(
+        select(BrokerConnection)
+        .where(
+            BrokerConnection.user_id
+            == user_id,
+            BrokerConnection.broker
+            == "schwab",
+            BrokerConnection.is_active
+            .is_(True),
+        )
+    )
+
+    if connection is None:
+        raise BrokerConnectionRequired(
+            "No Schwab account is connected for this user."
+        )
+
+    if not connection.is_verified:
+        raise BrokerConnectionRequired(
+            "Schwab connection has not been verified."
+        )
+
+    account_number = str(
+        connection.account_number
+        or ""
+    ).strip()
+
+    if not account_number:
+        raise BrokerConnectionRequired(
+            "Select a Schwab account before using Schwab."
+        )
+
+    selected_account = session.scalar(
+        select(BrokerAccount)
+        .where(
+            BrokerAccount.broker_connection_id
+            == connection.id,
+            BrokerAccount.account_number
+            == account_number,
+            BrokerAccount.is_active
+            .is_(True),
+        )
+    )
+
+    if selected_account is None:
+        raise BrokerConnectionRequired(
+            "Selected Schwab account is unavailable. "
+            "Select an active Schwab account."
+        )
+
+    def normalize_datetime(value):
+        if value is None:
+            return None
+
+        if value.tzinfo is None:
+            return value.replace(
+                tzinfo=timezone.utc
+            )
+
+        return value.astimezone(
+            timezone.utc
+        )
+
+    now = datetime.now(
+        timezone.utc
+    )
+
+    access_expiry = normalize_datetime(
+        connection.access_token_expires_at
+    )
+
+    refresh_required = (
+        access_expiry is None
+        or access_expiry
+        <= (
+            now
+            + timedelta(
+                seconds=60
+            )
+        )
+    )
+
+    access_token = ""
+
+    if connection.access_token_encrypted:
+        try:
+            access_token = (
+                decrypt_broker_secret(
+                    connection
+                    .access_token_encrypted
+                )
+            )
+        except BrokerCredentialError:
+            # A valid refresh token may still recover
+            # from an unreadable/missing access token.
+            refresh_required = True
+
+    if not access_token:
+        refresh_required = True
+
+    if refresh_required:
+        refresh_expiry = normalize_datetime(
+            connection
+            .refresh_token_expires_at
+        )
+
+        if (
+            refresh_expiry is None
+            or refresh_expiry <= now
+        ):
+            raise BrokerConnectionRequired(
+                "Schwab authorization has expired. "
+                "Reconnect Schwab."
+            )
+
+        try:
+            refresh_token = (
+                decrypt_broker_secret(
+                    connection
+                    .refresh_token_encrypted
+                )
+            )
+        except BrokerCredentialError as exc:
+            raise BrokerConnectionInvalid(
+                "Stored Schwab refresh credentials "
+                "are unavailable."
+            ) from exc
+
+        try:
+            tokens = (
+                schwab_oauth_service
+                .refresh_access_token(
+                    refresh_token
+                )
+            )
+        except (
+            schwab_oauth_service
+            .SchwabOAuthError
+        ) as exc:
+            raise BrokerConnectionRequired(
+                "Schwab authorization could not "
+                "be refreshed. Reconnect Schwab."
+            ) from exc
+
+        access_token = str(
+            tokens.get(
+                "access_token"
+            )
+            or ""
+        ).strip()
+
+        rotated_refresh_token = str(
+            tokens.get(
+                "refresh_token"
+            )
+            or refresh_token
+        ).strip()
+
+        try:
+            expires_in = int(
+                tokens.get(
+                    "expires_in",
+                    0,
+                )
+            )
+        except (
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise BrokerConnectionInvalid(
+                "Schwab returned an invalid "
+                "access-token lifetime."
+            ) from exc
+
+        if (
+            not access_token
+            or not rotated_refresh_token
+            or expires_in <= 0
+        ):
+            raise BrokerConnectionInvalid(
+                "Schwab returned an incomplete "
+                "token refresh response."
+            )
+
+        try:
+            encrypted_access_token = (
+                encrypt_broker_secret(
+                    access_token
+                )
+            )
+
+            encrypted_refresh_token = (
+                encrypt_broker_secret(
+                    rotated_refresh_token
+                )
+            )
+        except BrokerCredentialError as exc:
+            raise BrokerConnectionInvalid(
+                "Schwab credentials could not "
+                "be stored securely."
+            ) from exc
+
+        connection.access_token_encrypted = (
+            encrypted_access_token
+        )
+
+        connection.refresh_token_encrypted = (
+            encrypted_refresh_token
+        )
+
+        connection.access_token_expires_at = (
+            now
+            + timedelta(
+                seconds=expires_in
+            )
+        )
+
+        # Do not reset refresh_token_expires_at here.
+        # Refreshing the short-lived access token does
+        # not begin a new Schwab authorization period.
+        connection.last_verified_at = now
+
+        session.commit()
+
+    return SchwabBroker(
+        access_token=access_token,
+        account_number=account_number,
+        base_url=connection.base_url,
+    )
+
 
 def resolve_tastytrade_broker(
     session: Session,
