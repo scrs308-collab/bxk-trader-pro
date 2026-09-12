@@ -2615,6 +2615,411 @@ function ensureAccountStatusBanner() {
 }
 
 
+function brokerActionButton(
+  label,
+  action,
+  {
+    broker = "",
+    accountId = "",
+    disabled = false,
+  } = {},
+) {
+  const brokerAttribute =
+    broker
+      ? ` data-broker="${htmlSafe(broker)}"`
+      : "";
+
+  const accountAttribute =
+    accountId
+      ? ` data-account-id="${htmlSafe(accountId)}"`
+      : "";
+
+  const disabledAttribute =
+    disabled
+      ? " disabled"
+      : "";
+
+  return `
+    <button
+      type="button"
+      data-bxk-broker-action="${htmlSafe(action)}"
+      ${brokerAttribute}
+      ${accountAttribute}
+      ${disabledAttribute}
+      style="
+        border:1px solid rgba(148,163,184,.30);
+        border-radius:8px;
+        padding:7px 10px;
+        background:rgba(15,23,42,.16);
+        color:inherit;
+        font:inherit;
+        font-size:12px;
+        font-weight:700;
+        cursor:${disabled ? "default" : "pointer"};
+        opacity:${disabled ? ".62" : "1"};
+      "
+    >
+      ${htmlSafe(label)}
+    </button>
+  `;
+}
+
+
+async function fetchBrokerJson(
+  url,
+  options = {},
+) {
+  const response = await fetch(
+    url,
+    {
+      cache: "no-store",
+      ...options,
+    },
+  );
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch (_error) {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const detail =
+      data &&
+      typeof data === "object"
+        ? data.detail
+        : null;
+
+    throw new Error(
+      detail ||
+      `Broker request failed with HTTP ${response.status}`,
+    );
+  }
+
+  return data;
+}
+
+
+async function optionalBrokerJson(
+  url,
+  fallback,
+) {
+  try {
+    return await fetchBrokerJson(
+      url,
+    );
+  } catch (error) {
+    console.warn(
+      "Optional broker request failed:",
+      url,
+      error,
+    );
+
+    return fallback;
+  }
+}
+
+
+function brokerPreferenceEntry(
+  preferences,
+  brokerName,
+) {
+  const brokers =
+    Array.isArray(
+      preferences?.brokers,
+    )
+      ? preferences.brokers
+      : [];
+
+  return (
+    brokers.find(
+      (item) =>
+        String(
+          item?.broker || "",
+        )
+          .trim()
+          .toLowerCase()
+        === brokerName,
+    )
+    || null
+  );
+}
+
+
+function renderSchwabAccounts(
+  accounts,
+) {
+  if (
+    !Array.isArray(accounts)
+    || accounts.length === 0
+  ) {
+    return `
+      <div
+        style="
+          margin-top:8px;
+          opacity:.68;
+          font-size:12px;
+          line-height:1.45;
+        "
+      >
+        No authorized Schwab accounts are available yet.
+      </div>
+    `;
+  }
+
+  return accounts
+    .filter(
+      (account) =>
+        account &&
+        account.is_active !== false,
+    )
+    .map(
+      (account) => {
+        const selected =
+          account.is_default === true;
+
+        const label =
+          account.account_number_masked
+          || account.nickname
+          || "Authorized account";
+
+        const type =
+          account.account_type
+          || "";
+
+        const accountId =
+          account.id
+          || "";
+
+        const action =
+          selected
+            ? brokerActionButton(
+                "SELECTED",
+                "none",
+                {
+                  disabled: true,
+                },
+              )
+            : brokerActionButton(
+                "Select account",
+                "select-schwab-account",
+                {
+                  accountId,
+                  disabled: !accountId,
+                },
+              );
+
+        return `
+          <div
+            style="
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:10px;
+              padding:8px 0;
+              border-top:
+                1px solid rgba(148,163,184,.16);
+            "
+          >
+            <div
+              style="
+                min-width:0;
+                font-size:12px;
+                line-height:1.4;
+              "
+            >
+              <strong>
+                ${htmlSafe(label)}
+              </strong>
+
+              ${
+                type
+                  ? `
+                    <div
+                      style="
+                        opacity:.62;
+                        margin-top:2px;
+                      "
+                    >
+                      ${htmlSafe(type)}
+                    </div>
+                  `
+                  : ""
+              }
+            </div>
+
+            ${action}
+          </div>
+        `;
+      },
+    )
+    .join("");
+}
+
+
+function bindAccountStatusActions(
+  banner,
+) {
+  if (
+    banner.dataset.bxkBrokerActionsBound
+    === "1"
+  ) {
+    return;
+  }
+
+  banner.dataset.bxkBrokerActionsBound =
+    "1";
+
+  banner.addEventListener(
+    "click",
+    async (event) => {
+      const button =
+        event.target.closest(
+          "[data-bxk-broker-action]",
+        );
+
+      if (
+        !button
+        || !banner.contains(button)
+      ) {
+        return;
+      }
+
+      const action =
+        String(
+          button.dataset.bxkBrokerAction
+          || "",
+        ).trim();
+
+      if (
+        !action
+        || action === "none"
+      ) {
+        return;
+      }
+
+      const originalText =
+        button.textContent;
+
+      button.disabled = true;
+      button.textContent =
+        "WORKING...";
+
+      try {
+        if (
+          action === "connect-schwab"
+        ) {
+          window.location.assign(
+            "/api/broker-connection/schwab/connect",
+          );
+
+          return;
+        }
+
+        if (
+          action === "select-broker"
+        ) {
+          const brokerName =
+            String(
+              button.dataset.broker
+              || "",
+            )
+              .trim()
+              .toLowerCase();
+
+          if (!brokerName) {
+            throw new Error(
+              "Broker selection is missing.",
+            );
+          }
+
+          await fetchBrokerJson(
+            (
+              "/api/broker-connection/brokers/"
+              + encodeURIComponent(
+                  brokerName,
+                )
+              + "/select"
+            ),
+            {
+              method: "POST",
+            },
+          );
+        }
+
+        if (
+          action ===
+          "select-schwab-account"
+        ) {
+          const accountId =
+            String(
+              button.dataset.accountId
+              || "",
+            ).trim();
+
+          if (!accountId) {
+            throw new Error(
+              "Schwab account selection is missing.",
+            );
+          }
+
+          await fetchBrokerJson(
+            (
+              "/api/broker-connection/schwab/accounts/"
+              + encodeURIComponent(
+                  accountId,
+                )
+              + "/select"
+            ),
+            {
+              method: "POST",
+            },
+          );
+        }
+
+        window.dispatchEvent(
+          new CustomEvent(
+            "bxk:broker-connection-changed",
+            {
+              detail: {
+                source:
+                  "dashboard-broker-controls",
+              },
+            },
+          ),
+        );
+
+      } catch (error) {
+        console.error(
+          "Broker action failed:",
+          error,
+        );
+
+        button.disabled = false;
+        button.textContent =
+          "FAILED";
+
+        window.setTimeout(
+          () => {
+            if (
+              button.isConnected
+            ) {
+              button.textContent =
+                originalText;
+
+              button.disabled = false;
+            }
+          },
+          1800,
+        );
+      }
+    },
+  );
+}
+
+
 async function refreshAccountStatusBanner() {
   const authStatus =
     accountStatusAuth;
@@ -2630,6 +3035,10 @@ async function refreshAccountStatusBanner() {
   const banner =
     ensureAccountStatusBanner();
 
+  bindAccountStatusActions(
+    banner,
+  );
+
   banner.innerHTML = `
     <div class="card-label">
       Account & Trading Status
@@ -2642,84 +3051,258 @@ async function refreshAccountStatusBanner() {
         font-size:13px;
       "
     >
-      Checking your BXK account...
+      Checking your broker connections...
     </div>
   `;
 
   try {
-    const response = await fetch(
-      `/api/broker-connection/status?_=${Date.now()}`,
-      {
-        cache: "no-store",
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Broker status HTTP ${response.status}`,
+    const preferences =
+      await fetchBrokerJson(
+        (
+          "/api/broker-connection/brokers"
+          + `?_=${Date.now()}`
+        ),
       );
-    }
 
-    const broker =
-      await response.json();
+    const [
+      tastytrade,
+      schwabAccounts,
+    ] = await Promise.all([
+      optionalBrokerJson(
+        (
+          "/api/broker-connection/status"
+          + `?_=${Date.now()}`
+        ),
+        {
+          connected: false,
+          verified: false,
+          live_trading_enabled: false,
+        },
+      ),
+
+      optionalBrokerJson(
+        (
+          "/api/broker-connection/schwab/accounts"
+          + `?_=${Date.now()}`
+        ),
+        [],
+      ),
+    ]);
 
     const role = String(
       authStatus.role || "OWNER",
-    ).trim().toUpperCase();
+    )
+      .trim()
+      .toUpperCase();
 
     const username = String(
       authStatus.username || "",
     ).trim();
 
-    const connected =
-      broker.connected === true &&
-      broker.verified === true;
+    const preferredBroker =
+      String(
+        preferences?.preferred_broker
+        || "tastytrade",
+      )
+        .trim()
+        .toLowerCase();
+
+    const tastyPreference =
+      brokerPreferenceEntry(
+        preferences,
+        "tastytrade",
+      );
+
+    const schwabPreference =
+      brokerPreferenceEntry(
+        preferences,
+        "schwab",
+      );
+
+    const tastyConnected =
+      tastytrade?.connected === true
+      && tastytrade?.verified === true;
+
+    const tastyAvailable =
+      tastyConnected
+      || tastyPreference?.available === true;
 
     const live =
-      connected &&
-      broker.live_trading_enabled === true;
+      tastyConnected
+      && tastytrade
+        ?.live_trading_enabled === true;
 
-    const brokerState =
-      connected
-        ? "CONNECTED"
-        : "SETUP REQUIRED";
-
-    const account =
-      connected
+    const tastyAccount =
+      tastyConnected
         ? (
-            broker.account_number_masked ||
-            "Connected"
+            tastytrade
+              ?.account_number_masked
+            || "Connected"
           )
         : "--";
+
+    const activeSchwabAccounts =
+      Array.isArray(
+        schwabAccounts,
+      )
+        ? schwabAccounts.filter(
+            (account) =>
+              account
+              && account.is_active !== false,
+          )
+        : [];
+
+    const selectedSchwabAccount =
+      activeSchwabAccounts.find(
+        (account) =>
+          account.is_default === true,
+      )
+      || null;
+
+    const schwabConnected =
+      activeSchwabAccounts.length > 0;
+
+    const schwabAvailable =
+      schwabPreference?.available === true;
+
+    const schwabAccount =
+      selectedSchwabAccount
+        ? (
+            selectedSchwabAccount
+              .account_number_masked
+            || selectedSchwabAccount
+              .nickname
+            || "Selected"
+          )
+        : (
+            schwabConnected
+              ? "SELECT ACCOUNT"
+              : "--"
+          );
+
+    const dataSource =
+      preferredBroker === "schwab"
+        ? "SCHWAB"
+        : "TASTYTRADE";
 
     const tradingState =
       live
         ? "LIVE ENABLED"
         : "SAFE MODE";
 
-    let nextStep = "";
+    const tastyDataAction =
+      preferredBroker === "tastytrade"
+        ? brokerActionButton(
+            "ACCOUNT DATA SOURCE",
+            "none",
+            {
+              disabled: true,
+            },
+          )
+        : (
+            tastyAvailable
+              ? brokerActionButton(
+                  "Use for account data",
+                  "select-broker",
+                  {
+                    broker:
+                      "tastytrade",
+                  },
+                )
+              : ""
+          );
 
-    if (!connected) {
-      nextStep =
-        "Open Position Monitor and connect your " +
-        "Tastytrade account. Verify the credentials " +
-        "and select the account BXK should use.";
-    } else if (live) {
-      nextStep =
-        "Live order submission is enabled. Review " +
-        "every order carefully before submitting it " +
-        "to Tastytrade.";
+    const schwabDataAction =
+      preferredBroker === "schwab"
+        ? brokerActionButton(
+            "ACCOUNT DATA SOURCE",
+            "none",
+            {
+              disabled: true,
+            },
+          )
+        : (
+            schwabAvailable
+              ? brokerActionButton(
+                  "Use for account data",
+                  "select-broker",
+                  {
+                    broker:
+                      "schwab",
+                  },
+                )
+              : ""
+          );
+
+    const schwabConnectAction =
+      brokerActionButton(
+        (
+          schwabConnected
+            ? "Reconnect Schwab"
+            : "Connect Schwab"
+        ),
+        "connect-schwab",
+      );
+
+    let executionNote = "";
+
+    if (live) {
+      executionNote =
+        "Live order submission is enabled. " +
+        "Orders continue to execute through Tastytrade.";
     } else if (role === "BETA") {
-      nextStep =
-        "Your Tastytrade account is connected. " +
+      executionNote =
         "SAFE MODE is active, so real orders cannot " +
         "be submitted. Live access must be enabled " +
         "by the BXK OWNER.";
     } else {
-      nextStep =
-        "Your Tastytrade account is connected. " +
+      executionNote =
         "SAFE MODE is active, so real orders cannot " +
         "be submitted while live trading is disabled.";
+    }
+
+    const callbackParameters =
+      new URLSearchParams(
+        window.location.search,
+      );
+
+    const callbackBroker =
+      String(
+        callbackParameters.get("broker")
+        || "",
+      )
+        .trim()
+        .toLowerCase();
+
+    const callbackStatus =
+      String(
+        callbackParameters.get("status")
+        || "",
+      )
+        .trim()
+        .toLowerCase();
+
+    let callbackMessage = "";
+
+    if (callbackBroker === "schwab") {
+      if (
+        callbackStatus === "connected"
+      ) {
+        callbackMessage =
+          "Schwab authorization completed successfully.";
+      } else if (
+        callbackStatus === "select-account"
+      ) {
+        callbackMessage =
+          "Schwab is connected. Select the account " +
+          "BXK should use for account data.";
+      } else if (
+        callbackStatus === "error"
+      ) {
+        callbackMessage =
+          "Schwab authorization needs attention. " +
+          "Use Reconnect Schwab to try again.";
+      }
     }
 
     banner.innerHTML = `
@@ -2742,6 +3325,26 @@ async function refreshAccountStatusBanner() {
         }
       </div>
 
+      ${
+        callbackMessage
+          ? `
+            <div
+              style="
+                margin-bottom:12px;
+                padding:9px 11px;
+                border:
+                  1px solid rgba(59,130,246,.30);
+                border-radius:9px;
+                font-size:12px;
+                line-height:1.45;
+              "
+            >
+              ${htmlSafe(callbackMessage)}
+            </div>
+          `
+          : ""
+      }
+
       <div
         style="
           display:grid;
@@ -2756,13 +3359,13 @@ async function refreshAccountStatusBanner() {
         )}
 
         ${accountStatusMetric(
-          "Tastytrade",
-          brokerState,
+          "Account Data Source",
+          dataSource,
         )}
 
         ${accountStatusMetric(
-          "Account",
-          account,
+          "Execution Broker",
+          "TASTYTRADE",
         )}
 
         ${accountStatusMetric(
@@ -2773,16 +3376,219 @@ async function refreshAccountStatusBanner() {
 
       <div
         style="
+          display:grid;
+          grid-template-columns:
+            repeat(auto-fit,minmax(240px,1fr));
+          gap:12px;
+          margin-top:14px;
+        "
+      >
+        <section
+          style="
+            padding:12px;
+            border:
+              1px solid rgba(148,163,184,.22);
+            border-radius:10px;
+          "
+        >
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:flex-start;
+              gap:10px;
+            "
+          >
+            <div>
+              <strong>Tastytrade</strong>
+
+              <div
+                style="
+                  margin-top:3px;
+                  font-size:12px;
+                  opacity:.68;
+                "
+              >
+                Execution broker
+              </div>
+            </div>
+
+            <strong
+              style="
+                font-size:12px;
+              "
+            >
+              ${
+                tastyConnected
+                  ? "CONNECTED"
+                  : "SETUP REQUIRED"
+              }
+            </strong>
+          </div>
+
+          <div
+            style="
+              margin-top:11px;
+              font-size:12px;
+              line-height:1.5;
+            "
+          >
+            Account:
+            <strong>
+              ${htmlSafe(tastyAccount)}
+            </strong>
+          </div>
+
+          <div
+            style="
+              margin-top:10px;
+            "
+          >
+            ${tastyDataAction}
+          </div>
+
+          ${
+            !tastyConnected
+              ? `
+                <div
+                  style="
+                    margin-top:10px;
+                    font-size:12px;
+                    opacity:.68;
+                    line-height:1.45;
+                  "
+                >
+                  Tastytrade credentials and account
+                  selection are configured from
+                  Position Monitor.
+                </div>
+              `
+              : ""
+          }
+        </section>
+
+        <section
+          style="
+            padding:12px;
+            border:
+              1px solid rgba(148,163,184,.22);
+            border-radius:10px;
+          "
+        >
+          <div
+            style="
+              display:flex;
+              justify-content:space-between;
+              align-items:flex-start;
+              gap:10px;
+            "
+          >
+            <div>
+              <strong>Schwab</strong>
+
+              <div
+                style="
+                  margin-top:3px;
+                  font-size:12px;
+                  opacity:.68;
+                "
+              >
+                Read-only account data
+              </div>
+            </div>
+
+            <strong
+              style="
+                font-size:12px;
+              "
+            >
+              ${
+                schwabConnected
+                  ? "CONNECTED"
+                  : "NOT CONNECTED"
+              }
+            </strong>
+          </div>
+
+          <div
+            style="
+              margin-top:11px;
+              font-size:12px;
+              line-height:1.5;
+            "
+          >
+            Selected account:
+            <strong>
+              ${htmlSafe(schwabAccount)}
+            </strong>
+          </div>
+
+          <div
+            style="
+              display:flex;
+              flex-wrap:wrap;
+              gap:8px;
+              margin-top:10px;
+            "
+          >
+            ${schwabConnectAction}
+            ${schwabDataAction}
+          </div>
+
+          ${
+            (
+              schwabConnected
+              && !selectedSchwabAccount
+            )
+              ? `
+                <div
+                  style="
+                    margin-top:10px;
+                    font-size:12px;
+                    opacity:.75;
+                    line-height:1.45;
+                  "
+                >
+                  Select one Schwab account before
+                  using Schwab as the account data
+                  source.
+                </div>
+              `
+              : ""
+          }
+
+          ${renderSchwabAccounts(
+            activeSchwabAccounts,
+          )}
+        </section>
+      </div>
+
+      <div
+        style="
           margin-top:12px;
           padding:11px 13px;
-          border:1px solid rgba(148,163,184,.22);
+          border:
+            1px solid rgba(148,163,184,.22);
           border-radius:10px;
           font-size:13px;
           line-height:1.5;
         "
       >
-        <strong>Next step:</strong>
-        ${htmlSafe(nextStep)}
+        <strong>Execution:</strong>
+        ${htmlSafe(executionNote)}
+
+        <div
+          style="
+            margin-top:6px;
+            opacity:.72;
+            font-size:12px;
+          "
+        >
+          Schwab is read-only in this phase.
+          Changing the Account Data Source does not
+          change where BXK submits orders.
+          Execution Broker remains Tastytrade only.
+        </div>
       </div>
     `;
 
@@ -2797,8 +3603,13 @@ async function refreshAccountStatusBanner() {
         Account & Trading Status
       </div>
 
-      <div style="margin-top:10px;font-size:13px;">
-        Account status is temporarily unavailable.
+      <div
+        style="
+          margin-top:10px;
+          font-size:13px;
+        "
+      >
+        Broker status is temporarily unavailable.
         Trading permissions have not changed.
       </div>
     `;
