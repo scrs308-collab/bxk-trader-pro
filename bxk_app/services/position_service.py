@@ -96,6 +96,30 @@ def _reconcile_trade_journal_closures(
 
     global _JOURNAL_RECONCILE_NEXT_AT
 
+    active_reconcile_broker = (
+        broker_client
+        or order_broker
+    )
+
+    supports = getattr(
+        active_reconcile_broker,
+        "supports",
+        None,
+    )
+
+    if (
+        callable(supports)
+        and not supports(
+            "order_history"
+        )
+    ):
+        return {
+            "checked": False,
+            "reason":
+                "BROKER_ORDER_HISTORY_UNSUPPORTED",
+            "results": [],
+        }
+
     now_value = (
         time.monotonic()
         if now_monotonic is None
@@ -123,10 +147,8 @@ def _reconcile_trade_journal_closures(
     try:
         return _invoke_reconcile_missing_trade_journals(
             positions,
-            broker_client=(
-                broker_client
-                or order_broker
-            ),
+            broker_client=
+                active_reconcile_broker,
             user_context=
                 user_context,
         )

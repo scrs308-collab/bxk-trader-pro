@@ -14,7 +14,8 @@ from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
     get_broker_connection_status,
-    resolve_broker,
+    get_user_preferred_broker_name,
+    resolve_preferred_broker,
 )
 from bxk_app.services.broker_service import (
     get_account_summary,
@@ -90,21 +91,29 @@ def account_summary(
     ),
 ):
     try:
-        status = (
-            get_broker_connection_status(
+        preferred_broker = (
+            get_user_preferred_broker_name(
                 session,
                 user_context=user_context,
             )
         )
 
-        if (
-            status.get("source")
-            == "legacy_owner"
-        ):
-            return get_account_summary()
+        if preferred_broker == "tastytrade":
+            status = (
+                get_broker_connection_status(
+                    session,
+                    user_context=user_context,
+                )
+            )
+
+            if (
+                status.get("source")
+                == "legacy_owner"
+            ):
+                return get_account_summary()
 
         broker_client = (
-            resolve_broker(
+            resolve_preferred_broker(
                 session,
                 user_context=user_context,
             )

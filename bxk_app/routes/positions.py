@@ -13,7 +13,8 @@ from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
     BrokerConnectionRequired,
     get_broker_connection_status,
-    resolve_broker,
+    get_user_preferred_broker_name,
+    resolve_preferred_broker,
 )
 from bxk_app.services.position_service import (
     get_position_monitor,
@@ -44,28 +45,38 @@ def position_monitor(
     ),
 ):
     try:
-        status = (
-            get_broker_connection_status(
+        preferred_broker = (
+            get_user_preferred_broker_name(
                 session,
                 user_context=
                     user_context,
             )
         )
 
-        # Preserve Joe's current production Position
-        # Monitor path until the OWNER account is
-        # explicitly migrated into broker_connections.
-        if (
-            status.get("source")
-            == "legacy_owner"
-        ):
-            return get_position_monitor(
-                user_context=
-                    user_context,
+        # Preserve the current production OWNER path
+        # only when Tastytrade remains the selected
+        # broker. Selecting Schwab must bypass the
+        # legacy Tastytrade shortcut.
+        if preferred_broker == "tastytrade":
+            status = (
+                get_broker_connection_status(
+                    session,
+                    user_context=
+                        user_context,
+                )
             )
 
+            if (
+                status.get("source")
+                == "legacy_owner"
+            ):
+                return get_position_monitor(
+                    user_context=
+                        user_context,
+                )
+
         broker_client = (
-            resolve_broker(
+            resolve_preferred_broker(
                 session,
                 user_context=
                     user_context,
