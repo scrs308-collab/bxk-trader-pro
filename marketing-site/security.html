@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Security for BXK Trader Pro.">
+  <title>Security | BXK Trader Pro</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="/">
+      <span class="logo">BXK</span>
+      <span>BXK Trader Pro</span>
+    </a>
+    <div class="nav-links">
+      <a href="/#features">Features</a>
+      <a href="/#brokers">Brokers</a>
+      <a href="/security.html">Security</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/support.html">Support</a>
+      <a class="btn btn-primary" href="https://app.bxktraderpro.com">Launch Trader Pro</a>
+    </div>
+    <a class="btn menu-btn" href="https://app.bxktraderpro.com">Launch App</a>
+  </div>
+</nav>
+
+<main>
+  <section class="page-hero">
+    <div class="container">
+      <span class="eyebrow">Security</span>
+      <h1>Security is part of the architecture.</h1>
+    </div>
+  </section>
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="content-card">
+    <p>BXK Trader Pro is being designed so broker access, user isolation, and execution permissions are explicit parts of the system rather than conveniences added later.</p>
+    <h2>Broker authorization</h2>
+    <p>Where supported, broker connections use OAuth authorization. Broker tokens are associated with the individual BXK Trader Pro user and stored in encrypted form.</p>
+    <h2>Account isolation</h2>
+    <p>Broker connections and selected accounts are scoped per user. The application is designed to fail closed when a user does not have access to the requested broker connection or account.</p>
+    <h2>Execution controls</h2>
+    <p>Account-data access and trade execution are treated as separate capabilities. A broker being available as a data source does not automatically make it an execution broker.</p>
+    <h2>Responsible disclosure</h2>
+    <p>Security information on this page describes the product design and is not a certification, warranty, or guarantee that a security incident cannot occur.</p>
+    </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div>
+      <div class="brand"><span class="logo">BXK</span><span>BXK Trader Pro</span></div>
+      <p>Professional trading software for self-directed traders.</p>
+      <p>© <span data-year></span> BXK Capital Trading LLC.</p>
+    </div>
+    <div>
+      <strong>Product</strong>
+      <div class="footer-links" style="margin-top:10px">
+        <a href="/#features">Features</a>
+        <a href="/#brokers">Brokers</a>
+        <a href="/security.html">Security</a>
+        <a href="/support.html">Support</a>
+      </div>
+    </div>
+    <div>
+      <strong>Legal</strong>
+      <div class="footer-links" style="margin-top:10px">
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+        <a href="/risk-disclosure.html">Risk Disclosure</a>
+      </div>
+    </div>
+  </div>
+</footer>
+<script src="/script.js"></script>
+
+</body>
+</html>
