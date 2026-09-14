@@ -81,6 +81,50 @@ def positions_summary():
     return get_positions_summary()
 
 
+def _mask_account_identifier(value):
+    text = str(value or "").strip()
+
+    if not text:
+        return value
+
+    suffix = (
+        text[-4:]
+        if len(text) >= 4
+        else text
+    )
+
+    return f"****{suffix}"
+
+
+def _mask_account_summary_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    safe_payload = dict(payload)
+
+    account = safe_payload.get("account")
+
+    if not isinstance(account, dict):
+        return safe_payload
+
+    safe_account = dict(account)
+
+    for key in (
+        "number",
+        "account_number",
+    ):
+        if safe_account.get(key):
+            safe_account[key] = (
+                _mask_account_identifier(
+                    safe_account[key]
+                )
+            )
+
+    safe_payload["account"] = safe_account
+
+    return safe_payload
+
+
 @router.get("/account-summary")
 def account_summary(
     user_context: dict = Depends(
@@ -110,7 +154,9 @@ def account_summary(
                 status.get("source")
                 == "legacy_owner"
             ):
-                return get_account_summary()
+                return _mask_account_summary_payload(
+                get_account_summary()
+            )
 
         broker_client = (
             resolve_preferred_broker(
@@ -119,8 +165,10 @@ def account_summary(
             )
         )
 
-        return get_account_summary(
-            broker_client=broker_client,
+        return _mask_account_summary_payload(
+            get_account_summary(
+                broker_client=broker_client,
+            )
         )
 
     except BrokerConnectionRequired as exc:

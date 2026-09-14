@@ -90,7 +90,7 @@ def test_account_summary_uses_preferred_schwab(
 
     assert (
         result["account"]["number"]
-        == "SCHWAB"
+        == "****HWAB"
     )
 
 

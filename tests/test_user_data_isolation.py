@@ -337,7 +337,7 @@ def test_beta_account_summary_uses_own_broker(
     assert data["connected"] is True
     assert (
         data["account"]["account_number"]
-        == "BETA-ONLY"
+        == "****ONLY"
     )
 
 def test_market_header_hides_owner_context():

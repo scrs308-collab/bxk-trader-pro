@@ -683,7 +683,7 @@ def get_position_monitor(
             )
 
             return {
-                "status": "UNSUPPORTED",
+                "status": "NO_SUPPORTED_POSITIONS",
                 "connected": connected,
                 "position": None,
                 "positions": [],
@@ -692,10 +692,11 @@ def get_position_monitor(
                 "leg_count": len(
                     positions
                 ),
+                "ignored_position_count": len(positions),
                 "message": (
-                    "Open positions could not "
-                    "be grouped into supported "
-                    "Iron Condor positions."
+                    "No supported SPX option positions found. "
+                    f"{len(positions)} non-SPX/non-option "
+                    "position(s) were ignored."
                 ),
             }
 
