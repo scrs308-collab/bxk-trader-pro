@@ -42,7 +42,27 @@ async def enforce_bxk_authentication(
 
     path = request.url.path
 
-    if path in PUBLIC_PATHS:
+    is_schwab_root_callback = (
+        path == "/"
+        and bool(
+            request.query_params.get(
+                "state"
+            )
+        )
+        and bool(
+            request.query_params.get(
+                "code"
+            )
+            or request.query_params.get(
+                "error"
+            )
+        )
+    )
+
+    if (
+        path in PUBLIC_PATHS
+        or is_schwab_root_callback
+    ):
         return await call_next(request)
 
     token = request.cookies.get(

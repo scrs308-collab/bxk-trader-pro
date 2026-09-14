@@ -1,9 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from bxk_app.auth_middleware import (
     enforce_bxk_authentication,
@@ -151,7 +151,45 @@ def change_password_page():
 
 
 @app.get("/")
-def home():
+def home(
+    request: Request,
+):
+    state = request.query_params.get(
+        "state"
+    )
+
+    code = request.query_params.get(
+        "code"
+    )
+
+    error = request.query_params.get(
+        "error"
+    )
+
+    if (
+        state
+        and (
+            code
+            or error
+        )
+    ):
+        callback_url = (
+            "/api/broker-connection/"
+            "schwab/callback"
+        )
+
+        query = request.url.query
+
+        if query:
+            callback_url = (
+                f"{callback_url}?{query}"
+            )
+
+        return RedirectResponse(
+            url=callback_url,
+            status_code=303,
+        )
+
     return FileResponse(
         "static/index.html"
     )
