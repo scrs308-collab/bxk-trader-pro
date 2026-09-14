@@ -3141,16 +3141,25 @@ async function refreshAccountStatusBanner() {
           )
         : "--";
 
-    const activeSchwabAccounts =
+    const schwabAccountList =
       Array.isArray(
         schwabAccounts,
       )
-        ? schwabAccounts.filter(
-            (account) =>
-              account
-              && account.is_active !== false,
-          )
-        : [];
+        ? schwabAccounts
+        : (
+            Array.isArray(
+              schwabAccounts?.accounts,
+            )
+              ? schwabAccounts.accounts
+              : []
+          );
+
+    const activeSchwabAccounts =
+      schwabAccountList.filter(
+        (account) =>
+          account
+          && account.is_active !== false,
+      );
 
     const selectedSchwabAccount =
       activeSchwabAccounts.find(

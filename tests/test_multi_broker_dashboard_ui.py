@@ -116,3 +116,15 @@ def test_dashboard_refreshes_after_broker_changes():
         "dashboard-broker-controls"
         in DASHBOARD
     )
+
+
+def test_dashboard_accepts_wrapped_schwab_accounts():
+    assert (
+        "schwabAccounts?.accounts"
+        in DASHBOARD
+    )
+
+    assert (
+        "schwabAccountList"
+        in DASHBOARD
+    )
