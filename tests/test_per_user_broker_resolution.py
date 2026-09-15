@@ -350,3 +350,134 @@ def test_user_live_trading_defaults_to_disabled(
         resolved.live_trading_enabled
         is False
     )
+
+
+
+def test_oauth_connection_uses_server_application_secret(
+    db_session,
+    credential_key,
+    monkeypatch,
+):
+    beta = make_user(
+        db_session,
+        username="oauthbeta",
+        role=UserRole.BETA,
+    )
+
+    monkeypatch.setattr(
+        config,
+        "TASTYTRADE_CLIENT_SECRET",
+        "server-application-secret",
+    )
+
+    connection = BrokerConnection(
+        user_id=beta.id,
+        broker="tastytrade",
+        client_secret_encrypted=None,
+        refresh_token_encrypted=(
+            encrypt_broker_secret(
+                "oauth-user-refresh-token"
+            )
+        ),
+        access_token_encrypted=(
+            encrypt_broker_secret(
+                "oauth-user-access-token"
+            )
+        ),
+        account_number="OAUTH7178",
+        base_url="https://api.tastyworks.com",
+        is_active=True,
+        is_verified=True,
+        live_trading_enabled=False,
+    )
+
+    db_session.add(
+        connection
+    )
+    db_session.commit()
+
+    resolved = resolve_tastytrade_broker(
+        db_session,
+        user_context=context_for(beta),
+    )
+
+    assert isinstance(
+        resolved,
+        TastytradeBroker,
+    )
+
+    assert (
+        resolved.client_secret
+        == "server-application-secret"
+    )
+
+    assert (
+        resolved.refresh_token
+        == "oauth-user-refresh-token"
+    )
+
+    assert (
+        resolved.account_number
+        == "OAUTH7178"
+    )
+
+    assert (
+        resolved.live_trading_enabled
+        is False
+    )
+
+
+def test_oauth_connection_requires_server_application_secret(
+    db_session,
+    credential_key,
+    monkeypatch,
+):
+    beta = make_user(
+        db_session,
+        username="oauthnosecret",
+        role=UserRole.BETA,
+    )
+
+    monkeypatch.setattr(
+        config,
+        "TASTYTRADE_CLIENT_SECRET",
+        "",
+    )
+
+    connection = BrokerConnection(
+        user_id=beta.id,
+        broker="tastytrade",
+        client_secret_encrypted=None,
+        refresh_token_encrypted=(
+            encrypt_broker_secret(
+                "oauth-user-refresh-token"
+            )
+        ),
+        access_token_encrypted=(
+            encrypt_broker_secret(
+                "oauth-user-access-token"
+            )
+        ),
+        account_number="OAUTH9999",
+        base_url="https://api.tastyworks.com",
+        is_active=True,
+        is_verified=True,
+        live_trading_enabled=False,
+    )
+
+    db_session.add(
+        connection
+    )
+    db_session.commit()
+
+    with pytest.raises(
+        BrokerConnectionInvalid,
+        match=(
+            "Tastytrade application "
+            "client secret is unavailable"
+        ),
+    ):
+        resolve_tastytrade_broker(
+            db_session,
+            user_context=context_for(beta),
+        )

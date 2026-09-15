@@ -1196,19 +1196,41 @@ def resolve_tastytrade_broker(
             )
 
         try:
-            client_secret = (
-                decrypt_broker_secret(
-                    connection
-                    .client_secret_encrypted
-                )
-            )
-
             refresh_token = (
                 decrypt_broker_secret(
                     connection
                     .refresh_token_encrypted
                 )
             )
+
+            if (
+                connection
+                .client_secret_encrypted
+                is not None
+            ):
+                # Legacy manual connection.
+                # Preserve the user-specific client secret.
+                client_secret = (
+                    decrypt_broker_secret(
+                        connection
+                        .client_secret_encrypted
+                    )
+                )
+
+            else:
+                # OAuth connection.
+                # The application secret belongs to BXK
+                # and remains server-side.
+                client_secret = str(
+                    config.TASTYTRADE_CLIENT_SECRET
+                    or ""
+                ).strip()
+
+                if not client_secret:
+                    raise BrokerConnectionInvalid(
+                        "Tastytrade application "
+                        "client secret is unavailable."
+                    )
 
         except BrokerCredentialError as exc:
             raise BrokerConnectionInvalid(
