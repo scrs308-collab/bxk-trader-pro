@@ -19,6 +19,8 @@ from bxk_app.config import (
 # Refresh slightly early so requests do not fail at the boundary.
 ACCESS_TOKEN_REFRESH_SECONDS = 13 * 60
 
+TASTYTRADE_USER_AGENT = "bxk-trader-pro/1.0"
+
 
 class TastytradeBroker(BrokerBase):
     broker_name = "tastytrade"
@@ -149,6 +151,9 @@ class TastytradeBroker(BrokerBase):
         try:
             response = self.session.post(
                 f"{self._resolved_base_url()}/oauth/token",
+                headers={
+                    "User-Agent": TASTYTRADE_USER_AGENT,
+                },
                 json={
                     "grant_type": "refresh_token",
                     "refresh_token": self._resolved_refresh_token(),
@@ -212,6 +217,7 @@ class TastytradeBroker(BrokerBase):
 
         return {
             "Authorization": f"Bearer {self.access_token}",
+            "User-Agent": TASTYTRADE_USER_AGENT,
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
