@@ -20,6 +20,8 @@ from bxk_app.services import (
     broker_connection_service,
     schwab_connection_service,
     schwab_oauth_service,
+    tastytrade_connection_service,
+    tastytrade_oauth_service,
 )
 from bxk_app.services.broker_connection_service import (
     BrokerConnectionInvalid,
@@ -244,6 +246,130 @@ def _mask_account_number(
             len(value) - 4
         )
         + value[-4:]
+    )
+
+
+@router.get("/tastytrade/connect")
+def connect_tastytrade_oauth(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    user_id = _database_user_id(
+        user_context
+    )
+
+    try:
+        result = (
+            tastytrade_connection_service
+            .begin_tastytrade_oauth(
+                session,
+                user_id=user_id,
+            )
+        )
+
+    except (
+        tastytrade_connection_service
+        .TastytradeConnectionError,
+        tastytrade_oauth_service
+        .TastytradeOAuthError,
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    return RedirectResponse(
+        url=result[
+            "authorization_url"
+        ],
+        status_code=303,
+    )
+
+
+@router.get("/tastytrade/callback")
+def tastytrade_callback(
+    state: str | None = None,
+    code: str | None = None,
+    error: str | None = None,
+    session: Session = Depends(
+        get_db
+    ),
+):
+    if error:
+        if state:
+            (
+                tastytrade_connection_service
+                .cancel_tastytrade_oauth(
+                    session,
+                    state=state,
+                )
+            )
+
+        return RedirectResponse(
+            url=(
+                "/?broker=tastytrade"
+                "&status=denied"
+            ),
+            status_code=303,
+        )
+
+    if not state or not code:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Tastytrade OAuth callback is "
+                "missing required parameters."
+            ),
+        )
+
+    try:
+        result = (
+            tastytrade_connection_service
+            .complete_tastytrade_oauth(
+                session,
+                state=state,
+                code=code,
+            )
+        )
+
+    except (
+        tastytrade_connection_service
+        .TastytradeOAuthStateInvalid
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        tastytrade_connection_service
+        .TastytradeConnectionError
+    ):
+        return RedirectResponse(
+            url=(
+                "/?broker=tastytrade"
+                "&status=error"
+            ),
+            status_code=303,
+        )
+
+    if result.get(
+        "account_number"
+    ):
+        status = "connected"
+    else:
+        status = "select-account"
+
+    return RedirectResponse(
+        url=(
+            "/?broker=tastytrade"
+            f"&status={status}"
+        ),
+        status_code=303,
     )
 
 
