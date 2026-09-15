@@ -26,13 +26,29 @@ def test_beta_onboarding_status_ui_is_present():
     )
 
     assert (
-        "bxk:broker-connection-changed"
+        "hasOwnerAccess"
         in positions
     )
 
     assert (
-        "encrypted and scoped"
+        "temporarily unavailable for beta accounts"
         in positions
+    )
+
+    assert (
+        "/api/broker-connection/"
+        "tastytrade/connect"
+        in positions
+    )
+
+    assert (
+        "brokerClientSecret"
+        not in positions
+    )
+
+    assert (
+        "brokerRefreshToken"
+        not in positions
     )
 
     assert (

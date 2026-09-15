@@ -1,5 +1,8 @@
 import { POSITIONS_URL } from "./config.js";
 import {
+  hasOwnerAccess,
+} from "./access-control.js";
+import {
   el,
   safeNumber,
   formatMoney,
@@ -1160,318 +1163,99 @@ function renderBrokerConnectionForm(
 ) {
   brokerConnectionFlowActive = true;
 
+  const ownerCanConnect =
+    hasOwnerAccess();
+
+  const title =
+    ownerCanConnect
+      ? "Connect Tastytrade"
+      : "Tastytrade Connection Unavailable";
+
+  const connectionInstructions =
+    ownerCanConnect
+      ? `
+        <div
+          class="position-empty-text"
+          style="
+            max-width:520px;
+            margin:12px auto 0;
+            line-height:1.55;
+          "
+        >
+          Sign in to Tastytrade and authorize
+          BXK Trader Pro to access your account.
+          Your Tastytrade password stays with
+          Tastytrade.
+        </div>
+      `
+      : `
+        <div
+          class="position-empty-text"
+          style="
+            max-width:560px;
+            margin:12px auto 0;
+            line-height:1.55;
+          "
+        >
+          Tastytrade self-service connection is
+          temporarily unavailable for beta accounts
+          while third-party OAuth approval is pending.
+        </div>
+      `;
+
+  const connectionAction =
+    ownerCanConnect
+      ? `
+        <div
+          style="
+            margin-top:18px;
+          "
+        >
+          <button
+            id="connectTastytradeButton"
+            type="button"
+            class="position-action-button"
+          >
+            Connect Tastytrade
+          </button>
+        </div>
+      `
+      : "";
+
   container.innerHTML = `
     <div class="position-empty">
       <div class="position-empty-title">
-        Connect Tastytrade
+        ${title}
       </div>
 
       <div class="position-empty-text">
         ${message}
       </div>
 
-      <div
-        class="position-empty-text"
-        style="
-          max-width:520px;
-          margin:12px auto 0;
-          text-align:left;
-          line-height:1.55;
-        "
-      >
-        <strong>Setup:</strong>
-        Enter your Tastytrade API Client Secret and
-        Refresh Token, verify them, then select the
-        account BXK should use. Broker credentials are
-        encrypted and scoped to your BXK user account.
-      </div>
-
-      <div style="max-width:520px;margin:18px auto;display:grid;gap:12px;text-align:left;">
-        <label>
-          Client Secret
-          <input
-            id="brokerClientSecret"
-            type="password"
-            autocomplete="off"
-            style="width:100%;box-sizing:border-box;padding:10px;"
-          >
-        </label>
-
-        <label>
-          Refresh Token
-          <input
-            id="brokerRefreshToken"
-            type="password"
-            autocomplete="off"
-            style="width:100%;box-sizing:border-box;padding:10px;"
-          >
-        </label>
-
-        <button
-          id="verifyBrokerButton"
-          type="button"
-        >
-          VERIFY TASTYTRADE
-        </button>
-
-        <label
-          id="brokerAccountWrap"
-          hidden
-        >
-          Account
-          <select
-            id="brokerAccountNumber"
-            style="width:100%;box-sizing:border-box;padding:10px;"
-          ></select>
-        </label>
-
-        <button
-          id="connectBrokerButton"
-          type="button"
-          hidden
-        >
-          CONNECT ACCOUNT
-        </button>
-
-        <div
-          id="brokerConnectionMessage"
-          class="position-empty-text"
-        ></div>
-      </div>
+      ${connectionInstructions}
+      ${connectionAction}
     </div>
   `;
 
-  const secret =
-    document.getElementById(
-      "brokerClientSecret",
-    );
+  if (!ownerCanConnect) {
+    return;
+  }
 
-  const token =
-    document.getElementById(
-      "brokerRefreshToken",
-    );
+  const connectButton =
+    el("connectTastytradeButton");
 
-  const verify =
-    document.getElementById(
-      "verifyBrokerButton",
-    );
-
-  const connect =
-    document.getElementById(
-      "connectBrokerButton",
-    );
-
-  const accountWrap =
-    document.getElementById(
-      "brokerAccountWrap",
-    );
-
-  const account =
-    document.getElementById(
-      "brokerAccountNumber",
-    );
-
-  const status =
-    document.getElementById(
-      "brokerConnectionMessage",
-    );
-
-  const setStatus = (value) => {
-    if (status) {
-      status.textContent = value || "";
-    }
-  };
-
-  verify?.addEventListener(
+  connectButton?.addEventListener(
     "click",
-    async () => {
-      const clientSecret =
-        secret?.value?.trim() || "";
+    () => {
+      brokerConnectionFlowActive = false;
 
-      const refreshToken =
-        token?.value?.trim() || "";
-
-      if (!clientSecret || !refreshToken) {
-        setStatus(
-          "Enter both credentials first.",
-        );
-        return;
-      }
-
-      verify.disabled = true;
-
-      setStatus(
-        "Verifying Tastytrade...",
+      window.location.assign(
+        "/api/broker-connection/tastytrade/connect",
       );
-
-      try {
-        const response = await fetch(
-          "/api/broker-connection/verify",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              client_secret:
-                clientSecret,
-              refresh_token:
-                refreshToken,
-            }),
-          },
-        );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.detail ||
-            "Tastytrade verification failed.",
-          );
-        }
-
-        const accounts =
-          Array.isArray(data.accounts)
-            ? data.accounts
-            : [];
-
-        if (!accounts.length) {
-          throw new Error(
-            "No Tastytrade accounts were returned.",
-          );
-        }
-
-        account.innerHTML = "";
-
-        accounts.forEach(
-          (item) => {
-            const option =
-              document.createElement(
-                "option",
-              );
-
-            option.value =
-              item.account_number;
-
-            option.textContent =
-              item.nickname
-                ? `${item.nickname} (${item.account_number})`
-                : item.account_number;
-
-            account.appendChild(
-              option,
-            );
-          },
-        );
-
-        accountWrap.hidden = false;
-        connect.hidden = false;
-
-        setStatus(
-          "Verified. Select your account and connect.",
-        );
-
-      } catch (error) {
-        setStatus(
-          error.message ||
-          "Verification failed.",
-        );
-
-      } finally {
-        verify.disabled = false;
-      }
-    },
-  );
-
-  connect?.addEventListener(
-    "click",
-    async () => {
-      const clientSecret =
-        secret?.value?.trim() || "";
-
-      const refreshToken =
-        token?.value?.trim() || "";
-
-      const accountNumber =
-        account?.value?.trim() || "";
-
-      if (
-        !clientSecret ||
-        !refreshToken ||
-        !accountNumber
-      ) {
-        setStatus(
-          "Verify credentials and select an account.",
-        );
-        return;
-      }
-
-      connect.disabled = true;
-
-      setStatus(
-        "Connecting account...",
-      );
-
-      try {
-        const response = await fetch(
-          "/api/broker-connection/connect",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              client_secret:
-                clientSecret,
-              refresh_token:
-                refreshToken,
-              account_number:
-                accountNumber,
-            }),
-          },
-        );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.detail ||
-            "Unable to connect account.",
-          );
-        }
-
-        secret.value = "";
-        token.value = "";
-
-        setStatus(
-          "Connected. Loading positions...",
-        );
-
-        window.dispatchEvent(
-          new CustomEvent(
-            "bxk:broker-connection-changed",
-          ),
-        );
-
-        await loadPositions();
-
-        brokerConnectionFlowActive = false;
-
-      } catch (error) {
-        connect.disabled = false;
-
-        setStatus(
-          error.message ||
-          "Unable to connect account.",
-        );
-      }
     },
   );
 }
+
 
 export async function loadPositions() {
   const container = el("positionMonitor");

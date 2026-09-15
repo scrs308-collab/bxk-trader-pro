@@ -128,3 +128,49 @@ def test_dashboard_accepts_wrapped_schwab_accounts():
         "schwabAccountList"
         in DASHBOARD
     )
+
+
+
+def test_dashboard_supports_tastytrade_account_selection():
+    assert (
+        "/api/broker-connection/"
+        "tastytrade/accounts"
+        in DASHBOARD
+    )
+
+    assert (
+        "select-tastytrade-account"
+        in DASHBOARD
+    )
+
+    assert (
+        "tastytradeAccountList"
+        in DASHBOARD
+    )
+
+    assert (
+        "tastytradeAccounts?.accounts"
+        in DASHBOARD
+    )
+
+
+def test_dashboard_handles_tastytrade_oauth_callback():
+    assert (
+        'callbackBroker === "tastytrade"'
+        in DASHBOARD
+    )
+
+    assert (
+        "Tastytrade authorization completed successfully."
+        in DASHBOARD
+    )
+
+    assert (
+        "Tastytrade is connected. Select the account"
+        in DASHBOARD
+    )
+
+    assert (
+        "Tastytrade authorization needs attention."
+        in DASHBOARD
+    )

@@ -769,3 +769,141 @@ def complete_tastytrade_oauth(
         "accounts":
             account_result,
     }
+
+
+
+class TastytradeAccountSelectionError(
+    TastytradeConnectionError
+):
+    pass
+
+
+def list_tastytrade_accounts(
+    session: Session,
+    *,
+    user_id,
+) -> list[dict]:
+    connection = get_tastytrade_connection(
+        session,
+        user_id=user_id,
+    )
+
+    if connection is None:
+        return []
+
+    statement = (
+        select(BrokerAccount)
+        .where(
+            BrokerAccount
+            .broker_connection_id
+            == connection.id,
+            BrokerAccount.is_active
+            .is_(True),
+        )
+        .order_by(
+            BrokerAccount.account_number
+        )
+    )
+
+    accounts = list(
+        session.scalars(
+            statement
+        ).all()
+    )
+
+    return [
+        {
+            "id":
+                str(account.id),
+            "account_number":
+                account.account_number,
+            "nickname":
+                account.nickname,
+            "account_type":
+                account.account_type,
+            "is_default":
+                bool(
+                    account.is_default
+                ),
+            "is_active":
+                bool(
+                    account.is_active
+                ),
+        }
+        for account in accounts
+    ]
+
+
+def select_tastytrade_account(
+    session: Session,
+    *,
+    user_id,
+    account_id,
+) -> dict:
+    connection = get_tastytrade_connection(
+        session,
+        user_id=user_id,
+    )
+
+    if connection is None:
+        raise TastytradeAccountSelectionError(
+            "Tastytrade account not found."
+        )
+
+    selected = session.scalar(
+        select(BrokerAccount)
+        .where(
+            BrokerAccount.id
+            == account_id,
+            BrokerAccount
+            .broker_connection_id
+            == connection.id,
+            BrokerAccount.is_active
+            .is_(True),
+        )
+    )
+
+    if selected is None:
+        raise TastytradeAccountSelectionError(
+            "Tastytrade account not found."
+        )
+
+    accounts = list(
+        session.scalars(
+            select(BrokerAccount)
+            .where(
+                BrokerAccount
+                .broker_connection_id
+                == connection.id,
+                BrokerAccount.is_active
+                .is_(True),
+            )
+        ).all()
+    )
+
+    for account in accounts:
+        account.is_default = (
+            account.id
+            == selected.id
+        )
+
+    connection.account_number = (
+        selected.account_number
+    )
+
+    session.commit()
+
+    return {
+        "id":
+            str(selected.id),
+        "account_number":
+            selected.account_number,
+        "nickname":
+            selected.nickname,
+        "account_type":
+            selected.account_type,
+        "is_default":
+            True,
+        "is_active":
+            True,
+    }

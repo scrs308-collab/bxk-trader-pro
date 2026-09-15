@@ -721,3 +721,204 @@ def test_state_is_bound_to_its_connection(
         .oauth_state_hash
         is not None
     )
+
+
+
+def _make_tastytrade_selection_connection(
+    session,
+    *,
+    user_id,
+    first_number="TT1111",
+    second_number="TT2222",
+):
+    connection = BrokerConnection(
+        user_id=user_id,
+        broker="tastytrade",
+        client_secret_encrypted=None,
+        refresh_token_encrypted=None,
+        access_token_encrypted=None,
+        account_number=None,
+        base_url="https://api.tastyworks.com",
+        is_active=True,
+        is_verified=True,
+        live_trading_enabled=False,
+    )
+
+    session.add(
+        connection
+    )
+    session.flush()
+
+    first = BrokerAccount(
+        broker_connection_id=connection.id,
+        account_number=first_number,
+        nickname="Primary",
+        account_type="Business",
+        is_default=False,
+        is_active=True,
+    )
+
+    second = BrokerAccount(
+        broker_connection_id=connection.id,
+        account_number=second_number,
+        nickname="Secondary",
+        account_type="Business",
+        is_default=False,
+        is_active=True,
+    )
+
+    session.add_all([
+        first,
+        second,
+    ])
+
+    session.commit()
+
+    return (
+        connection,
+        first,
+        second,
+    )
+
+
+def test_list_tastytrade_accounts_returns_active_accounts(
+    db_session,
+):
+    user_id = uuid.uuid4()
+
+    connection, first, second = (
+        _make_tastytrade_selection_connection(
+            db_session,
+            user_id=user_id,
+        )
+    )
+
+    inactive = BrokerAccount(
+        broker_connection_id=connection.id,
+        account_number="TT9999",
+        nickname="Inactive",
+        account_type="Business",
+        is_default=False,
+        is_active=False,
+    )
+
+    db_session.add(
+        inactive
+    )
+    db_session.commit()
+
+    result = service.list_tastytrade_accounts(
+        db_session,
+        user_id=user_id,
+    )
+
+    assert [
+        item["account_number"]
+        for item in result
+    ] == [
+        first.account_number,
+        second.account_number,
+    ]
+
+    assert all(
+        item["is_active"] is True
+        for item in result
+    )
+
+    assert all(
+        "refresh_token" not in item
+        for item in result
+    )
+
+    assert all(
+        "access_token" not in item
+        for item in result
+    )
+
+
+def test_select_tastytrade_account_updates_default(
+    db_session,
+):
+    user_id = uuid.uuid4()
+
+    connection, first, second = (
+        _make_tastytrade_selection_connection(
+            db_session,
+            user_id=user_id,
+        )
+    )
+
+    result = service.select_tastytrade_account(
+        db_session,
+        user_id=user_id,
+        account_id=second.id,
+    )
+
+    assert result["id"] == str(
+        second.id
+    )
+
+    assert (
+        result["account_number"]
+        == second.account_number
+    )
+
+    assert result["is_default"] is True
+    assert result["is_active"] is True
+
+    db_session.refresh(
+        connection
+    )
+    db_session.refresh(
+        first
+    )
+    db_session.refresh(
+        second
+    )
+
+    assert (
+        connection.account_number
+        == second.account_number
+    )
+
+    assert first.is_default is False
+    assert second.is_default is True
+
+
+def test_select_tastytrade_account_rejects_other_user_account(
+    db_session,
+):
+    first_user_id = uuid.uuid4()
+    second_user_id = uuid.uuid4()
+
+    (
+        _first_connection,
+        _first_account,
+        _first_second_account,
+    ) = _make_tastytrade_selection_connection(
+        db_session,
+        user_id=first_user_id,
+        first_number="USER1A",
+        second_number="USER1B",
+    )
+
+    (
+        _second_connection,
+        foreign_account,
+        _second_second_account,
+    ) = _make_tastytrade_selection_connection(
+        db_session,
+        user_id=second_user_id,
+        first_number="USER2A",
+        second_number="USER2B",
+    )
+
+    with pytest.raises(
+        service.TastytradeAccountSelectionError,
+        match="Tastytrade account not found",
+    ):
+        service.select_tastytrade_account(
+            db_session,
+            user_id=first_user_id,
+            account_id=foreign_account.id,
+        )

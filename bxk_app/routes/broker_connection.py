@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
     require_owner_or_beta,
+    require_owner_or_auth_disabled,
 )
 from bxk_app.database import get_db
 from bxk_app.services import (
@@ -252,7 +253,7 @@ def _mask_account_number(
 @router.get("/tastytrade/connect")
 def connect_tastytrade_oauth(
     user_context: dict = Depends(
-        require_owner_or_beta
+        require_owner_or_auth_disabled
     ),
     session: Session = Depends(
         get_db
@@ -492,6 +493,137 @@ def schwab_callback(
         ),
         status_code=303,
     )
+
+
+
+@router.get("/tastytrade/accounts")
+def tastytrade_accounts(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    user_id = _database_user_id(
+        user_context
+    )
+
+    accounts = (
+        tastytrade_connection_service
+        .list_tastytrade_accounts(
+            session,
+            user_id=user_id,
+        )
+    )
+
+    safe_accounts = []
+
+    for account in accounts:
+        safe_accounts.append({
+            "id":
+                account["id"],
+            "account_number_masked":
+                _mask_account_number(
+                    account[
+                        "account_number"
+                    ]
+                ),
+            "nickname":
+                account.get(
+                    "nickname"
+                ),
+            "account_type":
+                account.get(
+                    "account_type"
+                ),
+            "is_default":
+                bool(
+                    account.get(
+                        "is_default"
+                    )
+                ),
+            "is_active":
+                bool(
+                    account.get(
+                        "is_active"
+                    )
+                ),
+        })
+
+    return {
+        "broker":
+            "tastytrade",
+        "accounts":
+            safe_accounts,
+    }
+
+
+@router.post(
+    "/tastytrade/accounts/{account_id}/select"
+)
+def select_tastytrade_account(
+    account_id: uuid.UUID,
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    user_id = _database_user_id(
+        user_context
+    )
+
+    try:
+        account = (
+            tastytrade_connection_service
+            .select_tastytrade_account(
+                session,
+                user_id=user_id,
+                account_id=account_id,
+            )
+        )
+
+    except (
+        tastytrade_connection_service
+        .TastytradeAccountSelectionError
+    ) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Tastytrade account not found."
+            ),
+        ) from exc
+
+    return {
+        "broker":
+            "tastytrade",
+        "selected":
+            True,
+        "account": {
+            "id":
+                account["id"],
+            "account_number_masked":
+                _mask_account_number(
+                    account[
+                        "account_number"
+                    ]
+                ),
+            "nickname":
+                account.get(
+                    "nickname"
+                ),
+            "account_type":
+                account.get(
+                    "account_type"
+                ),
+            "is_default":
+                True,
+            "is_active":
+                True,
+        },
+    }
 
 
 @router.get("/schwab/accounts")
