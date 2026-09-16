@@ -822,4 +822,3 @@ def select_schwab_account(
         "is_active":
             True,
     }
-

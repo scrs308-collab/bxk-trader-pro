@@ -813,4 +813,3 @@ def select_preferred_broker(
             status_code=400,
             detail=str(exc),
         ) from exc
-
