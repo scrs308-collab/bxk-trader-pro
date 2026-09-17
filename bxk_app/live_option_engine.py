@@ -24,6 +24,67 @@ def to_float(value, default=0.0):
         return default
 
 
+def quote_event_timestamp(
+    quote,
+) -> float:
+    """
+    Return the oldest usable bid/ask timestamp.
+
+    DXLink snapshots can contain a valid price while one of
+    bidTime or askTime is zero. In that case, eventTime is the
+    only trustworthy timestamp for the populated snapshot side.
+    """
+
+    event_time = to_float(
+        getattr(
+            quote,
+            "event_time",
+            None,
+        ),
+        0,
+    )
+
+    bid_time = to_float(
+        getattr(
+            quote,
+            "bid_time",
+            None,
+        ),
+        0,
+    )
+
+    ask_time = to_float(
+        getattr(
+            quote,
+            "ask_time",
+            None,
+        ),
+        0,
+    )
+
+    if bid_time <= 0:
+        bid_time = event_time
+
+    if ask_time <= 0:
+        ask_time = event_time
+
+    valid_times = [
+        value
+        for value in (
+            bid_time,
+            ask_time,
+        )
+        if value > 0
+    ]
+
+    if not valid_times:
+        return 0.0
+
+    return min(
+        valid_times
+    )
+
+
 async def fetch_live_market_data(symbols: list[str]) -> dict:
     """
     Fetch quotes and Greeks for the requested option streamer symbols.
@@ -78,9 +139,10 @@ async def fetch_live_market_data(symbols: list[str]) -> dict:
                 if symbol in market_data:
                     market_data[symbol].update(
                         {
-                            "quote_timestamp": min(
-                                to_float(getattr(quote, "bid_time", None), 0),
-                                to_float(getattr(quote, "ask_time", None), 0),
+                            "quote_timestamp": (
+                                quote_event_timestamp(
+                                    quote
+                                )
                             ),
                             "bid": to_float(
                                 getattr(

@@ -1,3 +1,8 @@
+from datetime import (
+    datetime,
+    timezone,
+)
+
 import pytest
 
 import bxk_app.routes.order as order_route
@@ -2357,6 +2362,9 @@ def _vertical_test_order(
         "quantity": 1,
         "order_type": "LIMIT",
         "time_in_force": "DAY",
+        "quote_timestamp": datetime.now(
+            timezone.utc
+        ).isoformat(),
         "limit_price": 3.20,
         "max_risk": 2180.0,
         "legs": [
@@ -2677,4 +2685,3 @@ def test_submission_reservation_is_user_and_account_scoped():
     assert first_alpha is True
     assert second_alpha is False
     assert first_bravo is True
-

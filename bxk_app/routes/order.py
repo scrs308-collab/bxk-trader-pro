@@ -1007,14 +1007,21 @@ def _validate_order(
         strike_order_valid = False
         width_valid = False
 
-    if is_debit:
-        try:
-            quote_age(order.get("quote_timestamp"))
-            fresh = True
-        except (ValueError, TypeError):
-            fresh = False
-        check("quote_freshness", fresh, "Option quotes are fresh.",
-              "Option quotes are missing or stale. Build a fresh preview.")
+    try:
+        quote_age(order.get("quote_timestamp"))
+        fresh = True
+    except (ValueError, TypeError):
+        fresh = False
+
+    check(
+        "quote_freshness",
+        fresh,
+        "Option quotes are fresh.",
+        (
+            "Option quotes are missing or stale. "
+            "Build a fresh preview."
+        ),
+    )
 
     check(
         "leg_directions",
@@ -1219,6 +1226,28 @@ def order_preview(
         return {
             "status": "NO_TRADE",
             "message": "No approved trade available.",
+        }
+
+    try:
+        quote_age(
+            order.get("quote_timestamp")
+        )
+    except (ValueError, TypeError):
+        return {
+            "status": "BLOCKED",
+            "live_submission_enabled": False,
+            "message": (
+                "Option quotes are missing or stale. "
+                "Build a fresh preview."
+            ),
+            "errors": [
+                (
+                    "Option quotes are missing or stale. "
+                    "Build a fresh preview."
+                )
+            ],
+            "trade": trade,
+            "order": order,
         }
 
     review_id = _create_order_review_lock(

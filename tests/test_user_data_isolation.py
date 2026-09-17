@@ -1,3 +1,8 @@
+from datetime import (
+    datetime,
+    timezone,
+)
+
 import pytest
 import bxk_app.routes.order as order_route
 from fastapi.testclient import TestClient
@@ -1309,7 +1314,14 @@ def test_beta_preview_respects_per_user_live_trading_flag(
         "_build_current_order",
         lambda *args, **kwargs: (
             {"strategy": "IRON_CONDOR"},
-            {"test_order": True},
+            {
+                "test_order": True,
+                "quote_timestamp": (
+                    datetime.now(
+                        timezone.utc
+                    ).isoformat()
+                ),
+            },
         ),
     )
 

@@ -7,6 +7,30 @@ import {
   formatNumber,
 } from "./utils.js";
 
+function quoteTimeLabel(value) {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unavailable";
+  }
+
+  return parsed.toLocaleTimeString();
+}
+
+function quoteAgeLabel(value) {
+  const age = Number(value);
+
+  if (!Number.isFinite(age) || age < 0) {
+    return "Unavailable";
+  }
+
+  return `${formatNumber(age, 1)}s`;
+}
+
 export async function loadBestTrade(
   overrides = {},
 ) {
@@ -139,12 +163,6 @@ const response = await fetch(
       recommendation === "TRADE" ||
       recommendation === "TRADE SMALL";
 
-    const badgeClass =
-      tradeApproved ? "enter" : "no-trade";
-
-    const badgeText =
-      manualPreviewReady ? `MANUAL · ${trade.playbook_status || "CAUTION"}` : tradeApproved ? recommendation : "NO TRADE";
-
         const missionScore = Math.max(
       0,
       Math.min(
@@ -179,13 +197,45 @@ const response = await fetch(
       ),
     ).toUpperCase();
 
+    const quoteAgeSeconds = Number(
+      trade.quote_age_seconds,
+    );
+
+    const quoteFresh =
+      trade.quote_is_fresh === true ||
+      (
+        trade.quote_is_fresh == null &&
+        Boolean(trade.quote_timestamp) &&
+        Number.isFinite(quoteAgeSeconds) &&
+        quoteAgeSeconds >= 0 &&
+        quoteAgeSeconds <= 60
+      );
+
     const executionReady =
-      data.execution?.ready === true ||
-      trade.execution?.ready === true ||
-      executionStatus === "READY";
+      quoteFresh &&
+      (
+        data.execution?.ready === true ||
+        trade.execution?.ready === true ||
+        executionStatus === "READY"
+      );
+
+    const tradeExecutable =
+      tradeApproved && executionReady;
+
+    const badgeClass =
+      tradeExecutable ? "enter" : "no-trade";
+
+    const badgeText =
+      !executionReady
+        ? "WAIT FOR FRESH QUOTE"
+        : manualPreviewReady
+          ? `MANUAL · ${trade.playbook_status || "CAUTION"}`
+          : tradeApproved
+            ? recommendation
+            : "NO TRADE";
 
     const missionStatusClass =
-      tradeApproved
+      tradeExecutable
         ? recommendation === "TRADE SMALL"
           ? "caution"
           : "ready"
@@ -467,7 +517,7 @@ const buyingPower =
       </div>
       <div class="setup-market-item"><strong>Strategy Playbook: ${trade.playbook_status || "See Strategies"}</strong></div>
       ${trade.structure_analysis ? `<div class="setup-market-item">Live structure fit: ${trade.structure_analysis.status} · ${trade.structure_analysis.score}/100<br>${trade.structure_analysis.factors.map(factor => factor.label + ": " + factor.points).join(" · ")}</div>` : ""}
-      ${trade.breakevens ? `<div class="setup-market-item">${trade.risk_classification} · Width ${trade.width} · Max profit ${formatMoney(trade.max_profit)} · Breakevens ${trade.breakevens.join(" / ")}<br>Midpoint ${formatMoney(trade.midpoint, 2)} · Quote ${trade.quote_timestamp ? new Date(trade.quote_timestamp).toLocaleTimeString() : "Unavailable"} · Age ${trade.quote_age_seconds ?? "Unavailable"}s</div>` : ""}
+      ${trade.breakevens ? `<div class="setup-market-item">${trade.risk_classification} · Width ${trade.width} · Max profit ${formatMoney(trade.max_profit)} · Breakevens ${trade.breakevens.join(" / ")}<br>Midpoint ${formatMoney(trade.midpoint, 2)} · Quote ${quoteTimeLabel(trade.quote_timestamp)} · Age ${quoteAgeLabel(trade.quote_age_seconds)}${!executionReady ? `<br>${trade.execution?.reason || "Fresh option quotes are required before execution."}` : ""}</div>` : ""}
 
       <div class="setup-divider"></div>
 
@@ -526,20 +576,22 @@ const buyingPower =
       <button
         id="enterTradeButton"
         class="enter-trade-button ${
-          tradeApproved
+          tradeExecutable
             ? "ready"
             : "disabled"
         }"
         type="button"
-        ${tradeApproved ? "" : "disabled"}
+        ${tradeExecutable ? "" : "disabled"}
         data-trade-approved="${
-          tradeApproved
+          tradeExecutable
         }"
       >
         ${
-          tradeApproved
+          tradeExecutable
             ? (manualPreviewReady ? "REVIEW MANUAL TRADE" : "ENTER TRADE")
-            : "NO TRADE"
+            : executionReady
+              ? "NO TRADE"
+              : "REFRESH FOR LIVE QUOTE"
         }
       </button>
 
@@ -554,7 +606,7 @@ const buyingPower =
 
     if (
       enterTradeButton &&
-      tradeApproved
+      tradeExecutable
     ) {
       enterTradeButton.addEventListener(
         "click",
@@ -947,7 +999,7 @@ function renderOrderPreview({
 
       <div class="order-review-content">
         <div class="order-review-section"><strong>Strategy Playbook: ${order.playbook_status || displayedTrade.playbook_status || "See Strategies"}</strong>
-          ${order.breakevens ? `<p>${order.risk_classification} · Width ${order.width} · Breakevens ${order.breakevens.join(" / ")} · Midpoint ${formatMoney(order.midpoint, 2)} · Quote ${order.quote_timestamp ? new Date(order.quote_timestamp).toLocaleTimeString() : "Unavailable"} · Age ${order.quote_age_seconds ?? "Unavailable"}s</p>` : ""}
+          ${order.breakevens ? `<p>${order.risk_classification} · Width ${order.width} · Breakevens ${order.breakevens.join(" / ")} · Midpoint ${formatMoney(order.midpoint, 2)} · Quote ${quoteTimeLabel(order.quote_timestamp)} · Age ${quoteAgeLabel(order.quote_age_seconds)}</p>` : ""}
         </div>
         <div class="order-review-main">
           <section class="order-review-section">

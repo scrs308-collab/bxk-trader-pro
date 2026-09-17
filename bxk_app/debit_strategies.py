@@ -57,9 +57,10 @@ def debit_risk(strategy, legs, debit):
     }
 
 
-def quote_age(timestamp, now=None):
+def quote_epoch_seconds(timestamp):
     if timestamp is None:
         raise ValueError("Quote timestamp is missing.")
+
     if isinstance(timestamp, (int, float)):
         stamp = float(timestamp)
         if stamp > 1e11:
@@ -69,6 +70,18 @@ def quote_age(timestamp, now=None):
         if parsed.tzinfo is None:
             raise ValueError("Quote timestamp must include timezone.")
         stamp = parsed.timestamp()
+
+    if not math.isfinite(stamp) or stamp <= 0:
+        raise ValueError("Quote timestamp is invalid.")
+
+    return stamp
+
+
+def quote_age(timestamp, now=None):
+    stamp = quote_epoch_seconds(
+        timestamp
+    )
+
     age = (now or datetime.now(timezone.utc).timestamp()) - stamp
     if not math.isfinite(age) or age < -5 or age > 60:
         raise ValueError("Option quote is stale or has an invalid timestamp.")
@@ -168,14 +181,99 @@ def credit_preview_metadata(trade):
         breakevens.append(round(trade["sell_put"] - credit, 2))
     if trade.get("sell_call") is not None:
         breakevens.append(round(trade["sell_call"] + credit, 2))
-    stamps = [q.get("quote_timestamp") for q in (trade.get("credit_details", {}).get("quotes") or {}).values()]
+    quotes = (
+        trade.get(
+            "credit_details",
+            {},
+        ).get("quotes")
+        or {}
+    )
+
+    quote_keys = [
+        trade.get(
+            f"{field}_streamer"
+        )
+        for field in fields
+    ]
+
+    stamps = [
+        (
+            quotes.get(
+                quote_key,
+                {},
+            ).get("quote_timestamp")
+            if quote_key
+            else None
+        )
+        for quote_key in quote_keys
+    ]
+
     quote_timestamp = None
     age = None
-    if stamps and all(stamps):
-        numeric = [float(s) / (1000 if float(s) > 1e11 else 1) for s in stamps]
-        oldest = min(numeric)
-        quote_timestamp = datetime.fromtimestamp(oldest, timezone.utc).isoformat()
-        age = max(0, datetime.now(timezone.utc).timestamp() - oldest)
+
+    quote_is_fresh = False
+
+    if (
+        all(quote_keys)
+        and all(stamps)
+    ):
+        try:
+            numeric = [
+                quote_epoch_seconds(stamp)
+                for stamp in stamps
+            ]
+
+            oldest = min(numeric)
+
+            quote_timestamp = (
+                datetime.fromtimestamp(
+                    oldest,
+                    timezone.utc,
+                ).isoformat()
+            )
+
+            age = max(
+                0,
+                datetime.now(
+                    timezone.utc
+                ).timestamp()
+                - oldest,
+            )
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            OSError,
+        ):
+            quote_timestamp = None
+            age = None
+            quote_is_fresh = False
+
+        else:
+            try:
+                quote_is_fresh = all(
+                    quote_age(stamp) <= 60
+                    for stamp in stamps
+                )
+            except (
+                TypeError,
+                ValueError,
+            ):
+                quote_is_fresh = False
+
+    execution_reason = (
+        "Option quotes are fresh."
+        if quote_is_fresh
+        else (
+            "Option quote timestamps are missing "
+            "or stale. Refresh the trade before execution."
+        )
+    )
+
     trade.update(legs=legs, price_effect="Credit", midpoint=credit, breakevens=breakevens,
                  width=trade.get("wing_width"), max_loss=trade.get("max_risk"),
-                 risk_classification="Defined risk · credit", quote_timestamp=quote_timestamp, quote_age_seconds=age)
+                 risk_classification="Defined risk · credit", quote_timestamp=quote_timestamp,
+                 quote_age_seconds=round(age, 2) if age is not None else None,
+                 quote_is_fresh=quote_is_fresh,
+                 execution={"status": "READY" if quote_is_fresh else "BLOCKED",
+                            "ready": quote_is_fresh, "reason": execution_reason})
