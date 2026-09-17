@@ -196,17 +196,50 @@ def credit_preview_metadata(trade):
         for field in fields
     ]
 
-    stamps = [
+    selected_quotes = [
         (
             quotes.get(
                 quote_key,
                 {},
-            ).get("quote_timestamp")
+            )
             if quote_key
-            else None
+            else {}
         )
         for quote_key in quote_keys
     ]
+
+    stamps = [
+        (
+            quote.get(
+                "quote_timestamp"
+            )
+        )
+        for quote in selected_quotes
+    ]
+
+    quotes_are_complete = True
+
+    for quote in selected_quotes:
+        try:
+            bid = float(quote["bid"])
+            ask = float(quote["ask"])
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            quotes_are_complete = False
+            break
+
+        if (
+            not math.isfinite(bid)
+            or not math.isfinite(ask)
+            or bid < 0
+            or ask <= 0
+            or ask < bid
+        ):
+            quotes_are_complete = False
+            break
 
     quote_timestamp = None
     age = None
@@ -216,6 +249,7 @@ def credit_preview_metadata(trade):
     if (
         all(quote_keys)
         and all(stamps)
+        and quotes_are_complete
     ):
         try:
             numeric = [

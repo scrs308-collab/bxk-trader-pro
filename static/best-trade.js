@@ -22,6 +22,10 @@ function quoteTimeLabel(value) {
 }
 
 function quoteAgeLabel(value) {
+  if (value == null || value === "") {
+    return "Unavailable";
+  }
+
   const age = Number(value);
 
   if (!Number.isFinite(age) || age < 0) {
@@ -221,6 +225,9 @@ const response = await fetch(
 
     const tradeExecutable =
       tradeApproved && executionReady;
+
+    const refreshOnly =
+      tradeApproved && !executionReady;
 
     const badgeClass =
       tradeExecutable ? "enter" : "no-trade";
@@ -578,10 +585,16 @@ const buyingPower =
         class="enter-trade-button ${
           tradeExecutable
             ? "ready"
-            : "disabled"
+            : refreshOnly
+              ? "refresh"
+              : "disabled"
         }"
         type="button"
-        ${tradeExecutable ? "" : "disabled"}
+        ${
+          tradeExecutable || refreshOnly
+            ? ""
+            : "disabled"
+        }
         data-trade-approved="${
           tradeExecutable
         }"
@@ -603,6 +616,27 @@ const buyingPower =
         const enterTradeButton = el(
       "enterTradeButton",
     );
+
+    if (
+      enterTradeButton &&
+      refreshOnly
+    ) {
+      enterTradeButton.addEventListener(
+        "click",
+        async () => {
+          enterTradeButton.disabled = true;
+          enterTradeButton.textContent =
+            "REFRESHING LIVE QUOTE...";
+
+          await loadBestTrade({
+            strategy: selectedStrategy,
+            dte: selectedDte,
+            wingWidth: selectedWingWidth,
+            contracts: selectedContracts,
+          });
+        },
+      );
+    }
 
     if (
       enterTradeButton &&

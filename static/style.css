@@ -2847,6 +2847,17 @@ button {
   box-shadow: 0 0 22px rgba(34, 197, 94, 0.3);
 }
 
+.enter-trade-button.refresh {
+  border: 1px solid #d97706;
+  background: #f59e0b;
+  color: #1c1917;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.24);
+}
+
+.enter-trade-button.refresh:hover {
+  background: #fbbf24;
+}
+
 .enter-trade-button.disabled {
   background: #334155;
   color: #94a3b8;

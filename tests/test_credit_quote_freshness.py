@@ -97,6 +97,22 @@ def test_quote_timestamp_falls_back_to_event_time():
     )
 
 
+def test_quote_timestamp_falls_back_to_receipt_time():
+    quote = SimpleNamespace(
+        event_time=0,
+        bid_time=0,
+        ask_time=0,
+    )
+
+    assert (
+        quote_event_timestamp(
+            quote,
+            received_at=1_700_000_004_000,
+        )
+        == 1_700_000_004_000
+    )
+
+
 def test_fresh_credit_quote_is_execution_ready():
     timestamp = (
         datetime.now(timezone.utc)
@@ -161,6 +177,29 @@ def test_missing_credit_timestamp_blocks_execution():
     assert trade["quote_is_fresh"] is False
     assert trade["execution"]["status"] == "BLOCKED"
     assert trade["execution"]["ready"] is False
+
+
+def test_incomplete_credit_quote_blocks_execution():
+    timestamp = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    trade = credit_trade(
+        timestamp=timestamp
+    )
+
+    trade["credit_details"]["quotes"][
+        "BUY-CALL"
+    ]["ask"] = 0
+
+    credit_preview_metadata(
+        trade
+    )
+
+    assert trade["quote_timestamp"] is None
+    assert trade["quote_age_seconds"] is None
+    assert trade["quote_is_fresh"] is False
+    assert trade["execution"]["status"] == "BLOCKED"
 
 
 def test_stale_credit_timestamp_is_shown_but_blocked():
@@ -303,3 +342,9 @@ def test_trade_button_requires_execution_readiness():
 
     assert "WAIT FOR FRESH QUOTE" in source
     assert "REFRESH FOR LIVE QUOTE" in source
+    assert "REFRESHING LIVE QUOTE..." in source
+
+    assert (
+        'value == null || value === ""'
+        in source
+    )

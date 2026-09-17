@@ -1,4 +1,5 @@
 import asyncio
+import time
 from decimal import Decimal
 
 from tastytrade import Session, DXLinkStreamer
@@ -26,6 +27,8 @@ def to_float(value, default=0.0):
 
 def quote_event_timestamp(
     quote,
+    *,
+    received_at=None,
 ) -> float:
     """
     Return the oldest usable bid/ask timestamp.
@@ -78,6 +81,14 @@ def quote_event_timestamp(
     ]
 
     if not valid_times:
+        receipt_time = to_float(
+            received_at,
+            0,
+        )
+
+        if receipt_time > 0:
+            return receipt_time
+
         return 0.0
 
     return min(
@@ -137,11 +148,19 @@ async def fetch_live_market_data(symbols: list[str]) -> dict:
                 )
 
                 if symbol in market_data:
+                    received_at = (
+                        time.time()
+                        * 1000
+                    )
+
                     market_data[symbol].update(
                         {
                             "quote_timestamp": (
                                 quote_event_timestamp(
-                                    quote
+                                    quote,
+                                    received_at=(
+                                        received_at
+                                    ),
                                 )
                             ),
                             "bid": to_float(
