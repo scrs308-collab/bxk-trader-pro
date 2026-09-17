@@ -18,6 +18,9 @@ from bxk_app.database import (
     Base,
     get_db,
 )
+from bxk_app.db_models.broker_account import (
+    BrokerAccount,
+)
 from bxk_app.db_models.broker_connection import (
     BrokerConnection,
 )
@@ -422,6 +425,41 @@ def test_connect_stores_encrypted_credentials(
         not in response.text
     )
 
+    # Simulate a personal-grant connection created before
+    # authorized-account synchronization was introduced.
+    with session_factory() as session:
+        stale_account = session.scalar(
+            select(
+                BrokerAccount
+            )
+        )
+
+        assert stale_account is not None
+
+        session.delete(
+            stale_account
+        )
+
+        session.commit()
+
+    accounts_response = client.get(
+        "/api/broker-connection/tastytrade/accounts"
+    )
+
+    assert accounts_response.status_code == 200
+
+    accounts = accounts_response.json()[
+        "accounts"
+    ]
+
+    assert len(accounts) == 1
+    assert (
+        accounts[0]["account_number_masked"]
+        == "****1234"
+    )
+    assert accounts[0]["nickname"] == "Main"
+    assert accounts[0]["is_default"] is True
+
     with session_factory() as session:
         connection = session.scalar(
             select(
@@ -452,6 +490,19 @@ def test_connect_stores_encrypted_credentials(
             .live_trading_enabled
             is False
         )
+
+        broker_account = session.scalar(
+            select(
+                BrokerAccount
+            )
+        )
+
+        assert broker_account is not None
+        assert (
+            broker_account.account_number
+            == "BETA1234"
+        )
+        assert broker_account.is_default is True
 
 
 def test_other_user_cannot_see_connection(

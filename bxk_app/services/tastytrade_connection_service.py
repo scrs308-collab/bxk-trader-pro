@@ -346,7 +346,7 @@ def _normalize_accounts(
     return normalized
 
 
-def _sync_accounts(
+def sync_tastytrade_accounts(
     session: Session,
     *,
     connection: BrokerConnection,
@@ -692,7 +692,7 @@ def complete_tastytrade_oauth(
             "be stored securely."
         ) from exc
 
-    synchronized = _sync_accounts(
+    synchronized = sync_tastytrade_accounts(
         session,
         connection=connection,
         discovered_accounts=accounts,

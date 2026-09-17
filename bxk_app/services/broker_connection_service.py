@@ -16,6 +16,9 @@ from bxk_app.db_models.broker_connection import (
     BrokerConnection,
 )
 from bxk_app.db_models.user import UserRole
+from bxk_app.services import (
+    tastytrade_connection_service,
+)
 from bxk_app.services.broker_credential_service import (
     BrokerCredentialError,
     decrypt_broker_secret,
@@ -451,6 +454,8 @@ def connect_tastytrade_account(
             connection
         )
 
+        session.flush()
+
     else:
         connection.client_secret_encrypted = (
             encrypted_client_secret
@@ -473,6 +478,20 @@ def connect_tastytrade_account(
         connection.live_trading_enabled = False
         connection.last_verified_at = now
 
+    synchronized_accounts = (
+        tastytrade_connection_service
+        .sync_tastytrade_accounts(
+            session,
+            connection=connection,
+            discovered_accounts=accounts,
+        )
+    )
+
+    if not synchronized_accounts:
+        raise BrokerVerificationError(
+            "No Tastytrade accounts were returned."
+        )
+
     session.commit()
     session.refresh(
         connection
@@ -480,6 +499,97 @@ def connect_tastytrade_account(
 
     return _connection_status(
         connection
+    )
+
+
+def list_or_sync_tastytrade_accounts(
+    session: Session,
+    *,
+    user_context: dict,
+) -> list[dict]:
+    """
+    Return authorized accounts and repair personal-grant
+    connections created before account synchronization was
+    added.
+    """
+
+    user_id = _normalized_user_id(
+        user_context
+    )
+
+    if user_id is None:
+        raise BrokerConnectionInvalid(
+            "A database-backed user account is required."
+        )
+
+    existing_accounts = (
+        tastytrade_connection_service
+        .list_tastytrade_accounts(
+            session,
+            user_id=user_id,
+        )
+    )
+
+    if existing_accounts:
+        return existing_accounts
+
+    connection = (
+        get_user_tastytrade_connection(
+            session,
+            user_id=user_id,
+        )
+    )
+
+    if (
+        connection is None
+        or not connection.is_verified
+        or not connection.client_secret_encrypted
+        or not connection.refresh_token_encrypted
+    ):
+        return []
+
+    try:
+        client_secret = decrypt_broker_secret(
+            connection.client_secret_encrypted
+        )
+
+        refresh_token = decrypt_broker_secret(
+            connection.refresh_token_encrypted
+        )
+    except BrokerCredentialError as exc:
+        raise BrokerConnectionInvalid(
+            "Stored Tastytrade credentials could not be read."
+        ) from exc
+
+    discovered_accounts = (
+        verify_tastytrade_credentials(
+            client_secret=client_secret,
+            refresh_token=refresh_token,
+        )
+    )
+
+    synchronized_accounts = (
+        tastytrade_connection_service
+        .sync_tastytrade_accounts(
+            session,
+            connection=connection,
+            discovered_accounts=(
+                discovered_accounts
+            ),
+        )
+    )
+
+    if not synchronized_accounts:
+        return []
+
+    session.commit()
+
+    return (
+        tastytrade_connection_service
+        .list_tastytrade_accounts(
+            session,
+            user_id=user_id,
+        )
     )
 
 

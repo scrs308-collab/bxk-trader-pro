@@ -505,17 +505,22 @@ def tastytrade_accounts(
         get_db
     ),
 ):
-    user_id = _database_user_id(
-        user_context
-    )
-
-    accounts = (
-        tastytrade_connection_service
-        .list_tastytrade_accounts(
-            session,
-            user_id=user_id,
+    try:
+        accounts = (
+            broker_connection_service
+            .list_or_sync_tastytrade_accounts(
+                session,
+                user_context=user_context,
+            )
         )
-    )
+    except (
+        BrokerConnectionInvalid,
+        BrokerVerificationError,
+    ) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
     safe_accounts = []
 
