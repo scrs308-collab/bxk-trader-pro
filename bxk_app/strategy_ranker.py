@@ -49,6 +49,52 @@ strategy_priority = {
 }
 
 
+def reverse_condor_playbook(stability=None, trade=None):
+    stability, trade = stability or {}, trade or {}
+    factors = []
+    def add(label, points):
+        factors.append({"label": label, "points": points})
+    add("Long volatility base fit", 35)
+    pressure = (stability.get("range_expansion_pressure") or {}).get("pressure_ratio")
+    if pressure is not None:
+        add("Expected expansion" if pressure >= 1.2 else "Contained range", 25 if pressure >= 1.6 else 15 if pressure >= 1.2 else -20)
+    else:
+        add("Expansion evidence unavailable", -10)
+    move = float(stability.get("implied_move") or trade.get("expected_move") or 0)
+    price = float(stability.get("spx_price") or 0)
+    center = float(stability.get("session_open") or 0)
+    if move and price and center:
+        add("Displacement from center", 15 if abs(price - center) / move >= .3 else -10)
+    if stability.get("event_driven_movement") is True:
+        add("Event-driven movement", 10)
+    if trade:
+        add("Time to expiration", 10 if trade.get("dte", 0) >= 2 else -10)
+        ratio = trade["debit"] / trade["width"]
+        add("Debit and reward/risk quality", 15 if ratio <= .5 else -25 if ratio >= .8 else 0)
+        add("Combo liquidity", -25 if trade.get("combo_ask", 0) - trade.get("combo_bid", 0) > trade["debit"] * .25 else 5)
+        breakevens = trade["breakevens"]
+        required = min(abs(trade["spx_price"] - b) for b in breakevens)
+        add("Expected movement versus breakevens", 10 if move >= required else -25)
+    else:
+        add("DTE, debit and liquidity require a live manual preview", 0)
+    item = build_strategy("Reverse Iron Condor", sum(f["points"] for f in factors),
+                          "Long volatility: needs expansion beyond either breakeven. Review time, debit and liquidity in the manual preview.", factors)
+    item.update(model_version="V2_OBSERVATION", observation_only=True, execution_supported=True, auto_eligible=False)
+    return item
+
+
+def rank_strategies_v2(market_score, vix_state, *, current_price=None, condor_stability=None):
+    existing = _rank_existing_strategies_v2(market_score, vix_state, current_price=current_price, condor_stability=condor_stability)
+    for item in existing:
+        if item["name"] in {"Butterfly", "Debit Call Spread", "Debit Put Spread"}:
+            item["execution_supported"] = True
+            item["auto_eligible"] = False
+    reverse = reverse_condor_playbook(condor_stability)
+    if existing and existing[0].get("model_version") == "V1_FALLBACK":
+        reverse["model_version"] = "V1_FALLBACK"
+    return existing + [reverse]
+
+
 def rank_strategies(
     market_score: int,
     trend: str,
@@ -331,7 +377,7 @@ def _strategy_adjust(
     )
 
 
-def rank_strategies_v2(
+def _rank_existing_strategies_v2(
     market_score: int,
     vix_state: str,
     *,

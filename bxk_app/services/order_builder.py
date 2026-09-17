@@ -1,4 +1,5 @@
 from decimal import Decimal, ROUND_FLOOR
+from bxk_app.debit_strategies import DEBIT_NAMES, strategy_key as debit_strategy_key, debit_risk, quote_age
 
 def _strategy_key(value):
     return (
@@ -73,6 +74,25 @@ def build_order(best_trade, quantity=1):
     )
 
     strategy_key = _strategy_key(strategy)
+
+    debit_key = debit_strategy_key(strategy)
+    if debit_key in DEBIT_NAMES:
+        legs = [dict(leg) for leg in best_trade.get("legs", [])]
+        if not legs or any(not leg.get("symbol") for leg in legs):
+            raise ValueError("One or more option symbols are missing.")
+        quote_age(best_trade.get("quote_timestamp"))
+        debit_risk(debit_key, legs, best_trade.get("debit"))
+        price = _normalize_credit_to_increment(best_trade.get("debit"))
+        risk = debit_risk(debit_key, legs, price)
+        order_quantity = int(quantity)
+        if order_quantity != quantity or order_quantity < 1:
+            raise ValueError("Order quantity must be a positive integer.")
+        return {**best_trade, **risk, "quantity": order_quantity, "order_type": "LIMIT",
+                "time_in_force": "DAY", "limit_price": price, "legs": legs,
+                "max_profit": round(risk["max_profit"] * order_quantity, 2),
+                "max_loss": round(risk["max_loss"] * order_quantity, 2),
+                "max_risk": round(risk["max_risk"] * order_quantity, 2),
+                "buying_power": round(risk["max_risk"] * order_quantity, 2)}
 
     if (
         "bear_call" in strategy_key
@@ -228,6 +248,7 @@ def build_order(best_trade, quantity=1):
     )
 
     return {
+        **{key: best_trade.get(key) for key in ("price_effect", "playbook_status", "midpoint", "quote_timestamp", "quote_age_seconds", "breakevens", "width", "risk_classification") if key in best_trade},
         "strategy": strategy,
         "symbol": best_trade.get(
             "symbol",
