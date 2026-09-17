@@ -36,19 +36,18 @@ def test_beta_onboarding_status_ui_is_present():
     )
 
     assert (
-        "/api/broker-connection/"
-        "tastytrade/connect"
+        "/api/broker-connection/verify"
         in positions
     )
 
     assert (
-        "brokerClientSecret"
-        not in positions
+        "tastytradeClientSecret"
+        in positions
     )
 
     assert (
-        "brokerRefreshToken"
-        not in positions
+        "tastytradeRefreshToken"
+        in positions
     )
 
     assert (

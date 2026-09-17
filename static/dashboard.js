@@ -34,7 +34,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js?v=7";
+} from "./position.js?v=8";
 
 import {
   initializeSystemSettings,
@@ -3175,30 +3175,6 @@ async function refreshAccountStatusBanner() {
       && tastytrade
         ?.live_trading_enabled === true;
 
-    const tastyAccount =
-      selectedTastytradeAccount
-        ? (
-            selectedTastytradeAccount
-              .account_number_masked
-            || selectedTastytradeAccount
-              .nickname
-            || "Selected"
-          )
-        : (
-            tastyConnected
-              ? (
-                  activeTastytradeAccounts
-                    .length > 0
-                    ? "SELECT ACCOUNT"
-                    : (
-                        tastytrade
-                          ?.account_number_masked
-                        || "Connected"
-                      )
-                )
-              : "--"
-          );
-
     const tastytradeAccountList =
       Array.isArray(
         tastytradeAccounts,
@@ -3225,6 +3201,30 @@ async function refreshAccountStatusBanner() {
           account.is_default === true,
       )
       || null;
+
+    const tastyAccount =
+      selectedTastytradeAccount
+        ? (
+            selectedTastytradeAccount
+              .account_number_masked
+            || selectedTastytradeAccount
+              .nickname
+            || "Selected"
+          )
+        : (
+            tastyConnected
+              ? (
+                  activeTastytradeAccounts
+                    .length > 0
+                    ? "SELECT ACCOUNT"
+                    : (
+                        tastytrade
+                          ?.account_number_masked
+                        || "Connected"
+                      )
+                )
+              : "--"
+          );
 
     const schwabAccountList =
       Array.isArray(

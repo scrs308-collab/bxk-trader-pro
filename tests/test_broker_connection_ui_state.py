@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def test_connection_form_survives_background_refresh():
+def test_personal_grant_form_survives_background_refresh():
     text = Path(
         "static/position.js"
     ).read_text(encoding="utf-8")
@@ -11,39 +11,43 @@ def test_connection_form_survives_background_refresh():
     assert "if (brokerConnectionFlowActive)" in text
 
     assert (
-        'id="connectTastytradeButton"'
+        'id="tastytradePersonalGrantForm"'
         in text
-    )
-
-    assert (
-        "/api/broker-connection/"
-        "tastytrade/connect"
-        in text
-    )
-
-    assert (
-        'id="brokerClientSecret"'
-        not in text
-    )
-
-    assert (
-        'id="brokerRefreshToken"'
-        not in text
-    )
-
-    assert (
-        'id="brokerAccountNumber"'
-        not in text
     )
 
     assert (
         "/api/broker-connection/verify"
+        in text
+    )
+
+    assert (
+        'id="tastytradeClientSecret"'
+        in text
+    )
+
+    assert (
+        'id="tastytradeRefreshToken"'
+        in text
+    )
+
+    assert (
+        'type="password"'
+        in text
+    )
+
+    assert (
+        "localStorage"
+        not in text
+    )
+
+    assert (
+        "sessionStorage"
         not in text
     )
 
 
 
-def test_tastytrade_oauth_button_is_permission_gated():
+def test_tastytrade_personal_grant_form_is_permission_gated():
     text = Path(
         "static/position.js"
     ).read_text(encoding="utf-8")
@@ -79,12 +83,41 @@ def test_tastytrade_oauth_button_is_permission_gated():
     )
 
     assert (
-        'id="connectTastytradeButton"'
+        'id="verifyTastytradeGrantButton"'
+        in text
+    )
+
+    assert (
+        "/api/broker-connection/connect"
         in text
     )
 
     assert (
         "/api/broker-connection/"
         "tastytrade/connect"
-        in text
+        not in text
+    )
+
+
+def test_dashboard_builds_tastytrade_account_after_dependencies():
+    text = Path(
+        "static/dashboard.js"
+    ).read_text(encoding="utf-8")
+
+    account_list_position = text.index(
+        "const activeTastytradeAccounts"
+    )
+
+    selected_account_position = text.index(
+        "const selectedTastytradeAccount"
+    )
+
+    display_account_position = text.index(
+        "const tastyAccount ="
+    )
+
+    assert (
+        account_list_position
+        < selected_account_position
+        < display_account_position
     )

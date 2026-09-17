@@ -1188,10 +1188,11 @@ function renderBrokerConnectionForm(
             line-height:1.55;
           "
         >
-          Sign in to Tastytrade and authorize
-          BXK Trader Pro to access your account.
-          Your Tastytrade password stays with
-          Tastytrade.
+          Enter the Client Secret and Refresh Token
+          from your Tastytrade personal OAuth grant.
+          Do not enter your Tastytrade password.
+          Trader Pro encrypts these credentials and
+          never displays them again.
         </div>
       `
       : `
@@ -1212,19 +1213,78 @@ function renderBrokerConnectionForm(
   const connectionAction =
     canConnect
       ? `
-        <div
-          style="
-            margin-top:18px;
-          "
+        <form
+          id="tastytradePersonalGrantForm"
+          class="broker-connect-form"
         >
-          <button
-            id="connectTastytradeButton"
-            type="button"
-            class="position-action-button"
+          <div class="broker-connect-field">
+            <label for="tastytradeClientSecret">
+              Client Secret
+            </label>
+            <input
+              id="tastytradeClientSecret"
+              name="client_secret"
+              type="password"
+              autocomplete="new-password"
+              autocapitalize="none"
+              spellcheck="false"
+              required
+            />
+          </div>
+
+          <div class="broker-connect-field">
+            <label for="tastytradeRefreshToken">
+              Refresh Token
+            </label>
+            <input
+              id="tastytradeRefreshToken"
+              name="refresh_token"
+              type="password"
+              autocomplete="new-password"
+              autocapitalize="none"
+              spellcheck="false"
+              required
+            />
+          </div>
+
+          <div
+            id="tastytradeAccountField"
+            class="broker-connect-field"
+            hidden
           >
-            Connect Tastytrade
-          </button>
-        </div>
+            <label for="tastytradeAccountSelect">
+              Tastytrade Account
+            </label>
+            <select
+              id="tastytradeAccountSelect"
+              name="account_number"
+            ></select>
+          </div>
+
+          <div class="broker-connect-actions">
+            <button
+              id="verifyTastytradeGrantButton"
+              type="submit"
+            >
+              Verify &amp; Connect
+            </button>
+
+            <button
+              id="connectSelectedTastytradeButton"
+              type="button"
+              hidden
+            >
+              Connect Selected Account
+            </button>
+          </div>
+
+          <div
+            id="tastytradeConnectMessage"
+            class="broker-connect-message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </form>
       `
       : "";
 
@@ -1247,16 +1307,303 @@ function renderBrokerConnectionForm(
     return;
   }
 
-  const connectButton =
-    el("connectTastytradeButton");
+  const form =
+    el("tastytradePersonalGrantForm");
 
-  connectButton?.addEventListener(
-    "click",
-    () => {
+  const clientSecretInput =
+    el("tastytradeClientSecret");
+
+  const refreshTokenInput =
+    el("tastytradeRefreshToken");
+
+  const accountField =
+    el("tastytradeAccountField");
+
+  const accountSelect =
+    el("tastytradeAccountSelect");
+
+  const verifyButton =
+    el("verifyTastytradeGrantButton");
+
+  const connectSelectedButton =
+    el("connectSelectedTastytradeButton");
+
+  const statusMessage =
+    el("tastytradeConnectMessage");
+
+  const setStatus = (
+    text,
+    state = "",
+  ) => {
+    if (!statusMessage) {
+      return;
+    }
+
+    statusMessage.textContent = text;
+    statusMessage.dataset.state = state;
+  };
+
+  const credentials = () => ({
+    client_secret:
+      String(
+        clientSecretInput?.value || "",
+      ).trim(),
+    refresh_token:
+      String(
+        refreshTokenInput?.value || "",
+      ).trim(),
+  });
+
+  const responseError = async (
+    response,
+  ) => {
+    try {
+      const payload = await response.json();
+
+      return String(
+        payload?.detail
+        || "Tastytrade connection failed.",
+      );
+    } catch (_error) {
+      return "Tastytrade connection failed.";
+    }
+  };
+
+  const connectAccount = async (
+    accountNumber = null,
+  ) => {
+    const requestBody = credentials();
+
+    if (
+      !requestBody.client_secret
+      || !requestBody.refresh_token
+    ) {
+      setStatus(
+        "Enter both OAuth credentials first.",
+        "error",
+      );
+      return;
+    }
+
+    if (accountNumber) {
+      requestBody.account_number =
+        accountNumber;
+    }
+
+    if (verifyButton) {
+      verifyButton.disabled = true;
+    }
+
+    if (connectSelectedButton) {
+      connectSelectedButton.disabled = true;
+    }
+
+    setStatus(
+      "Encrypting and saving your connection...",
+    );
+
+    try {
+      const response = await fetch(
+        "/api/broker-connection/connect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(response),
+        );
+      }
+
+      if (clientSecretInput) {
+        clientSecretInput.value = "";
+      }
+
+      if (refreshTokenInput) {
+        refreshTokenInput.value = "";
+      }
+
+      setStatus(
+        "Tastytrade connected successfully.",
+        "success",
+      );
+
       brokerConnectionFlowActive = false;
 
-      window.location.assign(
-        "/api/broker-connection/tastytrade/connect",
+      window.dispatchEvent(
+        new CustomEvent(
+          "bxk:broker-connection-changed",
+        ),
+      );
+
+      window.setTimeout(
+        () => {
+          loadPositions();
+        },
+        350,
+      );
+    } catch (error) {
+      setStatus(
+        error?.message
+        || "Tastytrade connection failed.",
+        "error",
+      );
+    } finally {
+      if (verifyButton) {
+        verifyButton.disabled = false;
+      }
+
+      if (connectSelectedButton) {
+        connectSelectedButton.disabled = false;
+      }
+    }
+  };
+
+  form?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+
+      const requestBody = credentials();
+
+      if (
+        !requestBody.client_secret
+        || !requestBody.refresh_token
+      ) {
+        setStatus(
+          "Enter both OAuth credentials first.",
+          "error",
+        );
+        return;
+      }
+
+      if (verifyButton) {
+        verifyButton.disabled = true;
+        verifyButton.textContent =
+          "Verifying...";
+      }
+
+      setStatus(
+        "Verifying credentials with Tastytrade...",
+      );
+
+      try {
+        const response = await fetch(
+          "/api/broker-connection/verify",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            await responseError(response),
+          );
+        }
+
+        const payload = await response.json();
+
+        const accounts =
+          Array.isArray(payload?.accounts)
+            ? payload.accounts
+            : [];
+
+        if (accounts.length === 0) {
+          throw new Error(
+            "No Tastytrade accounts were returned.",
+          );
+        }
+
+        if (accounts.length === 1) {
+          await connectAccount(
+            String(
+              accounts[0]?.account_number
+              || "",
+            ),
+          );
+          return;
+        }
+
+        if (
+          !accountSelect
+          || !accountField
+          || !connectSelectedButton
+        ) {
+          throw new Error(
+            "Account selection is unavailable.",
+          );
+        }
+
+        accountSelect.replaceChildren();
+
+        accounts.forEach((account) => {
+          const accountNumber = String(
+            account?.account_number || "",
+          ).trim();
+
+          if (!accountNumber) {
+            return;
+          }
+
+          const nickname = String(
+            account?.nickname || "",
+          ).trim();
+
+          const option =
+            document.createElement("option");
+
+          option.value = accountNumber;
+          option.textContent = nickname
+            ? `${nickname} (${accountNumber})`
+            : accountNumber;
+
+          accountSelect.appendChild(option);
+        });
+
+        if (accountSelect.options.length === 0) {
+          throw new Error(
+            "No usable Tastytrade accounts were returned.",
+          );
+        }
+
+        accountField.hidden = false;
+        connectSelectedButton.hidden = false;
+
+        setStatus(
+          "Choose the account Trader Pro should use.",
+        );
+      } catch (error) {
+        setStatus(
+          error?.message
+          || "Tastytrade verification failed.",
+          "error",
+        );
+      } finally {
+        if (verifyButton) {
+          verifyButton.disabled = false;
+          verifyButton.textContent =
+            "Verify & Connect";
+        }
+      }
+    },
+  );
+
+  connectSelectedButton?.addEventListener(
+    "click",
+    async () => {
+      await connectAccount(
+        String(
+          accountSelect?.value || "",
+        ),
       );
     },
   );

@@ -116,6 +116,7 @@ def add_user(
     username,
     email,
     role=UserRole.BETA,
+    broker_oauth_enabled=True,
 ):
     with session_factory() as session:
         user = User(
@@ -127,6 +128,9 @@ def add_user(
                 )
             ),
             role=role,
+            broker_oauth_enabled=(
+                broker_oauth_enabled
+            ),
             is_active=True,
             must_change_password=False,
         )
@@ -200,6 +204,56 @@ def test_broker_connection_requires_authentication(
     )
 
     assert response.status_code == 401
+
+
+def test_unapproved_beta_cannot_submit_broker_credentials(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    user_id = add_user(
+        session_factory,
+        username="betaunapproved",
+        email="betaunapproved@example.com",
+        broker_oauth_enabled=False,
+    )
+
+    client = client_with_user(
+        user_id
+    )
+
+    request_body = {
+        "client_secret": "secret-value",
+        "refresh_token": "refresh-value",
+    }
+
+    verify_response = client.post(
+        "/api/broker-connection/verify",
+        json=request_body,
+    )
+
+    connect_response = client.post(
+        "/api/broker-connection/connect",
+        json=request_body,
+    )
+
+    assert verify_response.status_code == 403
+    assert connect_response.status_code == 403
+
+    assert (
+        verify_response.json()["detail"]
+        == (
+            "Broker Connect has not been enabled "
+            "for this BXK account."
+        )
+    )
 
 
 def test_beta_without_connection_is_disconnected(

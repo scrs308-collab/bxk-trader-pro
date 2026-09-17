@@ -83,7 +83,7 @@ def broker_connection_status(
 def verify_tastytrade_connection(
     request_data: TastytradeVerifyRequest,
     _user_context: dict = Depends(
-        require_owner_or_beta
+        require_broker_oauth_access
     ),
 ):
     try:
@@ -117,7 +117,7 @@ def verify_tastytrade_connection(
 def connect_tastytrade(
     request_data: TastytradeConnectRequest,
     user_context: dict = Depends(
-        require_owner_or_beta
+        require_broker_oauth_access
     ),
     session: Session = Depends(
         get_db
