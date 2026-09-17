@@ -4,7 +4,7 @@ import {
   hasOwnerAccess,
   hasTradingAccess,
   setAccessContext,
-} from "./access-control.js?v=3";
+} from "./access-control.js?v=4";
 
 import {
   API_URL,
@@ -30,11 +30,11 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=18";
+} from "./best-trade.js?v=19";
 
 import {
   loadPositions,
-} from "./position.js?v=8";
+} from "./position.js?v=9";
 
 import {
   initializeSystemSettings,

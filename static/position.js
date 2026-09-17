@@ -1,7 +1,7 @@
 import { POSITIONS_URL } from "./config.js";
 import {
   hasBrokerOAuthAccess,
-} from "./access-control.js?v=3";
+} from "./access-control.js?v=4";
 import {
   el,
   safeNumber,

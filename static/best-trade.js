@@ -1,4 +1,4 @@
-import { hasTradingAccess } from "./access-control.js?v=2";
+import { hasTradingAccess } from "./access-control.js?v=4";
 import { BEST_TRADE_URL } from "./config.js";
 import {
   el,

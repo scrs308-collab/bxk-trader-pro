@@ -53,7 +53,7 @@ def test_tastytrade_personal_grant_form_is_permission_gated():
     ).read_text(encoding="utf-8")
 
     assert (
-        'from "./access-control.js?v=3"'
+        'from "./access-control.js?v=4"'
         in text
     )
 

@@ -119,3 +119,25 @@ def test_beta_end_to_end_frontend_access():
         'data-owner-only="true"'
         in system_section
     )
+
+
+def test_frontend_shares_one_access_context_module():
+    sources = {
+        name: Path(
+            f"static/{name}"
+        ).read_text(
+            encoding="utf-8"
+        )
+        for name in (
+            "dashboard.js",
+            "best-trade.js",
+            "position.js",
+        )
+    }
+
+    expected_import = (
+        'from "./access-control.js?v=4";'
+    )
+
+    for name, source in sources.items():
+        assert expected_import in source, name
