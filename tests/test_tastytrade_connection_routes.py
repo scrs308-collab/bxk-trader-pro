@@ -110,6 +110,7 @@ def add_user(
     *,
     username,
     role=UserRole.BETA,
+    broker_oauth_enabled=False,
 ):
     with session_factory() as session:
         user = User(
@@ -121,6 +122,9 @@ def add_user(
                 )
             ),
             role=role,
+            broker_oauth_enabled=(
+                broker_oauth_enabled
+            ),
             is_active=True,
             must_change_password=False,
         )
@@ -303,6 +307,63 @@ def test_tastytrade_connect_rejects_beta_user(
     assert response.status_code == 403
 
     assert called["begin"] is False
+
+
+def test_tastytrade_connect_redirects_approved_beta(
+    monkeypatch,
+):
+    session_factory = (
+        make_session_factory()
+    )
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    user_id = add_user(
+        session_factory,
+        username="kdixon",
+        role=UserRole.BETA,
+        broker_oauth_enabled=True,
+    )
+
+    captured = {}
+
+    def fake_begin(
+        session,
+        *,
+        user_id,
+    ):
+        captured["user_id"] = user_id
+
+        return {
+            "authorization_url":
+                "https://auth.example.test/start",
+        }
+
+    monkeypatch.setattr(
+        tastytrade_connection_service,
+        "begin_tastytrade_oauth",
+        fake_begin,
+    )
+
+    client = client_with_user(
+        user_id
+    )
+
+    response = client.get(
+        "/api/broker-connection/"
+        "tastytrade/connect",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert (
+        response.headers["location"]
+        == "https://auth.example.test/start"
+    )
+    assert str(captured["user_id"]) == user_id
 
 def test_tastytrade_callback_is_public_and_connects(
     monkeypatch,

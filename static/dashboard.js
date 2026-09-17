@@ -4,7 +4,7 @@ import {
   hasOwnerAccess,
   hasTradingAccess,
   setAccessContext,
-} from "./access-control.js?v=2";
+} from "./access-control.js?v=3";
 
 import {
   API_URL,
@@ -34,7 +34,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js?v=6";
+} from "./position.js?v=7";
 
 import {
   initializeSystemSettings,
@@ -43,7 +43,7 @@ import {
 
 import {
   initializeAdminUsers,
-} from "./admin-users.js?v=2";
+} from "./admin-users.js?v=3";
 
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;

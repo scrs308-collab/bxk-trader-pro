@@ -14,6 +14,7 @@ from bxk_app.services.admin_user_service import (
     create_user,
     list_users,
     set_user_active,
+    set_user_broker_oauth_access,
 )
 from bxk_app.services.system_settings_service import (
     verify_app_password,
@@ -57,6 +58,10 @@ def test_create_beta_user():
         assert result["username"] == "beta1"
         assert result["role"] == "BETA"
         assert result["is_active"] is True
+        assert (
+            result["broker_oauth_enabled"]
+            is False
+        )
         assert (
             result["must_change_password"]
             is True
@@ -258,4 +263,51 @@ def test_owner_account_cannot_be_disabled():
                 session,
                 user_id=str(owner.id),
                 is_active=False,
+            )
+
+
+def test_owner_can_enable_beta_broker_oauth_access():
+    factory = make_session_factory()
+
+    with factory() as session:
+        created = create_user(
+            session,
+            username="kdixon",
+            email="kdixon@example.com",
+            role="BETA",
+            temporary_password="Temporary123!",
+        )
+
+        updated = set_user_broker_oauth_access(
+            session,
+            user_id=created["id"],
+            enabled=True,
+        )
+
+        assert (
+            updated["broker_oauth_enabled"]
+            is True
+        )
+
+
+def test_viewer_cannot_receive_broker_oauth_access():
+    factory = make_session_factory()
+
+    with factory() as session:
+        created = create_user(
+            session,
+            username="viewer1",
+            email="viewer1@example.com",
+            role="VIEWER",
+            temporary_password="Temporary123!",
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="BETA users",
+        ):
+            set_user_broker_oauth_access(
+                session,
+                user_id=created["id"],
+                enabled=True,
             )

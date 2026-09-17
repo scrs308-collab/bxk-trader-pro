@@ -43,38 +43,38 @@ def test_connection_form_survives_background_refresh():
 
 
 
-def test_tastytrade_oauth_button_is_owner_gated():
+def test_tastytrade_oauth_button_is_permission_gated():
     text = Path(
         "static/position.js"
     ).read_text(encoding="utf-8")
 
     assert (
-        'from "./access-control.js"'
+        'from "./access-control.js?v=3"'
         in text
     )
 
     assert (
-        "hasOwnerAccess"
+        "hasBrokerOAuthAccess"
         in text
     )
 
     assert (
-        "const ownerCanConnect"
+        "const canConnect"
         in text
     )
 
     assert (
-        "if (!ownerCanConnect)"
+        "if (!canConnect)"
         in text
     )
 
     assert (
-        "Tastytrade self-service connection is"
+        "Broker Connect has not been enabled"
         in text
     )
 
     assert (
-        "temporarily unavailable for beta accounts"
+        "if this beta account should be approved"
         in text
     )
 

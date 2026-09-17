@@ -13,8 +13,8 @@ from pydantic import (
 from sqlalchemy.orm import Session
 
 from bxk_app.authorization import (
+    require_broker_oauth_access,
     require_owner_or_beta,
-    require_owner_or_auth_disabled,
 )
 from bxk_app.database import get_db
 from bxk_app.services import (
@@ -253,7 +253,7 @@ def _mask_account_number(
 @router.get("/tastytrade/connect")
 def connect_tastytrade_oauth(
     user_context: dict = Depends(
-        require_owner_or_auth_disabled
+        require_broker_oauth_access
     ),
     session: Session = Depends(
         get_db

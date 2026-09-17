@@ -38,6 +38,9 @@ def serialize_user(
             if isinstance(user.role, UserRole)
             else str(user.role)
         ),
+        "broker_oauth_enabled": bool(
+            user.broker_oauth_enabled
+        ),
         "is_active": bool(user.is_active),
         "must_change_password": bool(
             user.must_change_password
@@ -402,3 +405,64 @@ def set_user_broker_live_trading(
         ),
     }
 
+
+def set_user_broker_oauth_access(
+    session: Session,
+    *,
+    user_id: str,
+    enabled: bool,
+) -> dict:
+    """
+    Allow or block one BETA user from starting a
+    broker OAuth connection flow.
+
+    OWNER accounts always have Broker Connect access
+    and VIEWER accounts are never eligible.
+    """
+
+    import uuid
+
+    try:
+        parsed_user_id = uuid.UUID(
+            str(user_id)
+        )
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            "Invalid user ID."
+        ) from exc
+
+    user = session.get(
+        User,
+        parsed_user_id,
+    )
+
+    if user is None:
+        raise LookupError(
+            "User not found."
+        )
+
+    role = (
+        user.role
+        if isinstance(
+            user.role,
+            UserRole,
+        )
+        else UserRole(
+            str(user.role)
+        )
+    )
+
+    if role != UserRole.BETA:
+        raise ValueError(
+            "Broker Connect access can only be "
+            "managed here for BETA users."
+        )
+
+    user.broker_oauth_enabled = bool(
+        enabled
+    )
+
+    session.commit()
+    session.refresh(user)
+
+    return serialize_user(user)

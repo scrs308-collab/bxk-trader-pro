@@ -182,7 +182,15 @@ def fake_accounts(
     ]
 
 
-def test_broker_connection_requires_authentication():
+def test_broker_connection_requires_authentication(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        config,
+        "BXK_AUTH_ENABLED",
+        True,
+    )
+
     client = TestClient(
         app
     )
@@ -625,4 +633,3 @@ def test_reconnect_resets_live_trading_permission(
             connection.live_trading_enabled
             is False
         )
-

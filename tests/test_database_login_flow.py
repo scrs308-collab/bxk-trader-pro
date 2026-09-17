@@ -90,6 +90,7 @@ def add_beta(
     session_factory,
     *,
     active=True,
+    broker_oauth_enabled=False,
 ):
     with session_factory() as session:
         user = User(
@@ -99,6 +100,9 @@ def add_beta(
                 "BetaPassword123!"
             ),
             role=UserRole.BETA,
+            broker_oauth_enabled=(
+                broker_oauth_enabled
+            ),
             is_active=active,
         )
 
@@ -113,7 +117,10 @@ def test_beta_database_login_and_status(
 ):
     session_factory = make_session_factory()
 
-    beta_id = add_beta(session_factory)
+    beta_id = add_beta(
+        session_factory,
+        broker_oauth_enabled=True,
+    )
 
     configure_auth(
         monkeypatch,
@@ -151,6 +158,10 @@ def test_beta_database_login_and_status(
     assert status_body["user_id"] == beta_id
     assert status_body["username"] == "beta1"
     assert status_body["role"] == "BETA"
+    assert (
+        status_body["broker_oauth_enabled"]
+        is True
+    )
     assert (
         status_body["auth_source"]
         == "DATABASE"

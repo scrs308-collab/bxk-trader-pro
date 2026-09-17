@@ -32,6 +32,33 @@ export function hasOwnerAccess() {
 }
 
 
+export function hasBrokerOAuthAccess() {
+  if (!authStatus) {
+    return false;
+  }
+
+  if (authStatus.enabled === false) {
+    return true;
+  }
+
+  if (authStatus.authenticated !== true) {
+    return false;
+  }
+
+  const role = String(
+    authStatus.role || "",
+  ).trim().toUpperCase();
+
+  return (
+    role === "OWNER" ||
+    (
+      role === "BETA" &&
+      authStatus.broker_oauth_enabled === true
+    )
+  );
+}
+
+
 
 export function hasTradingAccess() {
   if (!authStatus) {

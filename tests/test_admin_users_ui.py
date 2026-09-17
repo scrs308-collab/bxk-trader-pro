@@ -20,7 +20,7 @@ def test_dashboard_initializes_admin_users():
     )
 
     assert "initializeAdminUsers" in text
-    assert "./admin-users.js?v=2" in text
+    assert "./admin-users.js?v=3" in text
 
 
 def test_admin_users_checks_owner_role():
@@ -72,3 +72,17 @@ def test_admin_users_supports_beta_live_trading_control():
     assert "DISABLE LIVE TRADING" in text
     assert "BROKER REQUIRED" in text
     assert "window.confirm" in text
+
+
+def test_admin_users_supports_broker_connect_control():
+    text = Path(
+        "static/admin-users.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert "broker_oauth_enabled" in text
+    assert "broker-oauth-access" in text
+    assert "setBrokerOAuthAccess" in text
+    assert "ENABLE BROKER CONNECT" in text
+    assert "DISABLE BROKER CONNECT" in text

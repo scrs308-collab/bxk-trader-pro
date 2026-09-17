@@ -26,12 +26,12 @@ def test_beta_onboarding_status_ui_is_present():
     )
 
     assert (
-        "hasOwnerAccess"
+        "hasBrokerOAuthAccess"
         in positions
     )
 
     assert (
-        "temporarily unavailable for beta accounts"
+        "Broker Connect has not been enabled"
         in positions
     )
 

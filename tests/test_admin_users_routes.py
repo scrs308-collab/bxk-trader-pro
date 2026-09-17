@@ -486,6 +486,108 @@ def test_owner_cannot_disable_owner_account(
     )
 
 
+def test_owner_can_enable_beta_broker_oauth_access(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner_oauth",
+        email="owner_oauth@example.com",
+        role=UserRole.OWNER,
+    )
+
+    beta_id = add_user(
+        factory,
+        username="kdixon",
+        email="kdixon@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta_id}"
+            "/broker-oauth-access"
+        ),
+        json={
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    user = response.json()["user"]
+
+    assert user["id"] == beta_id
+    assert (
+        user["broker_oauth_enabled"]
+        is True
+    )
+
+    with factory() as session:
+        stored_user = session.get(
+            User,
+            uuid.UUID(beta_id),
+        )
+
+        assert stored_user is not None
+        assert (
+            stored_user.broker_oauth_enabled
+            is True
+        )
+
+
+def test_beta_cannot_enable_broker_oauth_access(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    beta1_id = add_user(
+        factory,
+        username="beta_oauth_1",
+        email="beta_oauth_1@example.com",
+        role=UserRole.BETA,
+    )
+
+    beta2_id = add_user(
+        factory,
+        username="beta_oauth_2",
+        email="beta_oauth_2@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    client = client_with_user(
+        beta1_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta2_id}"
+            "/broker-oauth-access"
+        ),
+        json={
+            "enabled": True,
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def test_admin_status_update_returns_404_for_missing_user(
     monkeypatch,
 ):
@@ -699,4 +801,3 @@ def test_admin_live_trading_requires_broker_connection(
         "Tastytrade connection"
         in response.json()["detail"]
     )
-

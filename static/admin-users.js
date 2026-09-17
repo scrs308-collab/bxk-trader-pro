@@ -215,6 +215,9 @@ function renderUsers(users) {
       const brokerConnected =
         broker.connected === true;
 
+      const brokerOAuthEnabled =
+        user.broker_oauth_enabled === true;
+
       const liveTradingEnabled =
         broker.live_trading_enabled === true;
 
@@ -245,6 +248,14 @@ function renderUsers(users) {
 
       if (isBeta) {
         brokerStatus = `
+          <span
+            class="bxk-admin-live-status
+              ${brokerOAuthEnabled ? "active" : "disabled"}"
+          >
+            BROKER CONNECT:
+            ${brokerOAuthEnabled ? "ON" : "OFF"}
+          </span>
+
           <span class="bxk-admin-broker-status">
             TASTYTRADE:
             ${brokerConnected ? "CONNECTED" : "NOT CONNECTED"}
@@ -261,6 +272,26 @@ function renderUsers(users) {
       }
 
       let liveTradingAction = "";
+
+      let brokerOAuthAction = "";
+
+      if (isBeta) {
+        brokerOAuthAction = `
+          <button
+            class="bxk-admin-users-button
+              ${brokerOAuthEnabled ? "danger" : "secondary"}"
+            type="button"
+            data-oauth-user-id="${escapeHtml(user.id)}"
+            data-oauth-enabled="${brokerOAuthEnabled ? "true" : "false"}"
+          >
+            ${
+              brokerOAuthEnabled
+                ? "DISABLE BROKER CONNECT"
+                : "ENABLE BROKER CONNECT"
+            }
+          </button>
+        `;
+      }
 
       if (isBeta) {
         const canEnable =
@@ -325,6 +356,7 @@ function renderUsers(users) {
 
           <div class="bxk-admin-user-action">
             ${action}
+            ${brokerOAuthAction}
             ${liveTradingAction}
           </div>
 
@@ -353,6 +385,29 @@ function renderUsers(users) {
         },
       );
     });
+
+  container
+    .querySelectorAll(
+      "button[data-oauth-user-id]"
+    )
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        async () => {
+          const userId =
+            button.dataset.oauthUserId;
+
+          const currentlyEnabled =
+            button.dataset.oauthEnabled === "true";
+
+          await setBrokerOAuthAccess(
+            userId,
+            !currentlyEnabled,
+          );
+        },
+      );
+    });
+
   container
     .querySelectorAll(
       "button[data-live-user-id]"
@@ -374,6 +429,57 @@ function renderUsers(users) {
         },
       );
     });
+}
+
+
+async function setBrokerOAuthAccess(
+  userId,
+  enabled,
+) {
+  const action =
+    enabled ? "enable" : "disable";
+
+  try {
+    const response =
+      await fetch(
+        `${USERS_URL}/${userId}/broker-oauth-access`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            enabled,
+          }),
+        },
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+        `Unable to ${action} Broker Connect.`
+      );
+    }
+
+    setMessage(
+      enabled
+        ? "Broker Connect enabled for BETA user."
+        : "Broker Connect disabled for BETA user.",
+      "success",
+    );
+
+    await loadUsers();
+
+  } catch (error) {
+    setMessage(
+      error.message,
+      "error",
+    );
+  }
 }
 
 

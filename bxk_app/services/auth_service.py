@@ -252,6 +252,7 @@ def authenticate_database_credentials(
         "user_id": None,
         "username": None,
         "role": None,
+        "broker_oauth_enabled": False,
         "must_change_password": False,
     }
 
@@ -312,6 +313,9 @@ def authenticate_database_credentials(
                 "user_id": str(user.id),
                 "username": user.username,
                 "role": user.role.value,
+                "broker_oauth_enabled": bool(
+                    user.broker_oauth_enabled
+                ),
                 "must_change_password": bool(
                     user.must_change_password
                 ),
@@ -419,6 +423,7 @@ def authenticate_credentials(
                 config.BXK_APP_USERNAME or ""
             ),
             "role": "OWNER",
+            "broker_oauth_enabled": True,
             "must_change_password": False,
             "auth_source": "CONFIG",
         }
@@ -638,6 +643,7 @@ def verify_session_token(
                 "user_id": None,
                 "username": username,
                 "role": "OWNER",
+                "broker_oauth_enabled": True,
                 "must_change_password": False,
                 "auth_source": "CONFIG",
                 "issued_at": issued_at,
@@ -678,6 +684,9 @@ def verify_session_token(
                     "user_id": str(user.id),
                     "username": user.username,
                     "role": user.role.value,
+                    "broker_oauth_enabled": bool(
+                        user.broker_oauth_enabled
+                    ),
                     "must_change_password": bool(
                         user.must_change_password
                     ),

@@ -67,6 +67,13 @@ class User(Base):
         nullable=True,
     )
 
+    broker_oauth_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

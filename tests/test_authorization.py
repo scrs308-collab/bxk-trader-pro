@@ -2,8 +2,10 @@ import pytest
 from fastapi import HTTPException, Request
 
 from bxk_app.authorization import (
+    BROKER_OAUTH_ACCESS_DETAIL,
     OWNER_ACCESS_DETAIL,
     get_authenticated_user,
+    require_broker_oauth_access,
     require_owner,
 )
 from bxk_app.db_models.user import UserRole
@@ -133,4 +135,72 @@ def test_malformed_authenticated_user_is_forbidden():
     assert (
         exc_info.value.status_code
         == 403
+    )
+
+
+def test_owner_has_broker_oauth_access():
+    request = make_request(
+        {
+            "user_id": "owner-id",
+            "username": "owner",
+            "role": "OWNER",
+            "broker_oauth_enabled": False,
+        }
+    )
+
+    assert (
+        require_broker_oauth_access(
+            request
+        )["username"]
+        == "owner"
+    )
+
+
+def test_approved_beta_has_broker_oauth_access():
+    request = make_request(
+        {
+            "user_id": "beta-id",
+            "username": "kdixon",
+            "role": "BETA",
+            "broker_oauth_enabled": True,
+        }
+    )
+
+    assert (
+        require_broker_oauth_access(
+            request
+        )["username"]
+        == "kdixon"
+    )
+
+
+@pytest.mark.parametrize(
+    "user",
+    [
+        {
+            "role": "BETA",
+            "broker_oauth_enabled": False,
+        },
+        {
+            "role": "VIEWER",
+            "broker_oauth_enabled": True,
+        },
+    ],
+)
+def test_unapproved_user_lacks_broker_oauth_access(
+    user,
+):
+    request = make_request(user)
+
+    with pytest.raises(
+        HTTPException
+    ) as exc_info:
+        require_broker_oauth_access(
+            request
+        )
+
+    assert exc_info.value.status_code == 403
+    assert (
+        exc_info.value.detail
+        == BROKER_OAUTH_ACCESS_DETAIL
     )

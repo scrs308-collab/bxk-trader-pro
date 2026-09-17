@@ -9,6 +9,11 @@ OWNER_ACCESS_DETAIL = (
     "BXK OWNER access is required."
 )
 
+BROKER_OAUTH_ACCESS_DETAIL = (
+    "Broker Connect has not been enabled "
+    "for this BXK account."
+)
+
 
 def get_authenticated_user(
     request: Request,
@@ -104,6 +109,48 @@ def require_owner_or_beta(
         )
 
     return user
+
+
+def require_broker_oauth_access(
+    request: Request,
+) -> dict:
+    """
+    Allow Broker Connect for OWNER accounts and
+    individually approved BETA accounts.
+
+    The permission is loaded from the database on
+    every authenticated request, so OWNER changes
+    take effect without forcing the user to sign in
+    again. VIEWER accounts always fail closed.
+    """
+
+    user = get_authenticated_user(
+        request
+    )
+
+    role = user.get("role")
+
+    if isinstance(role, UserRole):
+        role = role.value
+
+    normalized_role = str(
+        role or ""
+    ).strip().upper()
+
+    if normalized_role == UserRole.OWNER.value:
+        return user
+
+    if (
+        normalized_role == UserRole.BETA.value
+        and user.get("broker_oauth_enabled")
+        is True
+    ):
+        return user
+
+    raise HTTPException(
+        status_code=403,
+        detail=BROKER_OAUTH_ACCESS_DETAIL,
+    )
 
 
 def require_owner_or_auth_disabled(

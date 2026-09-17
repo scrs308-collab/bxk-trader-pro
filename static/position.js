@@ -1,7 +1,7 @@
 import { POSITIONS_URL } from "./config.js";
 import {
-  hasOwnerAccess,
-} from "./access-control.js";
+  hasBrokerOAuthAccess,
+} from "./access-control.js?v=3";
 import {
   el,
   safeNumber,
@@ -1169,16 +1169,16 @@ function renderBrokerConnectionForm(
 ) {
   brokerConnectionFlowActive = true;
 
-  const ownerCanConnect =
-    hasOwnerAccess();
+  const canConnect =
+    hasBrokerOAuthAccess();
 
   const title =
-    ownerCanConnect
+    canConnect
       ? "Connect Tastytrade"
       : "Tastytrade Connection Unavailable";
 
   const connectionInstructions =
-    ownerCanConnect
+    canConnect
       ? `
         <div
           class="position-empty-text"
@@ -1203,14 +1203,14 @@ function renderBrokerConnectionForm(
             line-height:1.55;
           "
         >
-          Tastytrade self-service connection is
-          temporarily unavailable for beta accounts
-          while third-party OAuth approval is pending.
+          Broker Connect has not been enabled for
+          this BXK account. Contact the BXK owner
+          if this beta account should be approved.
         </div>
       `;
 
   const connectionAction =
-    ownerCanConnect
+    canConnect
       ? `
         <div
           style="
@@ -1243,7 +1243,7 @@ function renderBrokerConnectionForm(
     </div>
   `;
 
-  if (!ownerCanConnect) {
+  if (!canConnect) {
     return;
   }
 

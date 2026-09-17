@@ -200,6 +200,16 @@ def auth_status(request: Request):
             if session
             else None
         ),
+        "broker_oauth_enabled": (
+            bool(
+                session.get(
+                    "broker_oauth_enabled",
+                    False,
+                )
+            )
+            if session
+            else False
+        ),
         "must_change_password": (
             session.get(
                 "must_change_password",
