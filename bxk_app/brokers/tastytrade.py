@@ -1259,6 +1259,12 @@ class TastytradeBroker(BrokerBase):
 
         tasty_legs = []
 
+        from bxk_app.debit_strategies import DEBIT_NAMES, strategy_key, debit_risk
+        if strategy_key(order.get("strategy")) in DEBIT_NAMES:
+            debit_risk(order["strategy"], bxk_legs, price)
+            if order.get("price_effect") != "Debit":
+                raise ValueError("Debit strategy requires Debit price effect.")
+
         for leg in bxk_legs:
             symbol = str(
                 leg.get("symbol") or ""
@@ -1272,7 +1278,7 @@ class TastytradeBroker(BrokerBase):
             tasty_legs.append({
                 "instrument-type": "Equity Option",
                 "symbol": symbol,
-                "quantity": quantity,
+                "quantity": quantity * int(leg.get("quantity", 1)),
                 "action": self._tasty_open_action(
                     leg.get("action")
                 ),
@@ -1282,7 +1288,7 @@ class TastytradeBroker(BrokerBase):
             "time-in-force": "Day",
             "order-type": "Limit",
             "price": f"{price:.2f}",
-            "price-effect": "Credit",
+            "price-effect": order.get("price_effect", "Credit"),
             "legs": tasty_legs,
         }
 

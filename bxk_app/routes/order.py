@@ -42,6 +42,7 @@ from bxk_app.services.user_execution_audit_service import (
     write_user_order_audit,
 )
 from bxk_app.services.order_builder import build_order
+from bxk_app.debit_strategies import DEBIT_NAMES, strategy_key as debit_strategy_key, debit_risk, quote_age, PATTERNS, STRATEGY_PATTERN
 
 def _write_execution_audit(
     event,
@@ -793,7 +794,10 @@ def _validate_order(
 
     is_iron_condor = (
         "iron_condor" in strategy_key
+        and "reverse" not in strategy_key
     )
+    debit_key = debit_strategy_key(order.get("strategy"))
+    is_debit = debit_key in DEBIT_NAMES
 
     is_bull_put = (
         "bull_put" in strategy_key
@@ -809,6 +813,7 @@ def _validate_order(
         is_iron_condor
         or is_bull_put
         or is_bear_call
+        or is_debit
     )
 
     check(
@@ -816,12 +821,10 @@ def _validate_order(
         supported_strategy,
         (
             "Strategy verified as an approved "
-            "defined-risk credit structure."
+            "defined-risk structure."
         ),
         (
-            "Strategy must be an Iron Condor, "
-            "Bull Put Credit Spread, or "
-            "Bear Call Credit Spread."
+            "Strategy must be a supported defined-risk structure."
         ),
     )
 
@@ -842,7 +845,7 @@ def _validate_order(
     )
 
     expected_leg_count = (
-        4 if is_iron_condor else 2
+        len(PATTERNS[debit_key]) if is_debit else 4 if is_iron_condor else 2
     )
 
     check(
@@ -863,7 +866,9 @@ def _validate_order(
 
     expected_legs = []
 
-    if is_iron_condor:
+    if is_debit:
+        expected_legs = [(action, kind) for action, kind, ratio in PATTERNS[debit_key]]
+    elif is_iron_condor:
         expected_legs = [
             ("SELL", "PUT"),
             ("BUY", "PUT"),
@@ -925,7 +930,16 @@ def _validate_order(
             for leg in legs
         ]
 
-        if is_iron_condor:
+        if is_debit:
+            try:
+                risk = debit_risk(debit_key, legs, credit)
+                strike_order_valid = True
+                width_valid = risk["width"] == requested_wing_width
+                directions_valid = directions_valid and order.get("price_effect") == "Debit"
+                directions_valid = directions_valid and abs(max_risk - risk["max_risk"] * quantity) < 0.01
+            except (ValueError, KeyError, TypeError):
+                strike_order_valid = width_valid = False
+        elif is_iron_condor:
             strike_order_valid = (
                 strikes[0] > strikes[1] > 0
                 and strikes[3] > strikes[2] > 0
@@ -992,6 +1006,15 @@ def _validate_order(
         symbols_present = False
         strike_order_valid = False
         width_valid = False
+
+    if is_debit:
+        try:
+            quote_age(order.get("quote_timestamp"))
+            fresh = True
+        except (ValueError, TypeError):
+            fresh = False
+        check("quote_freshness", fresh, "Option quotes are fresh.",
+              "Option quotes are missing or stale. Build a fresh preview.")
 
     check(
         "leg_directions",
@@ -1086,13 +1109,13 @@ def _validate_order(
     check(
         "limit_credit",
         credit > 0,
-        "Limit credit is greater than zero.",
-        "Limit credit must be greater than zero.",
+        "Limit premium is greater than zero.",
+        "Limit premium must be greater than zero.",
     )
 
     check(
         "minimum_credit",
-        credit >= BXK_MIN_ORDER_CREDIT,
+        is_debit or credit >= BXK_MIN_ORDER_CREDIT,
         (
             "Limit credit meets the "
             f"${BXK_MIN_ORDER_CREDIT:,.2f} BXK minimum."
@@ -1159,17 +1182,17 @@ def _build_current_order(
     if not trade:
         return None, None
 
-    order = build_order(
-        trade,
-        quantity=contracts,
-    )
+    try:
+        order = build_order(trade, quantity=contracts)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return trade, order
 
 
 @router.get("/order-preview")
 def order_preview(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
@@ -1286,7 +1309,7 @@ def order_preview(
 
 
 def order_validate(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
@@ -1404,7 +1427,7 @@ def order_validate(
     "/order-validate",
 )
 def order_validate_api(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(
         1,
         ge=0,
@@ -1639,7 +1662,7 @@ def _evaluate_broker_dry_run(
         "broker_time_in_force":
             "Broker time in force verified as Day.",
         "broker_price_effect":
-            "Broker price effect verified as Credit.",
+            "Broker price effect matches the order.",
         "broker_buying_power":
             "Broker buying-power information is valid.",
         "broker_buying_power_reconciled":
@@ -1872,10 +1895,9 @@ def _evaluate_broker_dry_run(
 
     check(
         "broker_price_effect",
-        broker_order.get("price-effect") == "Credit",
+        broker_order.get("price-effect") == order.get("price_effect", "Credit"),
         (
-            "Tastytrade dry-run is not "
-            "a credit order."
+            "Tastytrade dry-run price effect does not match the order."
         ),
     )
 
@@ -2108,7 +2130,7 @@ def _execution_session_gate() -> dict:
 
 
 def order_dry_run(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
@@ -2415,7 +2437,7 @@ def order_dry_run(
     "/order-dry-run",
 )
 def order_dry_run_api(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(
         1,
         ge=0,
@@ -2592,7 +2614,7 @@ def order_status_api(
 
 
 def order_submit(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
@@ -3156,7 +3178,7 @@ def order_submit(
 
 @router.post("/order-submit")
 def order_submit_api(
-    strategy: str = Query("auto"),
+    strategy: str = Query("auto", pattern=STRATEGY_PATTERN),
     dte: int = Query(
         1,
         ge=0,

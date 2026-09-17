@@ -2543,7 +2543,7 @@ def test_vertical_wrong_option_type_is_blocked():
     )
 
 
-def test_debit_strategy_remains_blocked():
+def test_malformed_debit_strategy_remains_blocked():
     order = _vertical_test_order(
         strategy=(
             "Debit Call Spread"
@@ -2572,7 +2572,7 @@ def test_debit_strategy_remains_blocked():
     assert errors
     assert (
         strategy_check["passed"]
-        is False
+        is True
     )
 
 

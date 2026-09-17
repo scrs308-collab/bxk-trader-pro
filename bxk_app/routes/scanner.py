@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from bxk_app.debit_strategies import STRATEGY_PATTERN
 
 from bxk_app.authorization import (
     require_owner_or_auth_disabled,
@@ -86,11 +87,7 @@ def test_candidate_grid():
 def best_trade(
     strategy: str = Query(
         default="auto",
-        pattern=(
-            "^(auto|iron_condor|"
-            "bull_put_credit_spread|"
-            "bear_call_credit_spread)$"
-        ),
+        pattern=STRATEGY_PATTERN,
     ),
     dte: int = Query(
         default=1,

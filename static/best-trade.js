@@ -103,6 +103,7 @@ const response = await fetch(
     <div class="no-trade-message">
       ${
         data.reason ||
+        data.message ||
         "The trade engine did not return an approved setup."
       }
     </div>
@@ -132,7 +133,8 @@ const response = await fetch(
       .trim()
       .toUpperCase();
 
-    const tradeApproved =
+    const manualPreviewReady = trade.manual_selection === true && trade.structure_validated === true;
+    const tradeApproved = manualPreviewReady ||
       recommendation === "ENTER TRADE" ||
       recommendation === "TRADE" ||
       recommendation === "TRADE SMALL";
@@ -141,7 +143,7 @@ const response = await fetch(
       tradeApproved ? "enter" : "no-trade";
 
     const badgeText =
-      tradeApproved ? recommendation : "NO TRADE";
+      manualPreviewReady ? `MANUAL · ${trade.playbook_status || "CAUTION"}` : tradeApproved ? recommendation : "NO TRADE";
 
         const missionScore = Math.max(
       0,
@@ -234,6 +236,7 @@ const response = await fetch(
         : "--";
 
     const credit = safeNumber(
+      trade.debit ??
       trade.credit ??
       trade.net_credit ??
       trade.opening_credit ??
@@ -293,7 +296,9 @@ const buyingPower =
 
     let legsHtml = "";
 
-    if (
+    if (Array.isArray(trade.legs)) {
+      legsHtml = trade.legs.map(leg => `<div class="setup-leg"><span>${leg.action} ${leg.quantity || 1} ${leg.option_type}</span><strong>${leg.strike}</strong></div>`).join("");
+    } else if (
       strategyName === "Bull Put Credit Spread"
 )
      {
@@ -460,12 +465,15 @@ const buyingPower =
       <div class="setup-legs-grid">
         ${legsHtml}
       </div>
+      <div class="setup-market-item"><strong>Strategy Playbook: ${trade.playbook_status || "See Strategies"}</strong></div>
+      ${trade.structure_analysis ? `<div class="setup-market-item">Live structure fit: ${trade.structure_analysis.status} · ${trade.structure_analysis.score}/100<br>${trade.structure_analysis.factors.map(factor => factor.label + ": " + factor.points).join(" · ")}</div>` : ""}
+      ${trade.breakevens ? `<div class="setup-market-item">${trade.risk_classification} · Width ${trade.width} · Max profit ${formatMoney(trade.max_profit)} · Breakevens ${trade.breakevens.join(" / ")}<br>Midpoint ${formatMoney(trade.midpoint, 2)} · Quote ${trade.quote_timestamp ? new Date(trade.quote_timestamp).toLocaleTimeString() : "Unavailable"} · Age ${trade.quote_age_seconds ?? "Unavailable"}s</div>` : ""}
 
       <div class="setup-divider"></div>
 
       <div class="setup-metrics">
         <div class="setup-metric">
-          <span>Credit</span>
+          <span>${trade.price_effect === "Debit" ? "Debit" : "Credit"}</span>
           <strong>
             ${formatMoney(credit, 2)}
           </strong>
@@ -530,7 +538,7 @@ const buyingPower =
       >
         ${
           tradeApproved
-            ? "ENTER TRADE"
+            ? (manualPreviewReady ? "REVIEW MANUAL TRADE" : "ENTER TRADE")
             : "NO TRADE"
         }
       </button>
@@ -577,14 +585,12 @@ const buyingPower =
                 },
               );
 
+            const preview = await previewResponse.json();
             if (!previewResponse.ok) {
               throw new Error(
-                `Order preview error ${previewResponse.status}`,
+                preview.detail || `Order preview error ${previewResponse.status}`,
               );
             }
-
-            const preview =
-              await previewResponse.json();
 
             renderOrderPreview({
               preview,
@@ -714,6 +720,8 @@ function renderOrderPreview({
   );
 
   const limitPrice = safeNumber(
+    order.limit_price ??
+    displayedTrade.debit ??
     displayedTrade.credit ??
     displayedTrade.net_credit ??
     displayedTrade.opening_credit ??
@@ -722,12 +730,14 @@ function renderOrderPreview({
   );
 
   const maxProfit = safeNumber(
+    order.max_profit ??
     displayedTrade.max_profit ??
     order.max_profit,
     0,
   );
 
   const maxRisk = safeNumber(
+    order.max_risk ??
     displayedTrade.max_risk ??
     displayedTrade.max_loss ??
     order.max_risk,
@@ -792,7 +802,7 @@ function renderOrderPreview({
       .toLowerCase()
       .includes("condor")
       ? 4
-      : 2;
+      : String(order.strategy || "").toLowerCase().includes("butterfly") ? 3 : 2;
 
   const checks = [
     {
@@ -800,7 +810,7 @@ function renderOrderPreview({
       passed: true,
     },
     {
-      label: "Positive credit",
+      label: "Positive limit premium",
       passed: limitPrice > 0,
     },
     {
@@ -936,6 +946,9 @@ function renderOrderPreview({
       </div>
 
       <div class="order-review-content">
+        <div class="order-review-section"><strong>Strategy Playbook: ${order.playbook_status || displayedTrade.playbook_status || "See Strategies"}</strong>
+          ${order.breakevens ? `<p>${order.risk_classification} · Width ${order.width} · Breakevens ${order.breakevens.join(" / ")} · Midpoint ${formatMoney(order.midpoint, 2)} · Quote ${order.quote_timestamp ? new Date(order.quote_timestamp).toLocaleTimeString() : "Unavailable"} · Age ${order.quote_age_seconds ?? "Unavailable"}s</p>` : ""}
+        </div>
         <div class="order-review-main">
           <section class="order-review-section">
             <div class="order-review-section-heading">
@@ -963,7 +976,7 @@ function renderOrderPreview({
                             </span>
 
                             <strong>
-                              ${leg.strike ?? "--"}
+                              ${leg.strike ?? "--"} × ${(leg.quantity || 1) * quantity}
                             </strong>
                           </div>
                         `,
@@ -999,7 +1012,7 @@ function renderOrderPreview({
               </div>
 
               <div>
-                <span>Limit Credit</span>
+                <span>Limit ${order.price_effect === "Debit" ? "Debit" : "Credit"}</span>
                 <strong>
                   ${formatMoney(limitPrice, 2)}
                 </strong>
@@ -1847,7 +1860,7 @@ function renderOrderPreview({
               : "contracts"
           }`,
           `${order.strategy || "BXK trade"}`,
-          `Limit credit: ${formatMoney(
+          `Limit ${order.price_effect === "Debit" ? "debit" : "credit"}: ${formatMoney(
             limitPrice,
             2,
           )}`,

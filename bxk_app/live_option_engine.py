@@ -78,6 +78,10 @@ async def fetch_live_market_data(symbols: list[str]) -> dict:
                 if symbol in market_data:
                     market_data[symbol].update(
                         {
+                            "quote_timestamp": min(
+                                to_float(getattr(quote, "bid_time", None), 0),
+                                to_float(getattr(quote, "ask_time", None), 0),
+                            ),
                             "bid": to_float(
                                 getattr(
                                     quote,

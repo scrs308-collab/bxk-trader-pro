@@ -1287,6 +1287,19 @@ def build_vertical_summary(
         "legs": legs,
     }
 
+    if not is_credit:
+        summary["breakevens"] = [round(long_leg["strike"] + (opening_amount if option_type == "C" else -opening_amount), 2)]
+        summary["entry_debit"] = opening_amount
+        summary["current_mark"] = round(-current_net_credit, 2)
+        summary["current_value"] = summary["current_mark"]
+        summary["profit_target_value"] = round(opening_amount * 1.5, 2)
+        summary["stop_value"] = round(opening_amount * .5, 2)
+        summary["risk_classification"] = "Defined risk · directional"
+        summary["recommendation"] += " Debit spread: rising value is profit; manage targets and stops relative to entry debit."
+        if pnl_percent <= -50:
+            summary["status"] = "REVIEW"
+            summary["recommendation"] = "Debit value has fallen at least 50% from entry; review the stop."
+
     if option_type == "P":
         summary.update({
             "buy_put": int(
@@ -1476,6 +1489,51 @@ def build_single_option_summary(
     }
 
 
+def build_debit_combo_summary(positions, spx_price=None):
+    from bxk_app.debit_strategies import debit_risk, DEBIT_NAMES
+    legs = [_build_universal_leg(p) for p in positions]
+    if len(legs) not in (3, 4) or any(leg is None for leg in legs):
+        return None
+    if len({(leg["root"], leg["expiration"], leg["multiplier"]) for leg in legs}) != 1:
+        return None
+    legs.sort(key=lambda leg: leg["strike"])
+    quantity = min(leg["quantity"] for leg in legs)
+    key = "butterfly" if len(legs) == 3 else "reverse_iron_condor"
+    order_legs = [{"action": "BUY" if leg["direction"] == "LONG" else "SELL",
+                   "option_type": "CALL" if leg["option_type"] == "C" else "PUT",
+                   "strike": leg["strike"], "quantity": leg["quantity"] / quantity}
+                  for leg in legs]
+    def value(field):
+        return sum(leg[field] * order_leg["quantity"] * (1 if leg["direction"] == "LONG" else -1)
+                   for leg, order_leg in zip(legs, order_legs))
+    entry, mark = value("open_price"), value("current_price")
+    try:
+        risk = debit_risk(key, order_legs, entry)
+    except (ValueError, KeyError):
+        return None
+    pnl = (mark - entry) * quantity * 100
+    percent = (mark - entry) / entry * 100
+    dte = days_until_expiration(legs[0].get("expires_at") or legs[0]["expiration"])
+    status, recommendation = _universal_position_status(percent, dte)
+    if percent <= -50:
+        status, recommendation = "REVIEW", "Debit value has fallen 50% from entry; review the stop."
+    coaching = ("Reverse Iron Condor needs movement beyond either breakeven; rising value is profit. Time decay erodes the entry debit."
+                if key == "reverse_iron_condor" else
+                "Long-call Butterfly reaches maximum expiration profit at the middle strike; monitor pinning and debit decay.")
+    return {**risk, "strategy": DEBIT_NAMES[key], "position_type": key.upper(), "spread_type": "DEBIT",
+            "underlying": "SPX", "quantity": quantity, "expiration": legs[0]["expiration"], "dte": dte,
+            "opening_debit": entry, "opening_debit_dollars": round(entry * quantity * 100, 2),
+            "entry_debit": entry, "current_value": round(mark, 2), "current_mark": round(mark, 2),
+            "pnl": round(pnl, 2), "calculated_pnl": round(pnl, 2), "pnl_percent": round(percent, 2),
+            "max_profit": round(risk["max_profit"] * quantity, 2),
+            "max_risk": round(risk["max_risk"] * quantity, 2), "max_loss": round(risk["max_loss"] * quantity, 2),
+            "profit_target_value": round(entry * 1.5, 2), "stop_value": round(entry * .5, 2),
+            "status": status, "recommendation": recommendation + " " + coaching,
+            "active_side": ("PUT" if spx_price and spx_price < legs[1]["strike"] else "CALL" if spx_price and spx_price > legs[-2]["strike"] else "CENTER"),
+            "valuation_reliable": all(leg.get("quote_reliable") is True for leg in legs),
+            "pnl_is_estimate": True, "legs": legs, "spx_price": spx_price}
+
+
 def build_position_summaries(
     positions: list[dict],
     spx_price: float | None = None,
@@ -1494,6 +1552,42 @@ def build_position_summaries(
 
     if not positions:
         return []
+
+    # Recognize full debit combos before quantity grouping separates the 1:2:1 butterfly.
+    debit_summaries = []
+    expiration_groups = {}
+    for position in positions:
+        parsed = parse_option_symbol(position.get("symbol", ""))
+        if parsed:
+            expiration_groups.setdefault((parsed["root"], parsed["expiration"]), []).append(position)
+    consumed = set()
+    for group in expiration_groups.values():
+        summary = build_debit_combo_summary(group, spx_price)
+        if summary:
+            debit_summaries.append(summary)
+            consumed.update(id(p) for p in group)
+            continue
+        # A butterfly's middle quantity differs even when other trades share its expiry.
+        parsed_group = [(p, _build_universal_leg(p)) for p in group]
+        calls = [(p, leg) for p, leg in parsed_group if leg and leg["option_type"] == "C"]
+        for middle_raw, middle in calls:
+            if middle["direction"] != "SHORT" or id(middle_raw) in consumed:
+                continue
+            candidates = []
+            for lower_raw, lower in calls:
+                for upper_raw, upper in calls:
+                    if lower["strike"] < middle["strike"] < upper["strike"]:
+                        raw = [lower_raw, middle_raw, upper_raw]
+                        if any(id(p) in consumed for p in raw):
+                            continue
+                        candidate = build_debit_combo_summary(raw, spx_price)
+                        if candidate:
+                            candidates.append((raw, candidate))
+            if len(candidates) == 1:
+                raw, candidate = candidates[0]
+                debit_summaries.append(candidate)
+                consumed.update(id(p) for p in raw)
+    positions = [p for p in positions if id(p) not in consumed]
 
     grouped_positions: dict[
         tuple[str, str, float],
@@ -1528,7 +1622,7 @@ def build_position_summaries(
             [],
         ).append(position)
 
-    summaries: list[dict] = []
+    summaries: list[dict] = debit_summaries
 
     sorted_groups = sorted(
         grouped_positions.items(),
@@ -1548,6 +1642,10 @@ def build_position_summaries(
         # behavior whenever a complete 4-leg group
         # can be recognized.
         if len(remaining) == 4:
+            reverse = build_debit_combo_summary(remaining, spx_price)
+            if reverse:
+                summaries.append(reverse)
+                continue
             condor = (
                 build_iron_condor_summary(
                     positions=remaining,
@@ -1582,6 +1680,11 @@ def build_position_summaries(
                 block = remaining[
                     index:index + 4
                 ]
+
+                reverse = build_debit_combo_summary(block, spx_price)
+                if reverse:
+                    possible_condors.append(reverse)
+                    continue
 
                 condor = (
                     build_iron_condor_summary(

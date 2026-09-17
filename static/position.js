@@ -224,7 +224,7 @@ function renderPositionCard(position) {
     positionType === "IRON_CONDOR";
 
   const isVertical =
-    positionType === "VERTICAL";
+    ["VERTICAL", "REVERSE_IRON_CONDOR", "BUTTERFLY"].includes(positionType);
 
   const isSingle =
     positionType === "SINGLE";
@@ -795,6 +795,12 @@ function renderPositionCard(position) {
         "negative-value",
       );
 
+    if (!isCredit) {
+      metricsHtml += metricRow("Breakevens", (position.breakevens || []).join(" / ") || "--")
+        + metricRow("Profit Target Value", formatMoney(position.profit_target_value))
+        + metricRow("Stop Value", formatMoney(position.stop_value))
+        + metricRow("Active Side", position.active_side || "Directional");
+    }
     if (isCredit) {
       const openingCreditPerSpread =
         quantity > 0

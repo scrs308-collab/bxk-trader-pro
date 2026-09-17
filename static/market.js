@@ -1494,6 +1494,16 @@ function renderStrategyPlaybook(data) {
   ).toUpperCase();
 
   const strategyDetails = {
+    "Reverse Iron Condor": {
+      description: "Net-debit long-volatility position with equal put and call spread widths.",
+      conditions: "Expected expansion · Event-driven movement · Adequate time · Liquid quotes",
+      risk: "Defined / Entry debit",
+    },
+    "Butterfly": {
+      description: "Balanced long-call butterfly: buy one lower call, sell two center calls, buy one upper call. Maximum expiration profit occurs at the center.",
+      conditions: "Pinning near the center · Equal wings · Favorable debit",
+      risk: "Defined / Entry debit",
+    },
     "Iron Condor": {
       description:
         "Primary BXK strategy for a range-bound market with healthy premium.",

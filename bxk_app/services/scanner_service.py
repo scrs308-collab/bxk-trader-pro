@@ -16,6 +16,7 @@ from bxk_app.trade_builder import (
     build_best_trade,
 )
 from bxk_app.wing_optimizer import find_best_trade
+from bxk_app.debit_strategies import DEBIT_NAMES, build_manual_debit
 
 
 def safe_market_value(
@@ -165,6 +166,20 @@ def get_best_trade(
     contracts: int = 1,
 ):
     market = run_trade_quality()
+
+    if strategy in DEBIT_NAMES:
+        result = build_manual_debit(strategy, dte, wing_width)
+        result.update(requested_contracts=contracts, requested_strategy=strategy,
+                      requested_dte=dte, requested_wing_width=wing_width)
+        if result.get("best_trade"):
+            from bxk_app.strategy_ranker import rank_strategies_v2, reverse_condor_playbook
+            from bxk_app.market_data import market_data
+            rankings = rank_strategies_v2(safe_market_value(market, "score", 0), safe_market_value(market, "vix_state", "UNKNOWN"), current_price=market_data.spx, condor_stability=market_data.condor_stability)
+            item = next((r for r in rankings if r["name"] == DEBIT_NAMES[strategy]), {})
+            result["best_trade"]["playbook_status"] = item.get("status", "CAUTION")
+            if strategy == "reverse_iron_condor":
+                result["best_trade"]["structure_analysis"] = reverse_condor_playbook(market_data.condor_stability, result["best_trade"])
+        return result
 
     if strategy == "auto":
         rankings = rank_strategies(
@@ -316,6 +331,12 @@ def get_best_trade(
 
 
         if best_trade:
+            from bxk_app.debit_strategies import credit_preview_metadata
+            from bxk_app.strategy_ranker import rank_strategies_v2
+            from bxk_app.market_data import market_data
+            credit_preview_metadata(best_trade)
+            current_rankings = rank_strategies_v2(safe_market_value(market, "score", 0), safe_market_value(market, "vix_state", "UNKNOWN"), current_price=market_data.spx, condor_stability=market_data.condor_stability)
+            best_trade["playbook_status"] = next((r["status"] for r in current_rankings if r["name"] == best_trade.get("strategy", "").removeprefix("SPX ")), "CAUTION")
             final_decision = str(
                 best_trade.get(
                     "final_decision",

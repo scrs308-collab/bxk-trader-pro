@@ -507,6 +507,10 @@ def record_submitted_trade(
             "average_fill_price"
         )
     )
+    # Historical credit fields store signed entry cash flow; debit entries are negative.
+    is_debit_entry = order.get("price_effect") == "Debit"
+    if is_debit_entry and fill_credit is not None:
+        fill_credit = -abs(fill_credit)
 
     submitted_at = (
         _datetime(
@@ -675,6 +679,8 @@ def record_submitted_trade(
                 order.get("credit")
             )
         )
+        if is_debit_entry and journal.submitted_credit is not None:
+            journal.submitted_credit = -abs(journal.submitted_credit)
 
         if fill_credit is not None:
             journal.entry_fill_credit = (
@@ -1159,6 +1165,13 @@ def _entry_order_from_journal(
     )
 
 
+def _entry_leg_ratios(journal):
+    legs = _entry_order_from_journal(journal).get("legs") or []
+    quantities = [_number(leg.get("quantity")) or 1 for leg in legs]
+    base = min(quantities, default=1)
+    return {leg.get("symbol"): quantity / base for leg, quantity in zip(legs, quantities)}
+
+
 def _expected_close_actions(
     journal,
 ):
@@ -1321,6 +1334,8 @@ def _order_net_value(
 
     signed_total = 0.0
     saw_fill = False
+    leg_quantities = [_number(leg.get("quantity")) for leg in (order.get("legs") or [])]
+    base_quantity = min((q for q in leg_quantities if q and q > 0), default=1)
 
     for leg in (
         order.get("legs")
@@ -1386,6 +1401,7 @@ def _order_net_value(
             value_total
             / quantity_total
         )
+        average *= (_number(leg.get("quantity")) or base_quantity) / base_quantity
 
         action = (
             _normalized_broker_action(
@@ -1431,9 +1447,7 @@ def _opening_fill_credit(
     if value is None:
         return None
 
-    return abs(
-        value
-    )
+    return -value
 
 
 def _closing_exit_debit(
@@ -1530,6 +1544,7 @@ def _closing_order_matches(
             journal.quantity
             or 1
         )
+        required_quantity *= _entry_leg_ratios(journal).get(symbol, 1)
 
         if (
             quantity is None
@@ -2627,7 +2642,7 @@ def _expiration_settlement_evidence(
         in quantities.items()
         if abs(
             quantity
-            - required_quantity
+            - required_quantity * _entry_leg_ratios(journal).get(symbol, 1)
         ) > 0.000001
     ]
 
