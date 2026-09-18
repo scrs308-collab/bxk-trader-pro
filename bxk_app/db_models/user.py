@@ -74,6 +74,19 @@ class User(Base):
         server_default="false",
     )
 
+    sms_phone_e164: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        unique=True,
+    )
+
+    sms_alerts_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

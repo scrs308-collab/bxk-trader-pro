@@ -19,6 +19,12 @@ from bxk_app.services.overnight_risk_service import (
 from bxk_app.services.sms_service import (
     send_bxk_sms,
 )
+from bxk_app.services.sms_consent_service import (
+    list_active_sms_subscriptions,
+)
+from bxk_app.services.broker_connection_service import (
+    resolve_preferred_broker,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -445,14 +451,17 @@ def build_overnight_sms(
     return "\n".join(parts)
 
 
-def _load_locked_state(session):
+def _load_locked_state(
+    session,
+    scope=ALERT_SCOPE,
+):
     statement = (
         select(
             OvernightAlertState
         )
         .where(
             OvernightAlertState.scope
-            == ALERT_SCOPE
+            == scope
         )
         .with_for_update()
     )
@@ -467,6 +476,7 @@ def process_overnight_risk(
     *,
     session_factory=None,
     send_func=send_bxk_sms,
+    scope=ALERT_SCOPE,
 ):
     factory = (
         session_factory
@@ -497,12 +507,13 @@ def process_overnight_risk(
 
     with factory() as session:
         state = _load_locked_state(
-            session
+            session,
+            scope,
         )
 
         if state is None:
             state = OvernightAlertState(
-                scope=ALERT_SCOPE,
+                scope=scope,
                 state=None,
                 reason_code=reason_code,
             )
@@ -717,6 +728,86 @@ def process_overnight_risk(
         }
 
 
+def _run_subscriber_overnight_checks(
+    *,
+    session_factory=None,
+):
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    subscriptions = (
+        list_active_sms_subscriptions(
+            session_factory=factory,
+        )
+    )
+
+    results = []
+
+    for subscription in subscriptions:
+        user_context = subscription[
+            "user_context"
+        ]
+        phone = subscription["phone_e164"]
+        user_id = str(
+            user_context["user_id"]
+        )
+
+        try:
+            with factory() as session:
+                broker_client = (
+                    resolve_preferred_broker(
+                        session,
+                        user_context=user_context,
+                    )
+                )
+
+            payload = get_live_overnight_risk(
+                broker_client=broker_client,
+                user_context=user_context,
+            )
+
+            result = process_overnight_risk(
+                payload,
+                session_factory=factory,
+                send_func=(
+                    lambda message,
+                    recipient=phone:
+                        send_bxk_sms(
+                            message,
+                            recipient=recipient,
+                        )
+                ),
+                scope=(
+                    "USER_OVERNIGHT:"
+                    + user_id.replace("-", "")[:12]
+                ),
+            )
+
+        except Exception as exc:
+            logger.warning(
+                "Subscriber overnight SMS check "
+                "failed for %s: %s",
+                user_context.get("username"),
+                type(exc).__name__,
+            )
+            result = {
+                "action": "ERROR",
+                "alert_sent": False,
+            }
+
+        results.append(
+            {
+                "username":
+                    user_context.get("username"),
+                **result,
+            }
+        )
+
+    return results
+
+
 def run_overnight_alert_check():
     if not _monitor_allowed():
         return {
@@ -728,9 +819,28 @@ def run_overnight_alert_check():
         get_live_overnight_risk()
     )
 
-    return process_overnight_risk(
+    owner_result = process_overnight_risk(
         payload
     )
+
+    subscriber_results = (
+        _run_subscriber_overnight_checks()
+    )
+
+    subscriber_alerted = any(
+        result.get("alert_sent")
+        for result in subscriber_results
+    )
+
+    return {
+        **owner_result,
+        "alert_sent": bool(
+            owner_result.get("alert_sent")
+            or subscriber_alerted
+        ),
+        "subscriber_results":
+            subscriber_results,
+    }
 
 
 async def run_overnight_alert_monitor():

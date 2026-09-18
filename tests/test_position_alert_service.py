@@ -9,6 +9,7 @@ from bxk_app.services.position_alert_service import (
     classify_position_threat,
     process_position_threat,
 )
+import bxk_app.services.position_alert_service as service
 
 
 def make_factory():
@@ -189,6 +190,70 @@ def test_call_side_threat_is_identified():
     assert result["action"] == "ALERTED"
     assert result["side"] == "CALL"
     assert "CALL short: 6100" in sent[0]
+
+
+def test_subscriber_alert_uses_user_broker_and_phone(
+    monkeypatch,
+):
+    factory = make_factory()
+    broker = object()
+    sent = []
+    user_id = (
+        "3f574a3f-f5df-4fa1-b199-3b0eb4c82742"
+    )
+
+    monkeypatch.setattr(
+        service,
+        "list_active_sms_subscriptions",
+        lambda **kwargs: [
+            {
+                "user_context": {
+                    "user_id": user_id,
+                    "username": "kdixon",
+                    "role": "BETA",
+                },
+                "phone_e164": "+15553271020",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        service,
+        "resolve_preferred_broker",
+        lambda session, *, user_context: broker,
+    )
+
+    def fake_monitor(
+        *,
+        broker_client,
+        user_context,
+    ):
+        assert broker_client is broker
+        assert user_context["username"] == "kdixon"
+        return {
+            "status": "OK",
+            "positions": [position(spx=6018)],
+        }
+
+    monkeypatch.setattr(
+        service,
+        "get_position_monitor",
+        fake_monitor,
+    )
+    monkeypatch.setattr(
+        service,
+        "send_bxk_sms",
+        lambda message, *, recipient: sent.append(
+            (message, recipient)
+        ),
+    )
+
+    results = service._run_subscriber_daytime_checks(
+        session_factory=factory,
+    )
+
+    assert results[0]["action"] == "ALERTED"
+    assert sent[0][1] == "+15553271020"
+    assert "DAYTIME WARNING" in sent[0][0]
 from pathlib import Path
 
 

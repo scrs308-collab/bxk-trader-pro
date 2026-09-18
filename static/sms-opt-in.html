@@ -239,15 +239,62 @@
         "status"
       );
 
+    const phoneInput =
+      document.getElementById(
+        "phoneNumber"
+      );
+
+    async function loadSubscription() {
+      try {
+        const response = await fetch(
+          "/api/sms/subscription",
+          { cache: "no-store" }
+        );
+
+        if (response.status === 401) {
+          statusElement.className = "error";
+          statusElement.innerHTML =
+            'Sign in to your BXK account before ' +
+            'enabling SMS alerts. ' +
+            '<a href="/login">SIGN IN</a>';
+          return;
+        }
+
+        if (!response.ok) {
+          return;
+        }
+
+        const subscription =
+          await response.json();
+
+        if (subscription.phone_configured) {
+          phoneInput.placeholder =
+            `Assigned number ${subscription.phone}`;
+          phoneInput.required = false;
+        }
+
+        if (subscription.enabled) {
+          statusElement.className = "success";
+          statusElement.textContent =
+            `SMS alerts are enabled for ${subscription.phone}.`;
+          button.textContent =
+            "SMS ALERTS ENABLED";
+        }
+      } catch (error) {
+        // The disclosure remains available if status
+        // cannot be loaded.
+      }
+    }
+
+    loadSubscription();
+
     form.addEventListener(
       "submit",
       async (event) => {
         event.preventDefault();
 
         const phoneNumber =
-          document.getElementById(
-            "phoneNumber"
-          ).value;
+          phoneInput.value;
 
         const consent =
           document.getElementById(
@@ -271,7 +318,7 @@
               },
               body: JSON.stringify({
                 phone_number:
-                  phoneNumber,
+                  phoneNumber || null,
                 consent
               })
             }

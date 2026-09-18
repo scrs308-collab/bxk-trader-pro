@@ -1,5 +1,6 @@
 from fastapi import (
     APIRouter,
+    Depends,
     HTTPException,
 )
 from pydantic import (
@@ -8,8 +9,11 @@ from pydantic import (
 )
 
 from bxk_app.services.sms_consent_service import (
-    record_sms_consent,
+    get_user_sms_subscription,
+    record_user_sms_consent,
+    revoke_user_sms_consent,
 )
+from bxk_app.authorization import require_owner_or_beta
 
 
 router = APIRouter(
@@ -19,7 +23,8 @@ router = APIRouter(
 
 
 class SmsOptInRequest(BaseModel):
-    phone_number: str = Field(
+    phone_number: str | None = Field(
+        default=None,
         min_length=8,
         max_length=40,
     )
@@ -30,6 +35,9 @@ class SmsOptInRequest(BaseModel):
 @router.post("/opt-in")
 def sms_opt_in(
     payload: SmsOptInRequest,
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
 ):
     if payload.consent is not True:
         raise HTTPException(
@@ -41,8 +49,16 @@ def sms_opt_in(
         )
 
     try:
-        result = record_sms_consent(
-            payload.phone_number
+        user_id = user_context.get("user_id")
+
+        if not user_id:
+            raise ValueError(
+                "A database-backed account is required."
+            )
+
+        result = record_user_sms_consent(
+            user_id=user_id,
+            phone_number=payload.phone_number,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -56,5 +72,44 @@ def sms_opt_in(
             "BXK Trader Pro SMS consent "
             "was recorded."
         ),
+        **result,
+    }
+
+
+@router.get("/subscription")
+def sms_subscription(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+):
+    try:
+        return get_user_sms_subscription(
+            user_context.get("user_id")
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/opt-out")
+def sms_opt_out(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+):
+    try:
+        result = revoke_user_sms_consent(
+            user_context.get("user_id")
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "status": "OPTED_OUT",
         **result,
     }

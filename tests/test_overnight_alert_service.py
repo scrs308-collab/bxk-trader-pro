@@ -9,6 +9,7 @@ from bxk_app.services.overnight_alert_service import (
     ALERT_SCOPE,
     process_overnight_risk,
 )
+import bxk_app.services.overnight_alert_service as service
 
 
 def make_factory():
@@ -475,3 +476,64 @@ def test_first_red_observation_sends_sms():
 
     assert stored.state == "RED"
     assert stored.last_alerted_state == "RED"
+
+
+def test_subscriber_overnight_uses_user_broker_and_phone(
+    monkeypatch,
+):
+    factory = make_factory()
+    broker = object()
+    sent = []
+    user_id = (
+        "3f574a3f-f5df-4fa1-b199-3b0eb4c82742"
+    )
+
+    monkeypatch.setattr(
+        service,
+        "list_active_sms_subscriptions",
+        lambda **kwargs: [
+            {
+                "user_context": {
+                    "user_id": user_id,
+                    "username": "kdixon",
+                    "role": "BETA",
+                },
+                "phone_e164": "+15553271020",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        service,
+        "resolve_preferred_broker",
+        lambda session, *, user_context: broker,
+    )
+
+    def fake_risk(
+        *,
+        broker_client,
+        user_context,
+    ):
+        assert broker_client is broker
+        assert user_context["username"] == "kdixon"
+        return payload("RED")
+
+    monkeypatch.setattr(
+        service,
+        "get_live_overnight_risk",
+        fake_risk,
+    )
+    monkeypatch.setattr(
+        service,
+        "send_bxk_sms",
+        lambda message, *, recipient: sent.append(
+            (message, recipient)
+        ),
+    )
+
+    results = service._run_subscriber_overnight_checks(
+        session_factory=factory,
+    )
+
+    assert results[0]["action"] == "ALERTED"
+    assert sent[0][1] == "+15553271020"
+    assert "OVERNIGHT" in sent[0][0]

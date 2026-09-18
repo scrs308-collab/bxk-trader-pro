@@ -1,8 +1,10 @@
 from sqlalchemy import (
     Boolean,
     DateTime,
+    ForeignKey,
     String,
     Text,
+    Uuid,
     func,
     true,
 )
@@ -13,6 +15,8 @@ from sqlalchemy.orm import (
 
 from bxk_app.database import Base
 
+import uuid
+
 
 class SmsConsent(Base):
     __tablename__ = "sms_consents"
@@ -20,6 +24,16 @@ class SmsConsent(Base):
     phone_e164: Mapped[str] = mapped_column(
         String(20),
         primary_key=True,
+    )
+
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
     )
 
     is_active: Mapped[bool] = mapped_column(

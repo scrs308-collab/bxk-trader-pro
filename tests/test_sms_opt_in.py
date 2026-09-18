@@ -2,8 +2,41 @@ from fastapi.testclient import TestClient
 
 from bxk_app import auth_middleware
 from bxk_app.main import app
+from bxk_app.authorization import (
+    require_owner_or_beta,
+)
 
 import bxk_app.routes.sms_consent as consent_route
+
+
+TEST_USER_ID = (
+    "3f574a3f-f5df-4fa1-b199-3b0eb4c82742"
+)
+
+
+def authenticated_client(monkeypatch):
+    user = {
+        "user_id": TEST_USER_ID,
+        "username": "kdixon",
+        "role": "BETA",
+    }
+
+    monkeypatch.setattr(
+        auth_middleware,
+        "verify_session_token",
+        lambda token: user,
+    )
+
+    app.dependency_overrides[
+        require_owner_or_beta
+    ] = lambda: user
+
+    client = TestClient(app)
+    client.cookies.set(
+        "bxk_session",
+        "test-session",
+    )
+    return client
 
 
 def test_sms_opt_in_page_is_public_and_unchecked(
@@ -59,7 +92,9 @@ def test_sms_opt_in_requires_affirmative_consent(
         True,
     )
 
-    client = TestClient(app)
+    client = authenticated_client(
+        monkeypatch
+    )
 
     response = client.post(
         "/api/sms/opt-in",
@@ -71,6 +106,8 @@ def test_sms_opt_in_requires_affirmative_consent(
     )
 
     assert response.status_code == 400
+
+    app.dependency_overrides.clear()
 
 
 def test_sms_opt_in_records_consent(
@@ -85,9 +122,12 @@ def test_sms_opt_in_records_consent(
     captured = {}
 
     def fake_record(
+        *,
+        user_id,
         phone_number,
     ):
         captured["phone"] = phone_number
+        captured["user_id"] = user_id
 
         return {
             "phone": "***7111",
@@ -99,11 +139,13 @@ def test_sms_opt_in_records_consent(
 
     monkeypatch.setattr(
         consent_route,
-        "record_sms_consent",
+        "record_user_sms_consent",
         fake_record,
     )
 
-    client = TestClient(app)
+    client = authenticated_client(
+        monkeypatch
+    )
 
     response = client.post(
         "/api/sms/opt-in",
@@ -125,3 +167,7 @@ def test_sms_opt_in_records_consent(
         captured["phone"]
         == "(252) 318-7111"
     )
+
+    assert captured["user_id"] == TEST_USER_ID
+
+    app.dependency_overrides.clear()

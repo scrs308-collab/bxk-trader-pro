@@ -12,6 +12,9 @@ from bxk_app.db_models.user import (
 from bxk_app.services.system_settings_service import (
     hash_app_password,
 )
+from bxk_app.services.sms_consent_service import (
+    mask_sms_phone,
+)
 
 
 ALLOWED_ADMIN_CREATED_ROLES = {
@@ -40,6 +43,14 @@ def serialize_user(
         ),
         "broker_oauth_enabled": bool(
             user.broker_oauth_enabled
+        ),
+        "sms_phone": (
+            mask_sms_phone(user.sms_phone_e164)
+            if user.sms_phone_e164
+            else None
+        ),
+        "sms_alerts_enabled": bool(
+            user.sms_alerts_enabled
         ),
         "is_active": bool(user.is_active),
         "must_change_password": bool(

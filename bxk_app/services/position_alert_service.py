@@ -24,6 +24,12 @@ from bxk_app.services.position_threat_service import (
 from bxk_app.services.sms_service import (
     send_bxk_sms,
 )
+from bxk_app.services.sms_consent_service import (
+    list_active_sms_subscriptions,
+)
+from bxk_app.services.broker_connection_service import (
+    resolve_preferred_broker,
+)
 from bxk_app.trading_session import (
     get_spx_session,
 )
@@ -129,6 +135,8 @@ def _format_number(value):
 
 def _scope_for_position(
     position: dict,
+    *,
+    scope_prefix: str = ALERT_SCOPE_PREFIX,
 ) -> str:
     signature = "|".join(
         [
@@ -152,7 +160,7 @@ def _scope_for_position(
     ).hexdigest()[:20]
 
     return (
-        f"{ALERT_SCOPE_PREFIX}:"
+        f"{scope_prefix}:"
         f"{digest}"
     )
 
@@ -313,6 +321,7 @@ def process_position_threat(
     *,
     session_factory=None,
     send_func=send_bxk_sms,
+    scope_prefix: str = ALERT_SCOPE_PREFIX,
 ):
     risk = classify_position_threat(
         position
@@ -330,7 +339,8 @@ def process_position_threat(
     )
 
     scope = _scope_for_position(
-        position
+        position,
+        scope_prefix=scope_prefix,
     )
 
     current_state = risk["state"]
@@ -452,21 +462,13 @@ def process_position_threat(
         }
 
 
-def run_daytime_alert_check():
-    if not _monitor_allowed():
-        return {
-            "action": "DISABLED",
-            "alert_sent": False,
-        }
-
-    if get_spx_session() != "RTH":
-        return {
-            "action": "SESSION_IDLE",
-            "alert_sent": False,
-        }
-
-    monitor = get_position_monitor()
-
+def _process_daytime_monitor(
+    monitor,
+    *,
+    session_factory=None,
+    send_func=send_bxk_sms,
+    scope_prefix: str = ALERT_SCOPE_PREFIX,
+):
     if (
         not isinstance(
             monitor,
@@ -486,7 +488,10 @@ def run_daytime_alert_check():
 
     results = [
         process_position_threat(
-            position
+            position,
+            session_factory=session_factory,
+            send_func=send_func,
+            scope_prefix=scope_prefix,
         )
         for position in positions
         if isinstance(
@@ -517,6 +522,129 @@ def run_daytime_alert_check():
             alert_count > 0,
         "results":
             results,
+    }
+
+
+def _run_subscriber_daytime_checks(
+    *,
+    session_factory=None,
+):
+    factory = (
+        session_factory
+        or get_session_factory()
+    )
+
+    subscriptions = (
+        list_active_sms_subscriptions(
+            session_factory=factory,
+        )
+    )
+
+    results = []
+
+    for subscription in subscriptions:
+        user_context = subscription[
+            "user_context"
+        ]
+        phone = subscription["phone_e164"]
+        user_id = str(
+            user_context["user_id"]
+        )
+
+        try:
+            with factory() as session:
+                broker_client = (
+                    resolve_preferred_broker(
+                        session,
+                        user_context=user_context,
+                    )
+                )
+
+            monitor = get_position_monitor(
+                broker_client=broker_client,
+                user_context=user_context,
+            )
+
+            result = _process_daytime_monitor(
+                monitor,
+                session_factory=factory,
+                send_func=(
+                    lambda message,
+                    recipient=phone:
+                        send_bxk_sms(
+                            message,
+                            recipient=recipient,
+                        )
+                ),
+                scope_prefix=(
+                    "USER_DAY:"
+                    + user_id.replace("-", "")[:12]
+                ),
+            )
+
+        except Exception as exc:
+            logger.warning(
+                "Subscriber daytime SMS check failed "
+                "for %s: %s",
+                user_context.get("username"),
+                type(exc).__name__,
+            )
+            result = {
+                "action": "ERROR",
+                "alert_sent": False,
+            }
+
+        results.append(
+            {
+                "username":
+                    user_context.get("username"),
+                **result,
+            }
+        )
+
+    return results
+
+
+def run_daytime_alert_check():
+    if not _monitor_allowed():
+        return {
+            "action": "DISABLED",
+            "alert_sent": False,
+        }
+
+    if get_spx_session() != "RTH":
+        return {
+            "action": "SESSION_IDLE",
+            "alert_sent": False,
+        }
+
+    owner_result = _process_daytime_monitor(
+        get_position_monitor()
+    )
+
+    subscriber_results = (
+        _run_subscriber_daytime_checks()
+    )
+
+    alert_count = int(
+        owner_result.get("alert_count", 0)
+        or 0
+    ) + sum(
+        int(result.get("alert_count", 0) or 0)
+        for result in subscriber_results
+    )
+
+    return {
+        **owner_result,
+        "action": (
+            "ALERTED"
+            if alert_count
+            else "CHECKED"
+        ),
+        "alert_count": alert_count,
+        "alert_sent": alert_count > 0,
+        "subscriber_results":
+            subscriber_results,
     }
 
 

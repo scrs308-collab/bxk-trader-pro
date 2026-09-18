@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -18,10 +19,32 @@ from bxk_app.services.overnight_alert_service import (
 from bxk_app.services.position_alert_service import (
     run_daytime_alert_monitor,
 )
+from bxk_app.services.sms_consent_service import (
+    provision_sms_phones_from_environment,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        pending_sms = (
+            provision_sms_phones_from_environment()
+        )
+
+        if pending_sms:
+            logger.info(
+                "Provisioned %s pending SMS phone "
+                "assignment(s).",
+                len(pending_sms),
+            )
+    except Exception:
+        logger.exception(
+            "Pending SMS phone provisioning failed."
+        )
+
     heartbeat_task = asyncio.create_task(
         run_market_heartbeat(),
         name="bxk-market-heartbeat",

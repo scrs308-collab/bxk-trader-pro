@@ -275,6 +275,7 @@ def get_live_overnight_risk(
     *,
     prior_spx_close=None,
     es_anchor_price=None,
+    broker_client=None,
     user_context=None,
 ):
     """
@@ -501,7 +502,16 @@ def get_live_overnight_risk(
     # Retrieve actual open SPX condor(s).
     # -------------------------------------------------
 
-    monitor = get_position_monitor()
+    if (
+        broker_client is None
+        and user_context is None
+    ):
+        monitor = get_position_monitor()
+    else:
+        monitor = get_position_monitor(
+            broker_client=broker_client,
+            user_context=user_context,
+        )
 
     positions = (
         monitor.get("positions")
