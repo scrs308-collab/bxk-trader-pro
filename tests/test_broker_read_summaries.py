@@ -6,6 +6,9 @@ from bxk_app.brokers.base import (
 from bxk_app.brokers.schwab import (
     SchwabBroker,
 )
+from bxk_app.brokers.tastytrade import (
+    TastytradeBroker,
+)
 
 
 class MinimalBroker(
@@ -268,3 +271,123 @@ def test_schwab_account_summary_returns_none_without_balances(
         broker.get_account_summary()
         is None
     )
+
+
+def test_tastytrade_position_summary_adds_live_option_quote(
+    monkeypatch,
+):
+    broker = TastytradeBroker(
+        client_secret="secret",
+        refresh_token="refresh",
+        account_number="5WT00000",
+        base_url="https://example.test",
+    )
+
+    monkeypatch.setattr(
+        broker,
+        "get_positions",
+        lambda account_number=None: [
+            {
+                "symbol":
+                    "SPXW  260921P07570000",
+                "streamer-symbol":
+                    ".SPXW260921P7570",
+                "underlying-symbol": "SPX",
+                "instrument-type":
+                    "Equity Option",
+                "quantity": "1",
+                "quantity-direction": "SHORT",
+                "average-open-price": "4.00",
+                "close-price": "0",
+                "cost-effect": "Credit",
+                "expires-at":
+                    "2026-09-21T20:00:00.000Z",
+                "multiplier": "100",
+            }
+        ],
+    )
+
+    captured = {}
+
+    def fake_quotes(symbols):
+        captured["symbols"] = symbols
+        return [
+            {
+                "symbol":
+                    "SPXW  260921P07570000",
+                "bid": "1.10",
+                "ask": "1.30",
+            }
+        ]
+
+    monkeypatch.setattr(
+        broker,
+        "get_option_quotes",
+        fake_quotes,
+    )
+
+    result = broker.get_position_summary()
+
+    assert captured["symbols"] == [
+        "SPXW  260921P07570000"
+    ]
+    assert len(result) == 1
+    assert result[0]["bid"] == 1.1
+    assert result[0]["ask"] == 1.3
+    assert result[0]["current_price"] == 1.2
+    assert result[0]["price_source"] == "live-mid"
+    assert result[0]["pnl"] == 280.0
+
+
+def test_tastytrade_option_quotes_use_authenticated_market_data(
+    monkeypatch,
+):
+    broker = TastytradeBroker()
+    captured = {}
+
+    class Response:
+        def json(self):
+            return {
+                "data": {
+                    "items": [
+                        {
+                            "symbol": "OPTION",
+                            "bid": "1.00",
+                            "ask": "1.10",
+                        }
+                    ]
+                }
+            }
+
+    def fake_request(
+        method,
+        path,
+        *,
+        params=None,
+        json_body=None,
+    ):
+        captured.update({
+            "method": method,
+            "path": path,
+            "params": params,
+        })
+        return Response()
+
+    monkeypatch.setattr(
+        broker,
+        "_request",
+        fake_request,
+    )
+
+    result = broker.get_option_quotes(
+        ["OPTION"]
+    )
+
+    assert result[0]["bid"] == "1.00"
+    assert captured == {
+        "method": "GET",
+        "path": "/market-data/by-type",
+        "params": {
+            "equity-option": "OPTION",
+        },
+    }

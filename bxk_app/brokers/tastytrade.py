@@ -925,12 +925,178 @@ class TastytradeBroker(BrokerBase):
 
     def get_position_summary(self):
         positions = self.get_positions()
+
+        option_symbols = [
+            str(position.get("symbol") or "").strip()
+            for position in positions
+            if (
+                position.get("symbol")
+                and "option" in str(
+                    position.get("instrument-type")
+                    or ""
+                ).lower()
+            )
+        ]
+
+        quotes = self.get_option_quotes(
+            option_symbols
+        )
+
+        quote_map = {}
+
+        for quote in quotes:
+            quote_symbols = {
+                str(
+                    quote.get(key) or ""
+                ).strip()
+                for key in (
+                    "eventSymbol",
+                    "streamer-symbol",
+                    "symbol",
+                    "instrument-symbol",
+                )
+            }
+
+            for quote_symbol in quote_symbols:
+                if quote_symbol:
+                    quote_map[quote_symbol] = quote
+
         summary = []
 
         for position in positions:
+            option_symbol = str(
+                position.get("symbol") or ""
+            ).strip()
+
+            streamer_symbol = str(
+                position.get("streamer-symbol")
+                or ""
+            ).strip()
+
+            quote = (
+                quote_map.get(option_symbol)
+                or quote_map.get(streamer_symbol)
+                or {}
+            )
+
+            def quote_value(*keys):
+                for key in keys:
+                    value = quote.get(key)
+
+                    if value in (None, ""):
+                        continue
+
+                    try:
+                        return float(value)
+                    except (TypeError, ValueError):
+                        continue
+
+                return 0.0
+
+            bid = quote_value(
+                "bid",
+                "bidPrice",
+                "bid-price",
+            )
+
+            ask = quote_value(
+                "ask",
+                "askPrice",
+                "ask-price",
+            )
+
+            mark = quote_value(
+                "mid",
+                "mark",
+                "dx-mark",
+            )
+
+            close_price = quote_value(
+                "close",
+                "closePrice",
+                "close-price",
+            )
+
+            if bid > 0 and ask > 0:
+                current_price = (
+                    bid + ask
+                ) / 2
+                price_source = "live-mid"
+
+            elif mark > 0:
+                current_price = mark
+                price_source = "live-mark"
+
+            else:
+                try:
+                    current_price = float(
+                        position.get(
+                            "close-price",
+                            close_price,
+                        )
+                        or close_price
+                        or 0
+                    )
+                except (TypeError, ValueError):
+                    current_price = 0.0
+
+                price_source = "close-price"
+
+            try:
+                open_price = float(
+                    position.get(
+                        "average-open-price",
+                        0,
+                    )
+                    or 0
+                )
+            except (TypeError, ValueError):
+                open_price = 0.0
+
+            try:
+                quantity = abs(
+                    float(
+                        position.get(
+                            "quantity",
+                            0,
+                        )
+                        or 0
+                    )
+                )
+            except (TypeError, ValueError):
+                quantity = 0.0
+
+            try:
+                multiplier = float(
+                    position.get(
+                        "multiplier",
+                        100,
+                    )
+                    or 100
+                )
+            except (TypeError, ValueError):
+                multiplier = 100.0
+
+            direction = str(
+                position.get(
+                    "quantity-direction",
+                    "",
+                )
+            ).upper()
+
+            if direction == "SHORT":
+                pnl = (
+                    open_price - current_price
+                ) * quantity * multiplier
+            else:
+                pnl = (
+                    current_price - open_price
+                ) * quantity * multiplier
+
             summary.append(
                 {
-                    "symbol": position.get("symbol", ""),
+                    "symbol": option_symbol,
+                    "streamer_symbol": streamer_symbol,
                     "underlying": position.get(
                         "underlying-symbol",
                         "",
@@ -951,10 +1117,15 @@ class TastytradeBroker(BrokerBase):
                         "average-open-price",
                         "0",
                     ),
-                    "close_price": position.get(
-                        "close-price",
-                        "0",
+                    "close_price": current_price,
+                    "current_price": round(
+                        current_price,
+                        4,
                     ),
+                    "bid": round(bid, 4),
+                    "ask": round(ask, 4),
+                    "price_source": price_source,
+                    "pnl": round(pnl, 2),
                     "cost_effect": position.get(
                         "cost-effect",
                         "",
@@ -971,6 +1142,40 @@ class TastytradeBroker(BrokerBase):
             )
 
         return summary
+
+    def get_option_quotes(
+        self,
+        symbols: list[str],
+    ) -> list[dict]:
+        """
+        Retrieve live option quotes for open positions.
+
+        Per-user Tastytrade connections must use their own
+        authenticated client here so Position Monitor receives
+        the same bid/ask enrichment as the legacy OWNER path.
+        """
+
+        clean_symbols = [
+            str(symbol or "").strip()
+            for symbol in symbols
+            if str(symbol or "").strip()
+        ]
+
+        if not clean_symbols:
+            return []
+
+        response = self._request(
+            "GET",
+            "/market-data/by-type",
+            params={
+                "equity-option":
+                    ",".join(clean_symbols),
+            },
+        )
+
+        return self._items_from_response(
+            response
+        )
 
     def get_account_summary(self):
         balances = self.get_balances()
