@@ -1648,6 +1648,14 @@ body[data-theme="light"] .broker-connect-message[data-state="success"] {
     border-color 0.2s ease;
 }
 
+.dashboard-tab-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+
 .dashboard-tab:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.05);

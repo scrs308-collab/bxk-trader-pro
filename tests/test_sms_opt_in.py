@@ -82,6 +82,23 @@ def test_sms_opt_in_page_is_public_and_unchecked(
         in response.text
     )
 
+    assert (
+        'href="/"'
+        in response.text
+    )
+
+
+def test_dashboard_links_to_sms_opt_in():
+    response = TestClient(app).get("/")
+
+    assert response.status_code == 200
+    assert 'href="/sms-opt-in"' in response.text
+    assert "SMS Alerts" in response.text
+    assert (
+        'data-authenticated-only="true"'
+        in response.text
+    )
+
 
 def test_sms_opt_in_requires_affirmative_consent(
     monkeypatch,
