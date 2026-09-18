@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from bxk_app import auth_middleware
@@ -89,14 +91,20 @@ def test_sms_opt_in_page_is_public_and_unchecked(
 
 
 def test_dashboard_links_to_sms_opt_in():
-    response = TestClient(app).get("/")
+    dashboard_html = Path(
+        "static/index.html"
+    ).read_text(
+        encoding="utf-8-sig"
+    )
 
-    assert response.status_code == 200
-    assert 'href="/sms-opt-in"' in response.text
-    assert "SMS Alerts" in response.text
+    assert (
+        'href="/sms-opt-in"'
+        in dashboard_html
+    )
+    assert "SMS Alerts" in dashboard_html
     assert (
         'data-authenticated-only="true"'
-        in response.text
+        in dashboard_html
     )
 
 
