@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from fastapi import (
@@ -21,6 +22,9 @@ from bxk_app.services.admin_user_service import (
     set_user_active,
     set_user_broker_oauth_access,
     set_user_broker_live_trading,
+)
+from bxk_app.services.subscription_service import (
+    set_manual_subscription_access,
 )
 
 
@@ -66,6 +70,15 @@ class AdminUserCreate(BaseModel):
         "VIEWER",
     ]
     temporary_password: str
+
+
+class AdminSubscriptionAccessUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    granted: bool | None
+    expires_at: datetime | None = None
 
 
 @router.get("")
@@ -227,4 +240,46 @@ def admin_set_broker_live_trading(
 
     return {
         "broker": broker_status,
+    }
+
+
+@router.patch(
+    "/{user_id}/subscription-access"
+)
+def admin_set_subscription_access(
+    user_id: str,
+    request_data: AdminSubscriptionAccessUpdate,
+    _owner: dict = Depends(
+        require_owner
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    try:
+        subscription = (
+            set_manual_subscription_access(
+                session,
+                user_id=user_id,
+                granted=request_data.granted,
+                expires_at=(
+                    request_data.expires_at
+                ),
+            )
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "subscription": subscription,
     }

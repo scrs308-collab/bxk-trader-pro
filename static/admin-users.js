@@ -221,6 +221,19 @@ function renderUsers(users) {
       const liveTradingEnabled =
         broker.live_trading_enabled === true;
 
+      const subscription =
+        user.subscription || {};
+
+      const manualSubscriptionAccess =
+        subscription.manual_access_granted === true;
+
+      const subscriptionLabel = isOwner
+        ? "OWNER ACCESS"
+        : manualSubscriptionAccess
+          ? "MANUAL ACCESS"
+          : subscription.status ||
+            "NO SUBSCRIPTION";
+
       const action = isOwner
         ? `
           <span class="bxk-admin-owner-protected">
@@ -245,6 +258,16 @@ function renderUsers(users) {
           : "PASSWORD SET";
 
       let brokerStatus = "";
+
+      const subscriptionStatus = `
+        <span
+          class="bxk-admin-live-status
+            ${subscription.access_granted ? "active" : "disabled"}"
+        >
+          SUBSCRIPTION:
+          ${escapeHtml(subscriptionLabel)}
+        </span>
+      `;
 
       if (isBeta) {
         brokerStatus = `
@@ -274,6 +297,24 @@ function renderUsers(users) {
       let liveTradingAction = "";
 
       let brokerOAuthAction = "";
+
+      const subscriptionAction = isOwner
+        ? ""
+        : `
+          <button
+            class="bxk-admin-users-button
+              ${manualSubscriptionAccess ? "danger" : "secondary"}"
+            type="button"
+            data-subscription-user-id="${escapeHtml(user.id)}"
+            data-subscription-manual="${manualSubscriptionAccess ? "true" : "false"}"
+          >
+            ${
+              manualSubscriptionAccess
+                ? "REMOVE MANUAL ACCESS"
+                : "GRANT MANUAL ACCESS"
+            }
+          </button>
+        `;
 
       if (isBeta) {
         brokerOAuthAction = `
@@ -352,12 +393,14 @@ function renderUsers(users) {
             </span>
 
             ${brokerStatus}
+            ${subscriptionStatus}
           </div>
 
           <div class="bxk-admin-user-action">
             ${action}
             ${brokerOAuthAction}
             ${liveTradingAction}
+            ${subscriptionAction}
           </div>
 
         </div>
@@ -429,6 +472,76 @@ function renderUsers(users) {
         },
       );
     });
+
+  container
+    .querySelectorAll(
+      "button[data-subscription-user-id]"
+    )
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        async () => {
+          const userId =
+            button.dataset.subscriptionUserId;
+
+          const hasManualAccess =
+            button.dataset.subscriptionManual === "true";
+
+          await setSubscriptionAccess(
+            userId,
+            hasManualAccess ? null : true,
+          );
+        },
+      );
+    });
+}
+
+
+async function setSubscriptionAccess(
+  userId,
+  granted,
+) {
+  try {
+    const response =
+      await fetch(
+        `${USERS_URL}/${userId}/subscription-access`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            granted,
+          }),
+        },
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+        "Unable to update subscription access."
+      );
+    }
+
+    setMessage(
+      granted === true
+        ? "Manual subscription access granted."
+        : "Manual subscription access removed.",
+      "success",
+    );
+
+    await loadUsers();
+
+  } catch (error) {
+    setMessage(
+      error.message,
+      "error",
+    );
+  }
 }
 
 

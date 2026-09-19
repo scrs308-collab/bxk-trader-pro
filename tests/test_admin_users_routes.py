@@ -227,6 +227,67 @@ def test_owner_can_list_admin_users(
 
     for user in body["users"]:
         assert "password_hash" not in user
+        assert "subscription" in user
+
+
+def test_owner_can_grant_manual_subscription_access(
+    monkeypatch,
+):
+    factory = make_session_factory()
+
+    owner_id = add_user(
+        factory,
+        username="owner_subscription",
+        email="owner_subscription@example.com",
+        role=UserRole.OWNER,
+    )
+
+    beta_id = add_user(
+        factory,
+        username="beta_subscription",
+        email="beta_subscription@example.com",
+        role=UserRole.BETA,
+    )
+
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    monkeypatch.setattr(
+        config,
+        "BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED",
+        True,
+    )
+
+    client = client_with_user(
+        owner_id
+    )
+
+    response = client.patch(
+        (
+            f"/api/admin/users/{beta_id}"
+            "/subscription-access"
+        ),
+        json={
+            "granted": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    subscription = response.json()[
+        "subscription"
+    ]
+
+    assert (
+        subscription["access_granted"]
+        is True
+    )
+    assert (
+        subscription["access_reason"]
+        == "MANUAL_ACCESS"
+    )
 
 
 def test_owner_can_create_beta_user(

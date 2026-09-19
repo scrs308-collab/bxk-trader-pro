@@ -118,6 +118,24 @@ BXK_AUTH_COOKIE_SECURE = (
     in {"1", "true", "yes", "on"}
 )
 
+
+# ===============================
+# Subscription Access
+# ===============================
+
+# Keep enforcement disabled until hosted billing,
+# webhooks, and initial customer entitlements are
+# configured in production.
+BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED = (
+    os.getenv(
+        "BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
 if (
     BXK_AUTH_ENABLED
     and len(BXK_SESSION_SECRET) < 32

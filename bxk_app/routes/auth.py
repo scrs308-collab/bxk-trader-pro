@@ -210,6 +210,11 @@ def auth_status(request: Request):
             if session
             else False
         ),
+        "subscription": (
+            session.get("subscription")
+            if session
+            else None
+        ),
         "must_change_password": (
             session.get(
                 "must_change_password",
@@ -286,6 +291,9 @@ def login(
         "user_id": authentication["user_id"],
         "username": authentication["username"],
         "role": authentication["role"],
+        "subscription": authentication.get(
+            "subscription"
+        ),
         "must_change_password":
             authentication[
                 "must_change_password"

@@ -4,9 +4,11 @@ from fastapi import HTTPException, Request
 from bxk_app.authorization import (
     BROKER_OAUTH_ACCESS_DETAIL,
     OWNER_ACCESS_DETAIL,
+    SUBSCRIPTION_ACCESS_DETAIL,
     get_authenticated_user,
     require_broker_oauth_access,
     require_owner,
+    require_owner_or_beta,
 )
 from bxk_app.db_models.user import UserRole
 
@@ -203,4 +205,58 @@ def test_unapproved_user_lacks_broker_oauth_access(
     assert (
         exc_info.value.detail
         == BROKER_OAUTH_ACCESS_DETAIL
+    )
+
+
+def test_subscription_enforcement_blocks_unpaid_beta(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "bxk_app.config."
+        "BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED",
+        True,
+    )
+
+    request = make_request(
+        {
+            "role": "BETA",
+            "subscription": {
+                "access_granted": False,
+            },
+        }
+    )
+
+    with pytest.raises(
+        HTTPException
+    ) as exc_info:
+        require_owner_or_beta(request)
+
+    assert exc_info.value.status_code == 402
+    assert (
+        exc_info.value.detail
+        == SUBSCRIPTION_ACCESS_DETAIL
+    )
+
+
+def test_subscription_enforcement_allows_paid_beta(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "bxk_app.config."
+        "BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED",
+        True,
+    )
+
+    request = make_request(
+        {
+            "role": "BETA",
+            "subscription": {
+                "access_granted": True,
+            },
+        }
+    )
+
+    assert (
+        require_owner_or_beta(request)["role"]
+        == "BETA"
     )

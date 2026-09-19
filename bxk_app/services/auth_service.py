@@ -20,6 +20,9 @@ from bxk_app.services.system_settings_service import (
     hash_app_password,
     verify_app_password,
 )
+from bxk_app.services.subscription_service import (
+    get_subscription_access,
+)
 
 
 SESSION_COOKIE_NAME = "bxk_session"
@@ -254,6 +257,7 @@ def authenticate_database_credentials(
         "role": None,
         "broker_oauth_enabled": False,
         "must_change_password": False,
+        "subscription": None,
     }
 
     if not database_configured():
@@ -318,6 +322,12 @@ def authenticate_database_credentials(
                 ),
                 "must_change_password": bool(
                     user.must_change_password
+                ),
+                "subscription": (
+                    get_subscription_access(
+                        session,
+                        user,
+                    )
                 ),
             }
 
@@ -425,6 +435,23 @@ def authenticate_credentials(
             "role": "OWNER",
             "broker_oauth_enabled": True,
             "must_change_password": False,
+            "subscription": {
+                "enforcement_enabled": bool(
+                    config
+                    .BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED
+                ),
+                "access_granted": True,
+                "access_reason": "OWNER_BYPASS",
+                "plan": None,
+                "status": None,
+                "provider": None,
+                "current_period_end": None,
+                "trial_ends_at": None,
+                "grace_period_ends_at": None,
+                "cancel_at_period_end": False,
+                "manual_access_granted": None,
+                "manual_access_expires_at": None,
+            },
             "auth_source": "CONFIG",
         }
 
@@ -645,6 +672,23 @@ def verify_session_token(
                 "role": "OWNER",
                 "broker_oauth_enabled": True,
                 "must_change_password": False,
+                "subscription": {
+                    "enforcement_enabled": bool(
+                        config
+                        .BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED
+                    ),
+                    "access_granted": True,
+                    "access_reason": "OWNER_BYPASS",
+                    "plan": None,
+                    "status": None,
+                    "provider": None,
+                    "current_period_end": None,
+                    "trial_ends_at": None,
+                    "grace_period_ends_at": None,
+                    "cancel_at_period_end": False,
+                    "manual_access_granted": None,
+                    "manual_access_expires_at": None,
+                },
                 "auth_source": "CONFIG",
                 "issued_at": issued_at,
                 "expires_at": expires_at,
@@ -689,6 +733,12 @@ def verify_session_token(
                     ),
                     "must_change_password": bool(
                         user.must_change_password
+                    ),
+                    "subscription": (
+                        get_subscription_access(
+                            session,
+                            user,
+                        )
                     ),
                     "auth_source": "DATABASE",
                     "issued_at": issued_at,

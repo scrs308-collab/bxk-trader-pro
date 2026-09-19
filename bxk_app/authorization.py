@@ -14,6 +14,11 @@ BROKER_OAUTH_ACCESS_DETAIL = (
     "for this BXK account."
 )
 
+SUBSCRIPTION_ACCESS_DETAIL = (
+    "An active BXK Trader Pro subscription "
+    "is required."
+)
+
 
 def get_authenticated_user(
     request: Request,
@@ -107,6 +112,28 @@ def require_owner_or_beta(
                 "OWNER or BETA permission."
             ),
         )
+
+    if (
+        normalized_role != UserRole.OWNER.value
+        and config
+        .BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED
+    ):
+        subscription = user.get(
+            "subscription"
+        )
+
+        if (
+            not isinstance(subscription, dict)
+            or subscription.get(
+                "access_granted"
+            ) is not True
+        ):
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    SUBSCRIPTION_ACCESS_DETAIL
+                ),
+            )
 
     return user
 

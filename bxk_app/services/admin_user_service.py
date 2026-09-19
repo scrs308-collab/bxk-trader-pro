@@ -15,6 +15,9 @@ from bxk_app.services.system_settings_service import (
 from bxk_app.services.sms_consent_service import (
     mask_sms_phone,
 )
+from bxk_app.services.subscription_service import (
+    get_subscription_access,
+)
 
 
 ALLOWED_ADMIN_CREATED_ROLES = {
@@ -25,6 +28,8 @@ ALLOWED_ADMIN_CREATED_ROLES = {
 
 def serialize_user(
     user: User,
+    *,
+    session: Session | None = None,
 ) -> dict:
     """
     Return safe user information.
@@ -32,7 +37,7 @@ def serialize_user(
     Password hashes are intentionally never exposed.
     """
 
-    return {
+    payload = {
         "id": str(user.id),
         "username": user.username,
         "email": user.email,
@@ -68,6 +73,16 @@ def serialize_user(
         ),
     }
 
+    if session is not None:
+        payload["subscription"] = (
+            get_subscription_access(
+                session,
+                user,
+            )
+        )
+
+    return payload
+
 
 def list_users(
     session: Session,
@@ -96,7 +111,8 @@ def list_users(
 
     for user in users:
         payload = serialize_user(
-            user
+            user,
+            session=session,
         )
 
         connection = (
@@ -244,7 +260,10 @@ def create_user(
 
     session.refresh(user)
 
-    return serialize_user(user)
+    return serialize_user(
+        user,
+        session=session,
+    )
 
 def set_user_active(
     session: Session,
@@ -304,7 +323,10 @@ def set_user_active(
     session.commit()
     session.refresh(user)
 
-    return serialize_user(user)
+    return serialize_user(
+        user,
+        session=session,
+    )
 
 
 def set_user_broker_live_trading(
@@ -476,4 +498,7 @@ def set_user_broker_oauth_access(
     session.commit()
     session.refresh(user)
 
-    return serialize_user(user)
+    return serialize_user(
+        user,
+        session=session,
+    )

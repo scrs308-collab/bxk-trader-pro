@@ -20,7 +20,7 @@ def test_dashboard_initializes_admin_users():
     )
 
     assert "initializeAdminUsers" in text
-    assert "./admin-users.js?v=3" in text
+    assert "./admin-users.js?v=4" in text
 
 
 def test_admin_users_checks_owner_role():
