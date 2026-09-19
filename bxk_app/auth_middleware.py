@@ -29,6 +29,7 @@ PUBLIC_PATHS = {
     "/api/auth/logout",
     "/api/auth/status",
     "/api/auth/forgot-password",
+    "/api/billing/webhook",
     "/api/broker-connection/schwab/callback",
 }
 

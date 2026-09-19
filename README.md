@@ -78,6 +78,19 @@ Development Branch:
 
 ---
 
+### Subscription Billing
+
+- Stripe-hosted monthly and annual Checkout
+- Stripe Customer Portal for invoices, payment methods,
+  renewals, and cancellation
+- Signed, idempotent webhook processing
+- Automatic subscription entitlement synchronization
+- Owner and time-limited manual access overrides
+- Subscription enforcement remains off until billing is
+  fully configured and explicitly enabled
+
+---
+
 # Technology Stack
 
 - Python
@@ -131,6 +144,9 @@ See the **docs** folder for:
 - Trading Logic
 - Roadmap
 - Change Log
+
+Stripe production setup and rollout instructions are in
+[`docs/stripe-billing.md`](docs/stripe-billing.md).
 
 ---
 

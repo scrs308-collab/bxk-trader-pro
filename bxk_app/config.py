@@ -136,6 +136,57 @@ BXK_SUBSCRIPTION_ENFORCEMENT_ENABLED = (
     in {"1", "true", "yes", "on"}
 )
 
+# Stripe Billing remains independently disabled until
+# products, prices, the Customer Portal, and the webhook
+# endpoint are configured in Stripe production mode.
+BXK_BILLING_ENABLED = (
+    os.getenv(
+        "BXK_BILLING_ENABLED",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
+STRIPE_SECRET_KEY = os.getenv(
+    "STRIPE_SECRET_KEY",
+    "",
+).strip()
+
+STRIPE_WEBHOOK_SECRET = os.getenv(
+    "STRIPE_WEBHOOK_SECRET",
+    "",
+).strip()
+
+STRIPE_PRICE_PRO_MONTHLY = os.getenv(
+    "STRIPE_PRICE_PRO_MONTHLY",
+    "",
+).strip()
+
+STRIPE_PRICE_PRO_ANNUAL = os.getenv(
+    "STRIPE_PRICE_PRO_ANNUAL",
+    "",
+).strip()
+
+BXK_PUBLIC_APP_URL = os.getenv(
+    "BXK_PUBLIC_APP_URL",
+    "https://app.bxktraderpro.com",
+).strip().rstrip("/")
+
+BXK_STRIPE_PAST_DUE_GRACE_DAYS = int(
+    os.getenv(
+        "BXK_STRIPE_PAST_DUE_GRACE_DAYS",
+        "3",
+    )
+)
+
+if BXK_STRIPE_PAST_DUE_GRACE_DAYS < 0:
+    raise ValueError(
+        "BXK_STRIPE_PAST_DUE_GRACE_DAYS cannot "
+        "be negative."
+    )
+
 if (
     BXK_AUTH_ENABLED
     and len(BXK_SESSION_SECRET) < 32

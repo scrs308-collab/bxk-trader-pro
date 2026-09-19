@@ -173,6 +173,13 @@ def change_password_page():
     )
 
 
+@app.get("/subscription")
+def subscription_page():
+    return FileResponse(
+        "static/subscription.html"
+    )
+
+
 @app.get("/")
 def home(
     request: Request,

@@ -20,6 +20,17 @@ ACCESSIBLE_STATUSES = {
 }
 
 
+def _configured_stripe_prices() -> set[str]:
+    return {
+        str(price_id).strip()
+        for price_id in (
+            config.STRIPE_PRICE_PRO_MONTHLY,
+            config.STRIPE_PRICE_PRO_ANNUAL,
+        )
+        if str(price_id or "").strip()
+    }
+
+
 def _enum_value(value) -> str | None:
     if value is None:
         return None
@@ -119,6 +130,14 @@ def evaluate_subscription_access(
     ):
         granted = True
         reason = "MANUAL_ACCESS"
+    elif (
+        subscription.provider
+        == SubscriptionProvider.STRIPE
+        and subscription.provider_price_id
+        not in _configured_stripe_prices()
+    ):
+        granted = False
+        reason = "UNRECOGNIZED_PRICE"
     elif (
         subscription.status
         in ACCESSIBLE_STATUSES

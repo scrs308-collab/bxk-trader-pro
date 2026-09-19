@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subscription | BXK Trader Pro</title>
+  <link rel="stylesheet" href="/static/style.css?v=25" />
+  <link rel="icon" href="/static/favicon.ico" />
+  <style>
+    .billing-shell {
+      width: min(960px, calc(100% - 32px));
+      margin: 42px auto;
+    }
+    .billing-header {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .billing-header h1 { margin: 0 0 6px; }
+    .billing-header p { margin: 0; opacity: .72; }
+    .billing-back {
+      color: inherit;
+      text-decoration: none;
+      border: 1px solid rgba(128, 128, 128, .35);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .billing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .billing-card {
+      border: 1px solid rgba(128, 128, 128, .28);
+      border-radius: 14px;
+      padding: 24px;
+      background: rgba(255, 255, 255, .03);
+    }
+    .billing-card h2 { margin-top: 0; }
+    .billing-card button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .billing-card button:disabled {
+      cursor: not-allowed;
+      opacity: .5;
+    }
+    .billing-status {
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(128, 128, 128, .28);
+    }
+    .billing-message {
+      margin-bottom: 18px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: rgba(35, 165, 90, .15);
+    }
+    .billing-message.error {
+      background: rgba(204, 56, 56, .16);
+    }
+    .billing-muted { opacity: .7; }
+    @media (max-width: 700px) {
+      .billing-grid { grid-template-columns: 1fr; }
+      .billing-header { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="billing-shell">
+    <header class="billing-header">
+      <div>
+        <h1>BXK Trader Pro Billing</h1>
+        <p>Subscription status and secure Stripe billing.</p>
+      </div>
+      <a class="billing-back" href="/">Back to Trader Pro</a>
+    </header>
+
+    <div id="billingMessage" class="billing-message" hidden></div>
+
+    <section id="billingStatus" class="billing-status">
+      Loading subscription status…
+    </section>
+
+    <div class="billing-grid">
+      <section class="billing-card">
+        <h2>Monthly</h2>
+        <p>BXK Trader Pro access billed each month.</p>
+        <p class="billing-muted">
+          The final price and renewal terms appear in Stripe Checkout.
+        </p>
+        <button id="monthlyCheckout" type="button" disabled>
+          Choose Monthly
+        </button>
+      </section>
+
+      <section class="billing-card">
+        <h2>Annual</h2>
+        <p>BXK Trader Pro access billed once per year.</p>
+        <p class="billing-muted">
+          The final price and renewal terms appear in Stripe Checkout.
+        </p>
+        <button id="annualCheckout" type="button" disabled>
+          Choose Annual
+        </button>
+      </section>
+    </div>
+
+    <section class="billing-card" style="margin-top: 18px;">
+      <h2>Manage Billing</h2>
+      <p>
+        Update payment details, review invoices, or schedule cancellation
+        in Stripe's secure Customer Portal.
+      </p>
+      <button id="manageBilling" type="button" disabled>
+        Manage Billing
+      </button>
+    </section>
+  </main>
+
+  <script type="module" src="/static/subscription-billing.js?v=1"></script>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

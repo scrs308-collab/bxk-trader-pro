@@ -8,3 +8,4 @@ SQLAlchemy
 psycopg[binary]
 alembic
 cryptography==50.0.1
+stripe==15.6.1

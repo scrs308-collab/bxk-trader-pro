@@ -146,6 +146,21 @@ class UserSubscription(Base):
         )
     )
 
+    # Used to reject stale, out-of-order Stripe events.
+    provider_event_created_at: Mapped[
+        object | None
+    ] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    provider_event_id: Mapped[
+        str | None
+    ] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     manual_access_granted: Mapped[
         bool | None
     ] = mapped_column(
