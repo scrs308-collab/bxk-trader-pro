@@ -45,6 +45,7 @@ img{max-width:100%}
 }
 .nav-links{display:flex;align-items:center;gap:24px;color:var(--muted);font-size:.94rem}
 .nav-links a:hover{color:var(--text)}
+.nav-links a[aria-current="page"]{color:var(--text)}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   border:1px solid var(--line);border-radius:12px;padding:11px 16px;
@@ -145,6 +146,39 @@ h1{font-size:clamp(2.8rem,6vw,5.6rem);line-height:.97;margin:22px 0 24px;letter-
 }
 .cta h2{font-size:clamp(2rem,4vw,3.5rem);letter-spacing:-.04em;margin:0 0 12px}
 .cta p{max-width:700px;margin:0 auto 24px;color:var(--muted)}
+.cta-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.subscription-hero{padding-bottom:52px}
+.subscription-hero p{max-width:760px;color:var(--muted);font-size:1.1rem}
+.subscription-section{padding-top:0}
+.subscription-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.subscription-card{
+  display:flex;flex-direction:column;align-items:flex-start;min-height:390px;padding:28px;
+  border:1px solid var(--line);border-radius:var(--radius);
+  background:linear-gradient(180deg,var(--panel),rgba(16,29,48,.72))
+}
+.subscription-card.featured{
+  border-color:rgba(79,209,197,.34);
+  box-shadow:0 18px 56px rgba(79,209,197,.08)
+}
+.subscription-card-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.subscription-badge{
+  padding:6px 10px;border:1px solid var(--line);border-radius:999px;
+  color:#cbd5e1;font-size:.72rem;font-weight:850;text-transform:uppercase;letter-spacing:.05em
+}
+.subscription-badge.live{color:#9ff3c8;border-color:rgba(110,231,183,.25);background:rgba(110,231,183,.07)}
+.subscription-badge.pending{color:#fde68a;border-color:rgba(251,191,36,.25);background:rgba(251,191,36,.07)}
+.subscription-kicker{color:#7f91a8;font-size:.78rem;font-weight:750}
+.subscription-card h2{margin:24px 0 10px;font-size:1.55rem;line-height:1.15;letter-spacing:-.025em}
+.subscription-card p{margin:0 0 26px;color:var(--muted)}
+.subscription-card .btn{margin-top:auto}
+.subscription-list{display:grid;gap:12px;margin:4px 0 0;padding:0;list-style:none;color:#d6e0ec}
+.subscription-list li{display:flex;gap:10px}
+.subscription-list li::before{content:"✓";color:var(--accent2);font-weight:900}
+.subscription-note{
+  margin-top:20px;padding:18px 20px;border:1px solid rgba(251,191,36,.22);
+  border-radius:14px;background:rgba(251,191,36,.055);color:#d8c982
+}
+.subscription-note strong{color:#fde68a}
 .footer{border-top:1px solid var(--line);padding:34px 0 44px;color:#8798ac;font-size:.85rem}
 .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:24px}
 .footer-links{display:flex;gap:16px;flex-wrap:wrap}
@@ -154,10 +188,13 @@ h1{font-size:clamp(2.8rem,6vw,5.6rem);line-height:.97;margin:22px 0 24px;letter-
 .content-card{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:var(--radius);padding:30px}
 .content-card h2{margin-top:30px}.content-card h2:first-child{margin-top:0}
 .content-card p,.content-card li{color:var(--muted)}
+.content-card a{color:#baf3ea;text-decoration:underline;text-underline-offset:3px}
 .notice{padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,.22);background:rgba(251,191,36,.055);color:#fde68a}
 .menu-btn{display:none}
 @media (max-width:900px){
   .hero-grid,.split{grid-template-columns:1fr}
+  .subscription-grid{grid-template-columns:1fr}
+  .subscription-card{min-height:0}
   .mockup{transform:none}
   .grid-3{grid-template-columns:1fr 1fr}
   .nav-links{display:none}
