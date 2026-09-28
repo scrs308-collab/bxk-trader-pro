@@ -164,7 +164,16 @@ def get_best_trade(
     dte: int = 1,
     wing_width: int = 25,
     contracts: int = 1,
+    target_pop: int | None = None,
 ):
+    if target_pop is not None and target_pop not in (70, 75, 80):
+        raise ValueError("target_pop must be 70, 75, or 80")
+    if target_pop is not None and strategy not in ("auto", "iron_condor"):
+        return {
+            "status": "UNSUPPORTED_POP_TARGET",
+            "best_trade": None,
+            "message": "POP targets currently apply to SPX iron condors only.",
+        }
     market = run_trade_quality()
 
     if strategy in DEBIT_NAMES:
@@ -228,8 +237,17 @@ def get_best_trade(
             }
 
         selected_strategy = (
-            approved_strategies[0]["name"]
+            "Iron Condor" if target_pop is not None and any(
+                item["name"] == "Iron Condor" for item in approved_strategies
+            ) else approved_strategies[0]["name"]
         )
+        if target_pop is not None and selected_strategy != "Iron Condor":
+            return {
+                "status": "NO APPROVED STRATEGY",
+                "best_trade": None,
+                "message": "Iron condors are not approved in the current market.",
+                "requested_target_pop": target_pop,
+            }
 
     elif strategy == "bull_put_credit_spread":
         selected_strategy = "Bull Put Credit Spread"
@@ -259,6 +277,7 @@ def get_best_trade(
             wing_width=wing_width,
             days_to_expiration=dte,
             min_credit=1.00,
+            target_pop=target_pop,
         )
 
     if isinstance(result, dict):
@@ -266,6 +285,7 @@ def get_best_trade(
         result["requested_strategy"] = strategy
         result["requested_dte"] = dte
         result["requested_wing_width"] = wing_width
+        result["requested_target_pop"] = target_pop
 
         best_trade = result.get("best_trade")
 

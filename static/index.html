@@ -6,7 +6,7 @@
 
   <title>BXK Trader Pro</title>
 
-  <link rel="stylesheet" href="/static/style.css?v=25" />
+  <link rel="stylesheet" href="/static/style.css?v=26" />
   <link rel="stylesheet" href="/static/position-v10.css?v=1" />
   <link rel="icon" href="/static/favicon.ico" />
 </head>
@@ -213,6 +213,17 @@
       <option value="6">6</option>
       <option value="10">10</option>
     </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="popTargetSelector">Condor POP target</label>
+    <select id="popTargetSelector" aria-describedby="popTargetHelp">
+      <option value="" selected>Auto (current selection)</option>
+      <option value="80">80% · Conservative</option>
+      <option value="75">75% · Balanced</option>
+      <option value="70">70% · Higher premium</option>
+    </select>
+    <small id="popTargetHelp">Delta based estimate that both shorts expire OTM. Each short's OTM% differs. Quality scores use the selected profile.</small>
   </div>
 
   <div class="trade-parameter trade-parameter-action">
