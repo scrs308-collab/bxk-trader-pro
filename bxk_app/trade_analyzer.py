@@ -63,6 +63,9 @@ def analyze_trade(trade: dict):
         trade.get("pop"),
         0,
     )
+    target_pop = trade.get("target_pop")
+    pop_adjustment = (80 - target_pop) if target_pop in (70, 75, 80) else 0
+    scored_pop = min(100, pop + pop_adjustment) if pop > 0 else pop
 
     touch_raw = trade.get(
         "probability_of_touch"
@@ -88,6 +91,12 @@ def analyze_trade(trade: dict):
                 2 * (100 - pop),
                 1,
             ),
+        )
+    scored_touch = max(0, touch - pop_adjustment) if touch is not None else None
+    if pop_adjustment:
+        reasons.append(
+            f"Quality score uses the selected {target_pop}% condor POP profile; "
+            f"actual estimated POP is {pop:.1f}%."
         )
 
     risk_reward = safe_float(
@@ -183,7 +192,7 @@ def analyze_trade(trade: dict):
     # PROBABILITY OF PROFIT - 25 POINTS
     # =====================================================
 
-    if pop >= 90:
+    if scored_pop >= 90:
         score += 25
         strengths.append(
             {
@@ -192,7 +201,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif pop >= 85:
+    elif scored_pop >= 85:
         score += 22
         strengths.append(
             {
@@ -201,7 +210,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif pop >= 80:
+    elif scored_pop >= 80:
         score += 18
         strengths.append(
             {
@@ -210,7 +219,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif pop >= 75:
+    elif scored_pop >= 75:
         score += 13
         weaknesses.append(
             {
@@ -240,7 +249,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif touch <= 20:
+    elif scored_touch <= 20:
         score += 20
         strengths.append(
             {
@@ -249,7 +258,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif touch <= 30:
+    elif scored_touch <= 30:
         score += 17
         strengths.append(
             {
@@ -258,7 +267,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif touch <= 40:
+    elif scored_touch <= 40:
         score += 13
         strengths.append(
             {
@@ -267,7 +276,7 @@ def analyze_trade(trade: dict):
             }
         )
 
-    elif touch <= 50:
+    elif scored_touch <= 50:
         score += 7
         weaknesses.append(
             {

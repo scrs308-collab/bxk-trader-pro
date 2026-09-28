@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from typing import Literal
 from bxk_app.debit_strategies import STRATEGY_PATTERN
 
 from bxk_app.authorization import (
@@ -104,12 +105,14 @@ def best_trade(
         ge=1,
         le=50,
     ),
+    target_pop: Literal[70, 75, 80] | None = Query(default=None),
 ):
     return get_best_trade(
         strategy=strategy,
         dte=dte,
         wing_width=wing_width,
         contracts=contracts,
+        target_pop=target_pop,
     )
 
 

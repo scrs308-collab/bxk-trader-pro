@@ -77,6 +77,11 @@ const selectedContracts =
   contractsSelector?.value ??
   "1";
 
+const selectedTargetPop =
+  overrides.targetPop ??
+  el("popTargetSelector")?.value ??
+  "";
+
 const params = new URLSearchParams({
   strategy: selectedStrategy,
   dte: selectedDte,
@@ -84,6 +89,9 @@ const params = new URLSearchParams({
   contracts: selectedContracts,
   _: Date.now().toString(),
 });
+if (selectedTargetPop) {
+  params.set("target_pop", selectedTargetPop);
+}
 
 const response = await fetch(
   `${BEST_TRADE_URL}?${params.toString()}`,
@@ -537,7 +545,7 @@ const buyingPower =
         </div>
 
         <div class="setup-metric">
-          <span>POP</span>
+          <span>Condor POP${selectedTargetPop ? ` (target ${selectedTargetPop}%)` : ""}</span>
           <strong>
             ${
               pop > 0
@@ -546,6 +554,12 @@ const buyingPower =
             }
           </strong>
         </div>
+        ${trade.short_put_delta != null && trade.short_call_delta != null ? `
+          <div class="setup-metric">
+            <span>Short put / call OTM estimate</span>
+            <strong>${formatNumber((1 - Math.abs(Number(trade.short_put_delta))) * 100, 1)}% / ${formatNumber((1 - Math.abs(Number(trade.short_call_delta))) * 100, 1)}%</strong>
+          </div>
+        ` : ""}
 
         <div class="setup-metric">
           <span>Max Risk</span>
@@ -556,6 +570,13 @@ const buyingPower =
                 : "--"
             }
           </strong>
+        </div>
+
+        <div class="setup-metric">
+          <span>Max profit / max risk</span>
+          <strong>${credit > 0 && maxRisk > 0
+            ? `${formatNumber((credit * 100) / maxRisk * 100, 1)}%`
+            : "--"}</strong>
         </div>
 
         <div class="setup-metric">
@@ -633,6 +654,7 @@ const buyingPower =
             dte: selectedDte,
             wingWidth: selectedWingWidth,
             contracts: selectedContracts,
+            targetPop: selectedTargetPop,
           });
         },
       );
@@ -662,6 +684,9 @@ const buyingPower =
                 contracts:
                   selectedContracts,
               });
+            if (selectedTargetPop) {
+              previewParams.set("target_pop", selectedTargetPop);
+            }
 
             const previewResponse =
               await fetch(

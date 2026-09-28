@@ -428,6 +428,7 @@ def generate_candidate_condors(
     expected_move: float,
     wing_width: int | None = None,
     days_to_expiration: int = 0,
+    search_points: int | None = None,
 ):
     """
     Generate a grid of potential SPX iron condors.
@@ -449,7 +450,8 @@ def generate_candidate_condors(
     target_put = spx_price - expected_move
     target_call = spx_price + expected_move
 
-    search_points = scanner_settings.search_points
+    if search_points is None:
+        search_points = scanner_settings.search_points
     strike_increment = (
         scanner_settings.strike_increment
     )

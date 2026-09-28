@@ -156,6 +156,7 @@ def build_best_trade(
     min_credit: float = 1.00,
     strategy: str = "auto",
     contracts: int = 1,
+    target_pop: int | None = None,
 ):
 
     """
@@ -207,6 +208,7 @@ def build_best_trade(
         expected_move=expected_move,
         wing_width=wing_width,
         days_to_expiration=days_to_expiration,
+        search_points=(100 if target_pop is not None else None),
     )
 
     if not raw_candidates:
@@ -396,6 +398,15 @@ def build_best_trade(
                 credit_data["pop"]
             )
 
+        if target_pop is not None:
+            measured_pop = best_candidate["pop"]
+            # A target must be supported by current short-leg deltas.
+            # Stay within four percentage points of the requested POP.
+            if (measured_pop is None or
+                    not target_pop <= measured_pop <= target_pop + 4):
+                continue
+            best_candidate["target_pop"] = target_pop
+
         if credit_data.get(
             "probability_of_touch"
         ) is not None:
@@ -440,15 +451,21 @@ def build_best_trade(
             "status": "NO QUALIFYING TRADES",
             "best_trade": None,
             "message": (
-                "No live Iron Condor candidates "
-                "passed the trade filters."
+                f"No live iron condor matched the {target_pop}% POP target "
+                "within four points with valid quotes and credit."
+                if target_pop is not None else
+                "No live Iron Condor candidates passed the trade filters."
             ),
         }
 
-    ranked.sort(
-        key=lambda item: item["trade_score"],
-        reverse=True,
-    )
+    if target_pop is None:
+        ranked.sort(key=lambda item: item["trade_score"], reverse=True)
+    else:
+        ranked.sort(key=lambda item: (
+            item["final_decision"] == "NO TRADE",
+            item["pop"] - target_pop,
+            -item["trade_score"],
+        ))
 
     return {
         "status": "OK",

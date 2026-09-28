@@ -5,6 +5,7 @@ import secrets
 import threading
 import time
 from datetime import date, datetime
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -1176,12 +1177,14 @@ def _build_current_order(
     dte: int,
     wing_width: int,
     contracts: int,
+    target_pop: int | None = None,
 ):
     result = get_best_trade(
         strategy=strategy,
         dte=dte,
         wing_width=wing_width,
         contracts=contracts,
+        target_pop=target_pop,
     )
 
     trade = result.get("best_trade")
@@ -1203,6 +1206,7 @@ def order_preview(
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
+    target_pop: Literal[70, 75, 80] | None = Query(default=None),
     user_context: dict = Depends(
         require_owner_or_beta
     ),
@@ -1220,6 +1224,7 @@ def order_preview(
         dte,
         wing_width,
         contracts,
+        target_pop,
     )
 
     if not trade:
