@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, Query
-from typing import Literal
+from fastapi import APIRouter, Depends, HTTPException, Query
 from bxk_app.debit_strategies import STRATEGY_PATTERN
 
 from bxk_app.authorization import (
@@ -105,8 +104,10 @@ def best_trade(
         ge=1,
         le=50,
     ),
-    target_pop: Literal[70, 75, 80] | None = Query(default=None),
+    target_pop: int | None = None,
 ):
+    if target_pop is not None and target_pop not in (70, 75, 80):
+        raise HTTPException(status_code=422, detail="target_pop must be 70, 75, or 80")
     return get_best_trade(
         strategy=strategy,
         dte=dte,

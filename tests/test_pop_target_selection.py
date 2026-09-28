@@ -1,7 +1,34 @@
 from types import SimpleNamespace
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from bxk_app import trade_builder
 from bxk_app.trade_analyzer import analyze_trade
+
+
+def test_pop_target_query_is_accepted_by_scanner_and_order_preview(monkeypatch):
+    from bxk_app.routes import order, scanner
+
+    app = FastAPI()
+    app.include_router(scanner.router)
+    app.include_router(order.router)
+    app.dependency_overrides[order.require_owner_or_beta] = lambda: {"role": "OWNER"}
+    app.dependency_overrides[order.get_db] = lambda: None
+    monkeypatch.setattr(scanner, "get_best_trade", lambda **kwargs: kwargs)
+    monkeypatch.setattr(order, "_build_current_order", lambda *args: (None, None))
+
+    client = TestClient(app)
+    for target in (70, 75, 80):
+        response = client.get(f"/api/best-trade?target_pop={target}")
+        assert response.status_code == 200, response.json()
+        assert response.json()["target_pop"] == target
+
+        preview = client.get(f"/api/order-preview?target_pop={target}")
+        assert preview.status_code == 200, preview.json()
+        assert preview.json()["status"] == "NO_TRADE"
+
+    assert client.get("/api/best-trade?target_pop=71").status_code == 422
+    assert client.get("/api/order-preview?target_pop=71").status_code == 422
 
 
 def test_pop_target_selects_nearest_live_condor_and_keeps_strikes(monkeypatch):

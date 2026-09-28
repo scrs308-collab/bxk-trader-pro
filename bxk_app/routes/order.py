@@ -5,7 +5,6 @@ import secrets
 import threading
 import time
 from datetime import date, datetime
-from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -1206,7 +1205,7 @@ def order_preview(
     dte: int = Query(1, ge=0, le=_MAX_ORDER_DTE),
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
-    target_pop: Literal[70, 75, 80] | None = Query(default=None),
+    target_pop: int | None = None,
     user_context: dict = Depends(
         require_owner_or_beta
     ),
@@ -1218,6 +1217,9 @@ def order_preview(
     Build a broker-independent preview from the current best trade.
     This endpoint cannot submit an order.
     """
+
+    if target_pop is not None and target_pop not in (70, 75, 80):
+        raise HTTPException(status_code=422, detail="target_pop must be 70, 75, or 80")
 
     trade, order = _build_current_order(
         strategy,
