@@ -92,7 +92,7 @@
     type="button"
     class="dashboard-tab"
     data-tab="systemTab"
-    data-owner-only="true"
+    data-trading-only="true"
   >
     System
   </button>
@@ -102,16 +102,6 @@
   id="tradeSetup"
   class="dashboard-tab-panel active"
 >
- <section class="card" data-trading-only="true">
-   <div class="card-label">Trade Buying Power Reserve</div>
-   <form id="buyingPowerReserveForm">
-     <label for="myBuyingPowerReserve">Minimum remaining buying power ($)</label>
-     <input id="myBuyingPowerReserve" type="number" min="0" step="0.01" required />
-     <button type="submit">Save Reserve</button>
-     <span id="buyingPowerReserveStatus" role="status"></span>
-   </form>
- </section>
-
  <div class="trade-parameters">
   <div class="trade-parameter">
     <label for="underlyingSelector">
@@ -539,9 +529,29 @@
 <div
   id="systemTab"
   class="dashboard-tab-panel"
-  data-owner-only="true"
+  data-trading-only="true"
 >
-  <section class="card">
+  <section class="card" id="accountStatusBanner">
+    <div class="card-label">Account &amp; Trading Status</div>
+    Loading broker connections...
+  </section>
+
+  <section class="card" id="brokerConnectionSetup" hidden></section>
+
+  <section class="card" data-beta-only="true">
+    <div class="card-label">Trading Settings</div>
+    <form id="buyingPowerReserveForm" class="bxk-settings-form">
+      <label class="bxk-settings-field" for="myBuyingPowerReserve">
+        <span>Minimum Remaining Buying Power ($)</span>
+        <input id="myBuyingPowerReserve" type="number" min="0" step="0.01" required />
+      </label>
+      <button type="submit">Save Reserve</button>
+      <span id="buyingPowerReserveStatus" role="status"></span>
+    </form>
+    <p>This reserve applies to your own Tastytrade order checks.</p>
+  </section>
+
+  <section class="card" data-owner-only="true">
     <div class="card-label">
       BXK System Control Room
     </div>
@@ -551,7 +561,7 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card" data-owner-only="true">
     <div class="card-label">
       BXK System Settings
     </div>
@@ -565,6 +575,7 @@
   <section
     class="card"
     id="adminUsersCard"
+    data-owner-only="true"
     hidden
   >
     <div class="card-label">
@@ -577,8 +588,8 @@
   </section>
 </div>
 </div>
-<script type="module" src="/static/dashboard.js?v=33"></script>
-<script type="module" src="/static/buying-power-reserve.js?v=1"></script>
+<script type="module" src="/static/dashboard.js?v=34"></script>
+<script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
    
 </body>

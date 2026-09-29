@@ -1435,6 +1435,12 @@ function renderBrokerConnectionForm(
 
       brokerConnectionFlowActive = false;
 
+      const setupCard = el("brokerConnectionSetup");
+      if (setupCard) {
+        setupCard.hidden = true;
+        setupCard.innerHTML = "";
+      }
+
       window.dispatchEvent(
         new CustomEvent(
           "bxk:broker-connection-changed",
@@ -1644,10 +1650,25 @@ export async function loadPositions() {
           // Keep default message.
         }
 
-        renderBrokerConnectionForm(
-          container,
-          detail,
-        );
+        const setupCard = el("brokerConnectionSetup");
+        if (setupCard) {
+          setupCard.hidden = false;
+          renderBrokerConnectionForm(setupCard, detail);
+          container.innerHTML = `
+            <div class="position-empty">
+              <div class="position-empty-title">Connect Tastytrade</div>
+              <div class="position-empty-text">
+                Complete your broker connection in the System tab.
+              </div>
+              <button type="button" id="openBrokerSystemTab">Open System</button>
+            </div>
+          `;
+          el("openBrokerSystemTab")?.addEventListener("click", () => {
+            document.querySelector('[data-tab="systemTab"]')?.click();
+          });
+        } else {
+          renderBrokerConnectionForm(container, detail);
+        }
 
         return;
       }

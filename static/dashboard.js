@@ -1,6 +1,7 @@
 import { initializeAuthUi } from "./auth-ui.js?v=3";
 
 import {
+  getAccessContext,
   hasOwnerAccess,
   hasTradingAccess,
   setAccessContext,
@@ -34,7 +35,7 @@ import {
 
 import {
   loadPositions,
-} from "./position.js?v=9";
+} from "./position.js?v=10";
 
 import {
   initializeSystemSettings,
@@ -2453,6 +2454,17 @@ function applyOwnerVisibility() {
 }
 
 
+function applyBetaVisibility() {
+  const access = getAccessContext();
+  const betaAccess = access?.authenticated === true
+    && String(access.role || "").toUpperCase() === "BETA";
+
+  document.querySelectorAll('[data-beta-only="true"]').forEach((element) => {
+    element.hidden = !betaAccess;
+  });
+}
+
+
 function initializeUnderlyingSelector() {
   const selector =
     document.getElementById(
@@ -3421,7 +3433,7 @@ async function refreshAccountStatusBanner() {
       ) {
         callbackMessage =
           "Tastytrade authorization needs attention. " +
-          "Reconnect from Position Monitor to try again.";
+          "Reconnect from the System tab to try again.";
       }
     }
 
@@ -3578,7 +3590,7 @@ async function refreshAccountStatusBanner() {
                     line-height:1.45;
                   "
                 >
-                  Connect Tastytrade from Position Monitor
+                  Connect Tastytrade in the System tab
                   to authorize account access.
                 </div>
               `
@@ -3810,6 +3822,7 @@ async function initializeDashboardApplication() {
 
   applyTradingVisibility();
   applyOwnerVisibility();
+  applyBetaVisibility();
 
   await initializeAccountStatusBanner(
     authStatus,
