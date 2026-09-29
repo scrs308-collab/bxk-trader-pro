@@ -1916,6 +1916,24 @@ def test_buying_power_above_reserve_is_allowed(
     assert result["passed"] is True
     assert reserve_check["passed"] is True
 
+
+def test_user_reserve_overrides_global_broker_preflight(monkeypatch):
+    monkeypatch.setattr(order_route, "BXK_MIN_REMAINING_BUYING_POWER", 15000.0)
+    dry_run = _valid_broker_dry_run()
+    buying_power = dry_run["broker_response"]["data"]["buying-power-effect"]
+    impact = float(buying_power["change-in-buying-power"])
+    fees = float(dry_run["broker_response"]["data"]["fee-calculation"]["total-fees"])
+    buying_power["new-buying-power"] = "1000.00"
+    buying_power["current-buying-power"] = f"{1000 + impact:.2f}"
+    order = {"buying_power": round(impact - fees, 2)}
+
+    beta_result = order_route._evaluate_broker_dry_run(
+        dry_run, order, min_remaining_buying_power=1000.0
+    )
+    default_result = order_route._evaluate_broker_dry_run(dry_run, order)
+    assert _broker_checks(beta_result)["broker_buying_power_reserve"]["passed"]
+    assert not _broker_checks(default_result)["broker_buying_power_reserve"]["passed"]
+
 def _prepare_submission_audit_test(
     monkeypatch,
 ):

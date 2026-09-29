@@ -52,6 +52,7 @@ from bxk_app.routes.trade_journal import router as trade_journal_router
 from bxk_app.routes.billing import (
     router as billing_router,
 )
+from bxk_app.routes.buying_power_settings import router as buying_power_settings_router
 
 router = APIRouter()
 
@@ -71,3 +72,4 @@ router.include_router(admin_users_router)
 router.include_router(sms_consent_router)
 router.include_router(trade_journal_router)
 router.include_router(billing_router)
+router.include_router(buying_power_settings_router)

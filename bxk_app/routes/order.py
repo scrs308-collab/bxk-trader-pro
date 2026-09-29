@@ -4,6 +4,7 @@ import json
 import secrets
 import threading
 import time
+import uuid
 from datetime import date, datetime
 
 from fastapi import (
@@ -13,6 +14,7 @@ from fastapi import (
     Query,
 )
 from sqlalchemy.orm import Session
+from bxk_app.db_models.user import User
 
 from bxk_app.authorization import (
     require_owner_or_beta,
@@ -168,6 +170,20 @@ def _user_is_owner(
         "value",
         role,
     )
+
+
+def _user_buying_power_reserve(session: Session, user_context: dict) -> float:
+    """Use the user's override, falling back to the existing global policy."""
+    user_id = user_context.get("user_id")
+    if not user_id:
+        return BXK_MIN_REMAINING_BUYING_POWER
+    try:
+        user = session.get(User, uuid.UUID(str(user_id)))
+    except (TypeError, ValueError):
+        return BXK_MIN_REMAINING_BUYING_POWER
+    if user is None or user.min_remaining_buying_power is None:
+        return BXK_MIN_REMAINING_BUYING_POWER
+    return float(user.min_remaining_buying_power)
 
     return (
         str(role or "").strip().upper()
@@ -1672,6 +1688,7 @@ def _check_existing_order_overlap(
 def _evaluate_broker_dry_run(
     dry_run: dict,
     order: dict,
+    min_remaining_buying_power: float | None = None,
 ):
     """
     Fail-closed evaluation of Tastytrade dry-run response.
@@ -1978,10 +1995,15 @@ def _evaluate_broker_dry_run(
         ),
     )
 
+    reserve = (
+        BXK_MIN_REMAINING_BUYING_POWER
+        if min_remaining_buying_power is None
+        else min_remaining_buying_power
+    )
     buying_power_reserve_valid = (
         buying_power_valid
         and new_bp
-        >= BXK_MIN_REMAINING_BUYING_POWER
+        >= reserve
     )
 
     check(
@@ -1990,7 +2012,7 @@ def _evaluate_broker_dry_run(
         (
             f"Remaining buying power ${new_bp:,.2f} "
             "is below the "
-            f"${BXK_MIN_REMAINING_BUYING_POWER:,.2f} "
+            f"${reserve:,.2f} "
             "BXK reserve."
         ),
     )
@@ -2174,6 +2196,7 @@ def order_dry_run(
     broker_client=None,
     write_execution_audit: bool = True,
     review_scope: str | None = None,
+    min_remaining_buying_power: float | None = None,
 ):
     """
     Run the current BXK order through Tastytrade broker preflight.
@@ -2374,11 +2397,13 @@ def order_dry_run(
             "order": order,
         }
 
-    broker_preflight = (
-        _evaluate_broker_dry_run(
-            dry_run,
-            order,
-        )
+    broker_preflight = _evaluate_broker_dry_run(
+        dry_run,
+        order,
+        **(
+            {"min_remaining_buying_power": min_remaining_buying_power}
+            if min_remaining_buying_power is not None else {}
+        ),
     )
 
     account_text = str(account_number)
@@ -2507,6 +2532,7 @@ def order_dry_run_api(
         contracts=contracts,
         review_id=review_id,
         broker_client=broker_client,
+        min_remaining_buying_power=_user_buying_power_reserve(session, user_context),
         review_scope=(
             _execution_scope_key(
                 user_context
@@ -2662,6 +2688,7 @@ def order_submit(
     broker_client=None,
     execution_audit_writer=None,
     write_preflight_audit: bool = True,
+    min_remaining_buying_power: float | None = None,
 ):
     """
     Submit the current approved BXK order to Tastytrade.
@@ -2702,6 +2729,7 @@ def order_submit(
         contracts=contracts,
         review_id=review_id,
         broker_client=active_broker,
+        min_remaining_buying_power=min_remaining_buying_power,
         write_execution_audit=(
             write_preflight_audit
         ),
@@ -3337,6 +3365,7 @@ def order_submit_api(
         review_id=review_id,
         user_context=user_context,
         broker_client=active_broker,
+        min_remaining_buying_power=_user_buying_power_reserve(session, user_context),
         execution_audit_writer=(
             audit_writer
         ),

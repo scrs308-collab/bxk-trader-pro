@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Numeric,
     Enum,
     String,
     Text,
@@ -64,6 +65,11 @@ class User(Base):
 
     preferred_broker: Mapped[str | None] = mapped_column(
         String(32),
+        nullable=True,
+    )
+
+    min_remaining_buying_power: Mapped[float | None] = mapped_column(
+        Numeric(12, 2),
         nullable=True,
     )
 
