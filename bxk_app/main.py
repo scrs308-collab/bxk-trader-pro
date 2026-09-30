@@ -124,6 +124,13 @@ app.mount(
 )
 
 
+@app.get("/product")
+def product_page():
+    return FileResponse(
+        "static/product.html"
+    )
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(
