@@ -1,3 +1,4 @@
+import { brokerOrderLifecycle } from "./order-status.js?v=1";
 import { hasTradingAccess } from "./access-control.js?v=4";
 import { BEST_TRADE_URL } from "./config.js";
 import {
@@ -1218,7 +1219,7 @@ function renderOrderPreview({
               ? "approved"
               : "blocked"
           }">
-            <span>Order Status</span>
+            <span>Risk Check</span>
 
             <strong>
               ${
@@ -1230,6 +1231,14 @@ function renderOrderPreview({
           </div>
         </aside>
       </div>
+
+      <section id="orderLifecycle" class="order-lifecycle" aria-live="polite" aria-atomic="true" hidden>
+        <div class="order-lifecycle-heading"><span>LIVE ORDER STATUS</span><strong id="orderLifecycleTitle">ORDER SUBMITTED</strong></div>
+        <div class="order-lifecycle-track" aria-hidden="true"><span id="orderLifecycleMarker"></span></div>
+        <div class="order-lifecycle-stages"><span>Order submitted</span><span>Order pending</span><span>Order filled</span></div>
+        <p id="orderLifecycleDetail"></p>
+        <button id="refreshOrderStatus" type="button" hidden>Refresh order status</button>
+      </section>
 
       <section class="order-review-readiness">
         <div class="order-review-section-heading">
@@ -1872,95 +1881,80 @@ function renderOrderPreview({
     }
   };
 
-  const reconcileSubmittedOrder = async (
-    orderId,
-    initialReconciliation,
-  ) => {
-    let reconciliation = initialReconciliation;
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      if (reconciliation?.status === "RECONCILED") {
-        const status =
-          reconciliation.broker_status || "Verified";
-        const fillQuantity =
-          reconciliation.filled_quantity;
-        const fillPrice =
-          reconciliation.average_fill_price;
-        const fillDetail = [
-          fillQuantity
-            ? `${fillQuantity} filled`
-            : null,
-          fillPrice
-            ? `at ${formatMoney(fillPrice, 2)}`
-            : null,
-        ].filter(Boolean).join(" ");
-
-        updateReadinessCard(
-          submissionReadiness,
-          {
-            state: "ready",
-            icon: "OK",
-            detail: fillDetail
-              ? `${status} - ${fillDetail}`
-              : `${status} - Order ${orderId}`,
-          },
-        );
-
-        setBrokerMessage(
-          fillDetail
-            ? `Tastytrade independently verified order ${orderId}: ${status}, ${fillDetail}.`
-            : `Tastytrade independently verified order ${orderId}: ${status}.`,
-        );
-
-        confirmButton.textContent =
-          status.toUpperCase() === "FILLED"
-            ? "ORDER FILLED"
-            : "ORDER VERIFIED";
-        return;
-      }
-
-      if (attempt > 0 || !reconciliation) {
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, 1500);
-        });
-      }
-
-      try {
-        const response = await fetch(
-          `/api/order-status?order_id=${encodeURIComponent(orderId)}`,
-          {
-            cache: "no-store",
-          },
-        );
-
-        if (response.ok) {
-          reconciliation = await response.json();
-        }
-      } catch (error) {
-        console.warn(
-          "BXK order reconciliation pending:",
-          error,
-        );
-      }
-    }
-
-    updateReadinessCard(
-      submissionReadiness,
-      {
-        state: "pending",
-        icon: "...",
-        detail: `Order ${orderId} sent - verify broker`,
-      },
-    );
-    setBrokerMessage(
-      `Order ${orderId} was accepted, but independent status verification is still pending. Check Tastytrade before taking another action.`,
-    );
-    confirmButton.textContent = "VERIFY ORDER STATUS";
+  let submittedOrderId = null;
+  let statusPolling = false;
+  const refreshStatusButton = overlay.querySelector("#refreshOrderStatus");
+  const setOrderLifecycle = (state, title, detail) => {
+    const tracker = overlay.querySelector("#orderLifecycle");
+    tracker.hidden = false;
+    tracker.dataset.state = state;
+    overlay.querySelector("#orderLifecycleTitle").textContent = title;
+    overlay.querySelector("#orderLifecycleDetail").textContent = detail;
   };
+
+  const reconcileSubmittedOrder = async (orderId, initialReconciliation) => {
+    if (statusPolling) return;
+    statusPolling = true;
+    refreshStatusButton.hidden = true;
+    let reconciliation = initialReconciliation;
+    try {
+      // Verification is not a fill. Keep checking working orders for 15 minutes.
+      for (let attempt = 0; attempt < 180 && overlay.isConnected; attempt += 1) {
+        if (!reconciliation) {
+          try {
+            const response = await fetch(
+              `/api/order-status?order_id=${encodeURIComponent(orderId)}`,
+              { cache: "no-store", signal: AbortSignal.timeout(10000) },
+            );
+            if (response.ok) reconciliation = await response.json();
+          } catch (error) {
+            console.warn("BXK order reconciliation pending:", error);
+          }
+        }
+        if (!overlay.isConnected) return;
+        if (reconciliation?.status === "RECONCILED") {
+          const status = String(reconciliation.broker_status || "Unknown");
+          const lifecycle = brokerOrderLifecycle(status);
+          const fillQuantity = reconciliation.filled_quantity;
+          const fillPrice = reconciliation.average_fill_price;
+          const fillDetail = [
+            fillQuantity ? `${fillQuantity} filled` : null,
+            fillPrice != null ? `at ${formatMoney(fillPrice, 2)}` : null,
+          ].filter(Boolean).join(" ");
+          const detail = `Order ${orderId} · Broker: ${status}${fillDetail ? ` · ${fillDetail}` : ""}`;
+          setOrderLifecycle(lifecycle.state, lifecycle.title, detail);
+          updateReadinessCard(submissionReadiness, {
+            state: lifecycle.state === "filled" ? "ready" : "pending",
+            icon: lifecycle.state === "filled" ? "OK" : "...",
+            detail,
+          });
+          setBrokerMessage(`Tastytrade independently verified ${detail}.`);
+          confirmButton.textContent = lifecycle.title;
+          if (lifecycle.terminal) return;
+        } else {
+          setOrderLifecycle("submitted", "ORDER SUBMITTED — VERIFYING", `Order ${orderId} was accepted. Broker status is unavailable; check Tastytrade before taking another action.`);
+          setBrokerMessage(`Order ${orderId} was accepted, but independent status verification is still pending. Check Tastytrade before taking another action.`);
+          confirmButton.textContent = "VERIFY ORDER STATUS";
+        }
+        reconciliation = null;
+        await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      }
+      if (overlay.isConnected) {
+        refreshStatusButton.hidden = false;
+        overlay.querySelector("#orderLifecycleDetail").textContent += " · Automatic checking paused. Refresh for the latest broker status.";
+      }
+    } finally {
+      statusPolling = false;
+    }
+  };
+  refreshStatusButton.addEventListener("click", () => {
+    if (submittedOrderId) reconcileSubmittedOrder(submittedOrderId, null);
+  });
 
   confirmButton?.addEventListener(
     "click",
     async () => {
+      if (submittedOrderId || confirmButton.disabled) return;
       const liveConfirmed = window.confirm(
         [
           "SUBMIT REAL ORDER TO TASTYTRADE?",
@@ -2000,6 +1994,7 @@ function renderOrderPreview({
       confirmButton.textContent =
         "SUBMITTING...";
 
+      setOrderLifecycle("submitting", "SUBMITTING ORDER", "Waiting for broker acceptance...");
       setBrokerMessage(
         "Revalidating BXK order before submission...",
       );
@@ -2047,6 +2042,7 @@ function renderOrderPreview({
             "Broker preflight passed, but BXK live trading is disabled.",
           );
 
+          setOrderLifecycle("failed", "LIVE TRADING OFF", "No order was submitted.");
           confirmButton.textContent =
             "LIVE TRADING OFF";
 
@@ -2073,12 +2069,15 @@ function renderOrderPreview({
           );
 
           confirmButton.disabled = true;
+          setOrderLifecycle("unknown", "SUBMISSION UNCONFIRMED", "Check Tastytrade before taking another action. Do not retry.");
           confirmButton.textContent =
             "VERIFY TASTYTRADE";
 
           return;
         }
         if (result?.status === "SUBMITTED") {
+          submittedOrderId = result.order_id;
+          setOrderLifecycle("submitted", "ORDER SUBMITTED", result.order_id ? `Order ${result.order_id} accepted. Checking broker status...` : "Broker accepted the submission. Verify the order in Tastytrade.");
           updateReadinessCard(
             submissionReadiness,
             {
@@ -2124,6 +2123,7 @@ function renderOrderPreview({
         );
 
         setBrokerMessage(errorMessage);
+        setOrderLifecycle("failed", "ORDER BLOCKED", errorMessage);
 
         confirmButton.textContent =
           "ORDER BLOCKED";
@@ -2150,6 +2150,7 @@ function renderOrderPreview({
           "DO NOT RETRY.",
         );
 
+        setOrderLifecycle("unknown", "SUBMISSION UNCONFIRMED", "Check Tastytrade before taking another action. Do not retry.");
         confirmButton.disabled = true;
         confirmButton.textContent =
           "VERIFY TASTYTRADE";

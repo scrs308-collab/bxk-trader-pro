@@ -22,7 +22,7 @@ def test_submitted_order_is_reconciled_without_resubmission():
     assert "/api/order-status?order_id=" in source
     assert "reconcileSubmittedOrder" in source
     assert "ORDER SENT - VERIFYING" in source
-    assert "ORDER FILLED" in source
+    assert "brokerOrderLifecycle" in source
 
 def test_broker_preflight_displays_specific_error():
     source = Path(
