@@ -2,90 +2,185 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
-  <title>BXK Trader Pro - Application Access</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request Access | BXK Trader Pro</title>
   <style>
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
+      padding: 34px 18px;
       background: #020817;
       color: #f8fafc;
-      font-family: Arial, sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
     }
-
+    .shell { width: min(720px, 100%); margin: 0 auto; }
+    .toplink { display: inline-block; margin-bottom: 24px; color: #93c5fd; text-decoration: none; }
     .card {
-      width: min(520px, calc(100vw - 32px));
-      background: #111827;
+      background: #0f172a;
       border: 1px solid #334155;
       border-radius: 16px;
-      padding: 34px;
-      text-align: center;
+      padding: 32px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.35);
     }
-
-    .logo {
-      width: 64px;
-      height: 64px;
-      margin: 0 auto 18px;
-      display: grid;
-      place-items: center;
-      border: 1px solid #3b82f6;
-      border-radius: 14px;
-      font-weight: 900;
-      font-size: 20px;
+    .eyebrow { color: #60a5fa; text-transform: uppercase; letter-spacing: .13em; font-size: 12px; font-weight: 800; }
+    h1 { margin: 8px 0 10px; }
+    .intro { color: #cbd5e1; margin-bottom: 26px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    label { display: block; margin-bottom: 18px; font-weight: 700; }
+    label span { display: block; margin-bottom: 7px; font-size: 13px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      background: #020617;
+      color: #fff;
+      font: inherit;
     }
-
-    h1 {
-      margin-bottom: 10px;
+    textarea { min-height: 120px; resize: vertical; }
+    button {
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
     }
-
-    p {
-      color: #cbd5e1;
-      line-height: 1.6;
-    }
-
-    .status {
-      margin: 24px 0;
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .status { min-height: 24px; margin-top: 18px; }
+    .success { color: #86efac; }
+    .error { color: #fca5a5; }
+    .notice {
+      margin-top: 24px;
       padding: 16px;
       border: 1px solid #334155;
       border-radius: 10px;
-      background: #0f172a;
+      background: #111827;
+      color: #cbd5e1;
+      font-size: 14px;
     }
-
-    a {
-      color: #60a5fa;
-      text-decoration: none;
+    .legal { margin-top: 22px; color: #94a3b8; font-size: 12px; text-align: center; }
+    .legal a { color: #93c5fd; }
+    .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    @media (max-width: 620px) {
+      .grid { grid-template-columns: 1fr; gap: 0; }
+      .card { padding: 24px; }
     }
   </style>
 </head>
-
 <body>
-  <main class="card">
-    <div class="logo">BXK</div>
+  <main class="shell">
+    <a class="toplink" href="/product">&larr; BXK Trader Pro Overview</a>
 
-    <h1>Application Access</h1>
+    <section class="card">
+      <div class="eyebrow">Account access</div>
+      <h1>Request BXK Trader Pro Access</h1>
+      <p class="intro">
+        New accounts are currently reviewed before activation. Submit the information below and
+        BXK Capital Trading LLC will review the request before an account is issued.
+      </p>
 
-    <p>
-      BXK Trader Pro accounts are currently
-      issued by approval only.
-    </p>
+      <form id="accessForm">
+        <div class="grid">
+          <label>
+            <span>Full name</span>
+            <input id="fullName" autocomplete="name" maxlength="160" required>
+          </label>
 
-    <div class="status">
-      The online account application is being
-      prepared. This page will become the BXK
-      Trader Pro application and approval portal.
-    </div>
+          <label>
+            <span>Email address</span>
+            <input id="email" type="email" autocomplete="email" maxlength="320" required>
+          </label>
+        </div>
 
-    <a href="/login">
-      Return to Sign In
-    </a>
+        <label>
+          <span>Broker you expect to connect</span>
+          <select id="broker">
+            <option value="">Select one</option>
+            <option value="Tastytrade">Tastytrade</option>
+            <option value="Schwab">Charles Schwab</option>
+            <option value="Fidelity">Fidelity</option>
+            <option value="Interactive Brokers">Interactive Brokers</option>
+            <option value="Other">Other / not decided</option>
+          </select>
+        </label>
+
+        <label>
+          <span>How do you expect to use BXK Trader Pro?</span>
+          <textarea id="intendedUse" maxlength="2000" placeholder="Briefly describe your trading workflow or what you want the platform to help you monitor."></textarea>
+        </label>
+
+        <div class="honeypot" aria-hidden="true">
+          <label>Website<input id="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+
+        <button id="submitButton" type="submit">SUBMIT ACCESS REQUEST</button>
+      </form>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+
+      <div class="notice">
+        Submitting this form does not open a brokerage account, authorize trading, or guarantee platform access.
+        Broker connections are established separately by the authenticated user through supported broker authorization flows.
+      </div>
+
+      <div class="legal">
+        By submitting an access request, you acknowledge the
+        <a href="/privacy">Privacy Policy</a> and
+        <a href="/terms">Terms &amp; Conditions</a>.
+      </div>
+    </section>
   </main>
+
+  <script>
+    const form = document.getElementById("accessForm");
+    const button = document.getElementById("submitButton");
+    const statusElement = document.getElementById("status");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      button.textContent = "SUBMITTING...";
+      statusElement.className = "status";
+      statusElement.textContent = "";
+
+      try {
+        const response = await fetch("/api/access-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: document.getElementById("fullName").value,
+            email: document.getElementById("email").value,
+            broker: document.getElementById("broker").value || null,
+            intended_use: document.getElementById("intendedUse").value || null,
+            website: document.getElementById("website").value || null
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(" ")
+            : data.detail;
+          throw new Error(detail || "Unable to submit access request.");
+        }
+
+        statusElement.className = "status success";
+        statusElement.textContent = data.message || "Access request received.";
+        form.reset();
+        button.textContent = "REQUEST SUBMITTED";
+      } catch (error) {
+        statusElement.className = "status error";
+        statusElement.textContent = error.message;
+        button.disabled = false;
+        button.textContent = "SUBMIT ACCESS REQUEST";
+      }
+    });
+  </script>
 </body>
 </html>
