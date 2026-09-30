@@ -1,3 +1,8 @@
+from bxk_app.closing_flow_risk import (
+    evaluate_closing_flow_risk,
+)
+
+
 STATE_RANK = {
     "GREEN": 0,
     "ORANGE": 1,
@@ -22,6 +27,7 @@ def _number(value):
 
 def classify_position_threat(
     position: dict,
+    now=None,
 ):
     """
     Shared daytime short-strike threat classification.
@@ -77,13 +83,54 @@ def classify_position_threat(
         distance = call_distance
         short_strike = short_call
 
+    closing_flow_risk = (
+        evaluate_closing_flow_risk(
+            dte=position.get(
+                "dte",
+                position.get(
+                    "days_to_expiration"
+                ),
+            ),
+            strategy=position.get(
+                "strategy",
+                "SPX Iron Condor",
+            ),
+            now=now,
+        )
+    )
+
+    red_threshold = 10.0
+    orange_threshold = 20.0
+
+    if closing_flow_risk[
+        "tighten_position_monitor"
+    ]:
+        red_threshold = max(
+            red_threshold,
+            spx_price
+            * float(
+                closing_flow_risk[
+                    "red_distance_pct"
+                ]
+            ),
+        )
+        orange_threshold = max(
+            orange_threshold,
+            spx_price
+            * float(
+                closing_flow_risk[
+                    "orange_distance_pct"
+                ]
+            ),
+        )
+
     if distance <= 0:
         state = "CRITICAL"
 
-    elif distance <= 10:
+    elif distance <= red_threshold:
         state = "RED"
 
-    elif distance <= 20:
+    elif distance <= orange_threshold:
         state = "ORANGE"
 
     else:
@@ -119,6 +166,16 @@ def classify_position_threat(
         # without breaking existing consumers.
         "short_put": short_put,
         "short_call": short_call,
+        "red_threshold": round(
+            red_threshold,
+            2,
+        ),
+        "orange_threshold": round(
+            orange_threshold,
+            2,
+        ),
+        "closing_flow_risk":
+            closing_flow_risk,
         "expiration":
             position.get(
                 "expiration"
