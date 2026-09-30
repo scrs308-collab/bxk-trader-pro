@@ -18,6 +18,7 @@ PASSWORD_CHANGE_ALLOWED_PATHS = {
 
 PUBLIC_PATHS = {
     "/api/broker-connection/tastytrade/callback",
+    "/product",
     "/login",
     "/forgot-password",
     "/application-access",
