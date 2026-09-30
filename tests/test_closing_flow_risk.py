@@ -1,9 +1,13 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
+
+from bxk_app import trade_analyzer
 from bxk_app.closing_flow_risk import (
     evaluate_closing_flow_risk,
 )
+from bxk_app.routes import order as order_route
 from bxk_app.services.position_threat_service import (
     classify_position_threat,
 )
@@ -189,3 +193,89 @@ def test_position_inside_point_four_percent_is_red():
     )
 
     assert risk["state"] == "RED"
+
+
+
+def test_analyzer_applies_penalty_and_hard_block(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        trade_analyzer,
+        "evaluate_closing_flow_risk",
+        lambda **kwargs: {
+            "active": True,
+            "level": "HIGH",
+            "event": "QUARTER_END",
+            "score_penalty": 20,
+            "block_new_entry": True,
+            "message": "Quarter-end test block.",
+        },
+    )
+
+    result = trade_analyzer.analyze_trade(
+        {
+            "strategy": "SPX Iron Condor",
+            "dte": 0,
+            "credit": 3.25,
+            "pop": 90,
+            "probability_of_touch": 20,
+            "risk_reward": 7,
+            "wing_width": 25,
+            "put_distance": 40,
+            "call_distance": 40,
+            "market_regime": "TRADE",
+            "market_score": 90,
+        }
+    )
+
+    assert result["trade_quality_score"] == 80
+    assert result["final_decision"] == "NO TRADE"
+    assert result["market_permission"] == "WAIT"
+    assert result["closing_flow_risk"][
+        "block_new_entry"
+    ] is True
+    assert any(
+        item["reason"]
+        == "Quarter-end test block."
+        for item in result["weaknesses"]
+    )
+
+
+def test_order_builder_refuses_closing_flow_block(
+    monkeypatch,
+):
+    trade = {
+        "strategy": "SPX Iron Condor",
+        "closing_flow_risk": {
+            "block_new_entry": True,
+        },
+    }
+
+    monkeypatch.setattr(
+        order_route,
+        "get_best_trade",
+        lambda **kwargs: {
+            "best_trade": trade,
+        },
+    )
+
+    monkeypatch.setattr(
+        order_route,
+        "build_order",
+        lambda *args, **kwargs: pytest.fail(
+            "Blocked closing-flow trade "
+            "must not reach order builder."
+        ),
+    )
+
+    built_trade, order = (
+        order_route._build_current_order(
+            "iron_condor",
+            0,
+            25,
+            1,
+        )
+    )
+
+    assert built_trade is None
+    assert order is None
