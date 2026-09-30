@@ -2004,7 +2004,53 @@ function renderSystemDashboard(data) {
   `;
 }
 
+function renderClosingFlowRisk(
+  data = {},
+) {
+  const banner = el(
+    "closingFlowRiskBanner",
+  );
+
+  if (!banner) {
+    return;
+  }
+
+  const risk =
+    data.closing_flow_risk ?? {};
+
+  if (risk.active !== true) {
+    banner.hidden = true;
+    banner.textContent = "";
+    banner.className =
+      "closing-flow-risk-banner";
+    return;
+  }
+
+  const level = String(
+    risk.level || "ELEVATED",
+  ).toLowerCase();
+
+  const event = String(
+    risk.event || "LATE_SESSION",
+  )
+    .replaceAll("_", " ");
+
+  const message = String(
+    risk.message ||
+    "Late-session closing-flow risk is elevated.",
+  );
+
+  banner.hidden = false;
+  banner.className =
+    `closing-flow-risk-banner ${level}`;
+  banner.textContent =
+    `CLOSING FLOW RISK · ${event}: ${message}`;
+}
+
+
 export function updateDashboard(data, updateChecklist) {
+  renderClosingFlowRisk(data);
+
    const tradeState = String(
     data.trade ?? "",
   ).toUpperCase();

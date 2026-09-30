@@ -1,3 +1,8 @@
+from bxk_app.closing_flow_risk import (
+    evaluate_closing_flow_risk,
+)
+
+
 def safe_float(value, default=0.0):
     try:
         if value is None:
@@ -444,6 +449,47 @@ def analyze_trade(trade: dict):
         ),
     )
 
+    closing_flow_risk = (
+        evaluate_closing_flow_risk(
+            dte=trade.get(
+                "dte",
+                trade.get(
+                    "days_to_expiration"
+                ),
+            ),
+            strategy=trade.get(
+                "strategy"
+            ),
+        )
+    )
+
+    if closing_flow_risk["active"]:
+        closing_penalty = int(
+            closing_flow_risk[
+                "score_penalty"
+            ]
+            or 0
+        )
+
+        if closing_penalty > 0:
+            score = max(
+                0,
+                score - closing_penalty,
+            )
+
+            weaknesses.append(
+                {
+                    "reason": (
+                        closing_flow_risk[
+                            "message"
+                        ]
+                    ),
+                    "impact": (
+                        -closing_penalty
+                    ),
+                }
+            )
+
     grade, rating = grade_trade(score)
 
     # =====================================================
@@ -481,6 +527,16 @@ def analyze_trade(trade: dict):
     else:
         final_decision = "NO TRADE"
 
+    if closing_flow_risk[
+        "block_new_entry"
+    ]:
+        final_decision = "NO TRADE"
+        market_permission = "WAIT"
+        permission_label = (
+            "Closing-flow guard blocks new "
+            "0DTE short-premium entry"
+        )
+
     reasons.extend(
         item["reason"]
         for item in strengths
@@ -509,6 +565,10 @@ def analyze_trade(trade: dict):
         "permission_label": permission_label,
 
         "final_decision": final_decision,
+
+        "closing_flow_risk": (
+            closing_flow_risk
+        ),
 
         "strengths": strengths,
         "weaknesses": weaknesses,

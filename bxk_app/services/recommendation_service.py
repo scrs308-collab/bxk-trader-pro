@@ -1,5 +1,8 @@
 from datetime import datetime
 
+from bxk_app.closing_flow_risk import (
+    evaluate_closing_flow_risk,
+)
 from bxk_app.market_data import market_data
 from bxk_app.scoring import run_trade_quality
 from bxk_app.strategy_ranker import (
@@ -421,6 +424,15 @@ def get_recommendation():
         execution_trade
     )
 
+    # Dashboard context for late-session 0DTE risk.
+    # The canonical recommendation above remains 1DTE.
+    closing_flow_risk = (
+        evaluate_closing_flow_risk(
+            dte=0,
+            strategy="SPX Iron Condor",
+        )
+    )
+
     return {
         "app": "BXK Trader Pro",
         "version": "6.1",
@@ -434,6 +446,9 @@ def get_recommendation():
             "score": trade_score,
             "recommendation": canonical_recommendation,
             "final_decision": final_decision,
+            "closing_flow_risk": (
+                closing_flow_risk
+            ),
 
             # Trade-quality explainability
             "grade": trade_grade,
