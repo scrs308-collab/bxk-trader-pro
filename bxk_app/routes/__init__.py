@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from bxk_app.routes.access_requests import (
     router as access_requests_router,
 )
+from bxk_app.routes.support_requests import (
+    router as support_requests_router,
+)
 from bxk_app.routes.broker import (
     router as broker_router,
 )
@@ -61,6 +64,7 @@ router = APIRouter()
 
 router.include_router(health_router)
 router.include_router(access_requests_router)
+router.include_router(support_requests_router)
 router.include_router(market_router)
 router.include_router(recommendation_router)
 router.include_router(broker_router)
