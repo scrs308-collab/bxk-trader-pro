@@ -1207,6 +1207,18 @@ def _build_current_order(
     if not trade:
         return None, None
 
+    closing_flow_risk = (
+        trade.get(
+            "closing_flow_risk"
+        )
+        or {}
+    )
+
+    if closing_flow_risk.get(
+        "block_new_entry"
+    ):
+        return None, None
+
     try:
         order = build_order(trade, quantity=contracts)
     except (ValueError, TypeError) as exc:
