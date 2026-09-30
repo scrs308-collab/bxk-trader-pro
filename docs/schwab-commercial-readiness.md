@@ -4,18 +4,18 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 
 ## Public product presentation
 - [x] Public product overview page
-- [x] Privacy Policy
-- [x] Terms & Conditions
+- [x] Privacy Policy expanded for broker-connected and billing data
+- [x] Terms & Conditions expanded for connected services and subscriptions
 - [x] SMS opt-in disclosure and consent page
-- [ ] Public support/contact information
+- [ ] Public support/contact information (awaiting final support address)
 - [ ] Final subscription pricing presentation
-- [ ] Final legal/compliance review of public claims and disclosures
+- [ ] Final attorney/compliance review of public claims and disclosures
 
 ## Account lifecycle
 - [x] Secure sign-in
 - [x] Forgot-password workflow
 - [x] Password-change workflow
-- [ ] Production account application / self-service signup flow
+- [x] Production access-request workflow with database persistence
 - [ ] Email verification, if required for production rollout
 - [ ] Administrative approval workflow documented for commercial review
 
