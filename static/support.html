@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support | BXK Trader Pro</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 34px 18px;
+      background: #020817;
+      color: #f8fafc;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
+    }
+    .shell { width: min(760px, 100%); margin: 0 auto; }
+    .toplink { display: inline-block; margin-bottom: 24px; color: #93c5fd; text-decoration: none; }
+    .card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 32px;
+    }
+    h1 { margin: 8px 0 10px; }
+    .intro { color: #cbd5e1; margin-bottom: 24px; }
+    label { display: block; margin-bottom: 18px; font-weight: 700; }
+    label span { display: block; margin-bottom: 7px; font-size: 13px; }
+    input, textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      background: #020617;
+      color: #fff;
+      font: inherit;
+    }
+    textarea { min-height: 150px; resize: vertical; }
+    button {
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .status { min-height: 24px; margin-top: 18px; }
+    .success { color: #86efac; }
+    .error { color: #fca5a5; }
+    .notice {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      background: #111827;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    .legal { margin-top: 22px; color: #94a3b8; font-size: 12px; text-align: center; }
+    .legal a { color: #93c5fd; }
+    .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <a class="toplink" href="/product">&larr; BXK Trader Pro Overview</a>
+
+    <section class="card">
+      <h1>BXK Trader Pro Support</h1>
+      <p class="intro">
+        Use this form for account-access, billing, broker-connection, technical, or general product questions.
+      </p>
+
+      <form id="supportForm">
+        <label>
+          <span>Name</span>
+          <input id="name" autocomplete="name" maxlength="160" required>
+        </label>
+
+        <label>
+          <span>Email</span>
+          <input id="email" type="email" autocomplete="email" maxlength="320" required>
+        </label>
+
+        <label>
+          <span>Subject</span>
+          <input id="subject" maxlength="200" required>
+        </label>
+
+        <label>
+          <span>Message</span>
+          <textarea id="message" maxlength="4000" required></textarea>
+        </label>
+
+        <div class="honeypot" aria-hidden="true">
+          <label>Website<input id="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+
+        <button id="submitButton" type="submit">SEND SUPPORT REQUEST</button>
+      </form>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+
+      <div class="notice">
+        Do not include brokerage passwords, full account numbers, Social Security numbers,
+        payment-card numbers, or other sensitive credentials in a support request.
+      </div>
+
+      <div class="legal">
+        <a href="/privacy">Privacy Policy</a>
+        &nbsp;·&nbsp;
+        <a href="/terms">Terms &amp; Conditions</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("supportForm");
+    const button = document.getElementById("submitButton");
+    const statusElement = document.getElementById("status");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      button.textContent = "SENDING...";
+      statusElement.className = "status";
+      statusElement.textContent = "";
+
+      try {
+        const response = await fetch("/api/support-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: document.getElementById("name").value,
+            email: document.getElementById("email").value,
+            subject: document.getElementById("subject").value,
+            message: document.getElementById("message").value,
+            website: document.getElementById("website").value || null
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(" ")
+            : data.detail;
+          throw new Error(detail || "Unable to send support request.");
+        }
+
+        statusElement.className = "status success";
+        statusElement.textContent = data.message || "Support request received.";
+        form.reset();
+        button.textContent = "REQUEST SENT";
+      } catch (error) {
+        statusElement.className = "status error";
+        statusElement.textContent = error.message;
+        button.disabled = false;
+        button.textContent = "SEND SUPPORT REQUEST";
+      }
+    });
+  </script>
+</body>
+</html>
