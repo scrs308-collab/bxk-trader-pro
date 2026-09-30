@@ -131,6 +131,13 @@ def product_page():
     )
 
 
+@app.get("/support")
+def support_page():
+    return FileResponse(
+        "static/support.html"
+    )
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(
