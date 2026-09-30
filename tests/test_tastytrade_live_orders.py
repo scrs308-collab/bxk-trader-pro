@@ -13,7 +13,8 @@ class FakeResponse:
         return self.payload
 
 
-def test_get_order_fetches_exact_order(monkeypatch):
+@pytest.mark.parametrize("nested", [False, True])
+def test_get_order_fetches_exact_order(monkeypatch, nested):
     broker = TastytradeBroker()
     request = {}
 
@@ -28,14 +29,8 @@ def test_get_order_fetches_exact_order(monkeypatch):
             "method": method,
             "path": path,
         })
-        return FakeResponse({
-            "data": {
-                "order": {
-                    "id": "ORDER-77",
-                    "status": "Filled",
-                },
-            },
-        })
+        order = {"id": "ORDER-77", "status": "Filled"}
+        return FakeResponse({"data": {"order": order} if nested else order})
 
     monkeypatch.setattr(
         broker,

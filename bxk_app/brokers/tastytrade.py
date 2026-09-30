@@ -454,9 +454,9 @@ class TastytradeBroker(BrokerBase):
 
         try:
             payload = response.json()
-            order = (payload.get("data") or {}).get(
-                "order"
-            )
+            data = payload.get("data") or {}
+            # GET order returns data directly; submit responses wrap data.order.
+            order = data.get("order") if "order" in data else data
         except (AttributeError, TypeError, ValueError) as exc:
             self.last_error = (
                 "Invalid Tastytrade order response: "
@@ -464,7 +464,7 @@ class TastytradeBroker(BrokerBase):
             )
             return None
 
-        if not isinstance(order, dict):
+        if not isinstance(order, dict) or not order.get("id"):
             self.last_error = (
                 "Tastytrade did not return order data."
             )
