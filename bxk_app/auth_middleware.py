@@ -26,6 +26,7 @@ PUBLIC_PATHS = {
     "/privacy",
     "/terms",
     "/health",
+    "/api/access-requests",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/status",
