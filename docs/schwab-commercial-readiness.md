@@ -55,6 +55,10 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 - [ ] Confirm audit logging sufficient for broker connection and trade actions
 - [ ] Final production security review
 
+## Schwab submission package
+- [x] Commercial submission draft prepared in `docs/schwab-commercial-submission-draft.md`
+- [x] Follow-up email draft prepared in `docs/schwab-follow-up-email-draft.md`
+
 ## Schwab reviewer package
 - [ ] Public product URL
 - [ ] Reviewer/demo account
