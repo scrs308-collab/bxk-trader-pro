@@ -50,6 +50,10 @@ import {
   initializeAdminRequests,
 } from "./admin-requests.js?v=1";
 
+import {
+  initializeCommercialReadiness,
+} from "./commercial-readiness.js?v=1";
+
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;
 let backendOffline = false;
@@ -3877,6 +3881,8 @@ async function initializeDashboardApplication() {
     initializeAdminUsers();
 
   initializeAdminRequests();
+
+  initializeCommercialReadiness();
   }
 
   startDashboardRefresh();
