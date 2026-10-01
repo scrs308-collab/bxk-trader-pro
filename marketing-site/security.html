@@ -20,9 +20,10 @@
       <a href="/security.html">Security</a>
       <a href="/subscription.html">Subscription</a>
       <a href="/support.html">Support</a>
-      <a class="btn btn-primary" href="https://app.bxktraderpro.com">Launch Trader Pro</a>
+      <a href="https://app.bxktraderpro.com/login">Sign In</a>
+      <a class="btn btn-primary" href="https://app.bxktraderpro.com/application-access">Request Access</a>
     </div>
-    <a class="btn menu-btn" href="https://app.bxktraderpro.com">Launch App</a>
+    <a class="btn menu-btn" href="https://app.bxktraderpro.com/application-access">Request Access</a>
   </div>
 </nav>
 
@@ -41,8 +42,12 @@
     <p>Where supported, broker connections use OAuth authorization. Broker tokens are associated with the individual BXK Trader Pro user and stored in encrypted form.</p>
     <h2>Account isolation</h2>
     <p>Broker connections and selected accounts are scoped per user. The application is designed to fail closed when a user does not have access to the requested broker connection or account.</p>
+    <h2>Connection removal</h2>
+    <p>Supported broker integrations include a user-controlled disconnect path. For Schwab, BXK Trader Pro removes the locally stored authorization tokens and linked account metadata when the user disconnects. Any separate broker-side revocation requirement depends on the final approved broker workflow.</p>
     <h2>Execution controls</h2>
     <p>Account-data access and trade execution are treated as separate capabilities. A broker being available as a data source does not automatically make it an execution broker.</p>
+    <h2>Support safety</h2>
+    <p>BXK support will not ask users to send brokerage passwords, access tokens, refresh tokens, API secrets, Social Security numbers, or payment-card numbers through support messages.</p>
     <h2>Responsible disclosure</h2>
     <p>Security information on this page describes the product design and is not a certification, warranty, or guarantee that a security incident cannot occur.</p>
     </div>
