@@ -27,8 +27,6 @@ PUBLIC_PATHS = {
     "/privacy",
     "/terms",
     "/health",
-    "/api/access-requests",
-    "/api/support-requests",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/status",
@@ -64,9 +62,18 @@ async def enforce_bxk_authentication(
         )
     )
 
+    is_public_form_submission = (
+        request.method.upper() == "POST"
+        and path in {
+            "/api/access-requests",
+            "/api/support-requests",
+        }
+    )
+
     if (
         path in PUBLIC_PATHS
         or is_schwab_root_callback
+        or is_public_form_submission
     ):
         return await call_next(request)
 
