@@ -104,6 +104,24 @@ def create_support_request(
             # is temporarily unavailable.
             pass
 
+    try:
+        send_operational_email(
+            item.email,
+            subject=(
+                "BXK Trader Pro support request received"
+            ),
+            text=(
+                "We received your BXK Trader Pro "
+                "support request.\n\n"
+                f"Subject: {item.subject}\n"
+                f"Request ID: {item.id}\n\n"
+                "A BXK administrator can review the "
+                "request from the Trader Pro System tab."
+            ),
+        )
+    except Exception:
+        pass
+
     return {
         "accepted": True,
         "request_id": str(item.id),
