@@ -279,3 +279,59 @@ def test_support_request_notification_is_best_effort(
         assert item.email == (
             "support-notify@example.com"
         )
+
+
+
+def test_support_resolution_notification_does_not_block_status_update(
+    monkeypatch,
+):
+    factory = make_session_factory()
+    owner_id = add_user(
+        factory,
+        UserRole.OWNER,
+    )
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    create_response = TestClient(app).post(
+        "/api/support-requests",
+        json={
+            "name": "Resolution User",
+            "email": "resolution@example.com",
+            "subject": "Question",
+            "message": "Please review.",
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    import bxk_app.routes.support_requests as route
+
+    monkeypatch.setattr(
+        route,
+        "send_operational_email",
+        lambda *args, **kwargs: (
+            (_ for _ in ()).throw(
+                RuntimeError(
+                    "email unavailable"
+                )
+            )
+        ),
+    )
+
+    response = client_with_user(
+        owner_id
+    ).patch(
+        f"/api/support-requests/{request_id}/status",
+        json={
+            "status": "RESOLVED",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "RESOLVED"
