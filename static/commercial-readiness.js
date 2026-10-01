@@ -58,6 +58,7 @@ async function loadCommercialReadiness() {
       flag("Schwab OAuth config", checks.schwab_oauth_configured) +
       flag("Stripe checkout config", checks.stripe_checkout_configured) +
       flag("Reviewer safe mode", checks.reviewer_safe_mode) +
+      flag("Production demo hidden", checks.production_demo_hidden) +
       flag("Operational email", checks.operational_email_ready) +
       '<div style="margin-top:10px;font-size:12px;line-height:1.45;opacity:.72;">' +
       'Schwab commercial approval is tracked separately because it is an external approval, not a software configuration check.' +
