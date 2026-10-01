@@ -63,8 +63,8 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 ## Validation
 - [x] GitHub Actions pytest workflow added to the PR branch
 - [x] Full pytest suite passing on the commercial-readiness PR (862 passed)
-- [ ] New database migrations validated against temporary PostgreSQL in CI
-- [ ] Public customer journey smoke-tested end to end
+- [x] New database migrations validated against temporary PostgreSQL in CI
+- [ ] Public customer journey smoke-tested end to end (automated page smoke tests added; deployed review still pending)
 
 ## Release rule
 
