@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 from bxk_app.authorization import require_owner
 from bxk_app.database import get_db
 from bxk_app.db_models.access_request import AccessRequest
+from bxk_app.services.email_service import (
+    owner_notification_email,
+    send_operational_email,
+)
 
 
 router = APIRouter(
@@ -89,6 +93,35 @@ def submit_access_request(
     session.add(access_request)
     session.commit()
     session.refresh(access_request)
+
+    notification_email = (
+        owner_notification_email()
+    )
+
+    if notification_email:
+        try:
+            send_operational_email(
+                notification_email,
+                subject=(
+                    "New BXK Trader Pro "
+                    "access request"
+                ),
+                text=(
+                    "A new BXK Trader Pro access "
+                    "request was submitted.\n\n"
+                    f"Name: {access_request.full_name}\n"
+                    f"Email: {access_request.email}\n"
+                    f"Broker: {access_request.broker or 'Not provided'}\n"
+                    f"Request ID: {access_request.id}\n\n"
+                    "Review it in Trader Pro under "
+                    "System > Access & Support Requests."
+                ),
+            )
+        except Exception:
+            # Request persistence must not fail
+            # because an operational notification
+            # provider is unavailable.
+            pass
 
     return {
         "accepted": True,
