@@ -13,6 +13,11 @@ from bxk_app.services.sms_consent_service import (
     record_user_sms_consent,
     revoke_user_sms_consent,
 )
+from bxk_app.services.sms_alert_modes import (
+    get_preferences,
+    set_mode,
+    set_snooze,
+)
 from bxk_app.authorization import require_owner_or_beta
 
 
@@ -20,6 +25,20 @@ router = APIRouter(
     prefix="/api/sms",
     tags=["sms-consent"],
 )
+
+
+class SmsAlertModeRequest(BaseModel):
+    mode: str = Field(
+        min_length=2,
+        max_length=32,
+    )
+
+
+class SmsSnoozeRequest(BaseModel):
+    action: str = Field(
+        min_length=2,
+        max_length=32,
+    )
 
 
 class SmsOptInRequest(BaseModel):
@@ -83,9 +102,18 @@ def sms_subscription(
     ),
 ):
     try:
-        return get_user_sms_subscription(
-            user_context.get("user_id")
+        user_id = user_context.get("user_id")
+
+        result = get_user_sms_subscription(
+            user_id
         )
+
+        return {
+            **result,
+            **get_preferences(
+                user_id
+            ),
+        }
     except (LookupError, ValueError) as exc:
         raise HTTPException(
             status_code=404,
@@ -113,3 +141,42 @@ def sms_opt_out(
         "status": "OPTED_OUT",
         **result,
     }
+
+
+
+@router.post("/preferences")
+def sms_preferences(
+    payload: SmsAlertModeRequest,
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+):
+    try:
+        return set_mode(
+            user_context.get("user_id"),
+            payload.mode,
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/snooze")
+def sms_snooze(
+    payload: SmsSnoozeRequest,
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+):
+    try:
+        return set_snooze(
+            user_context.get("user_id"),
+            payload.action,
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
