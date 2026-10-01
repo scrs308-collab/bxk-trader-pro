@@ -221,6 +221,43 @@ def update_access_request_status(
     session.commit()
     session.refresh(item)
 
+    if status in {
+        "APPROVED",
+        "DECLINED",
+        "CLOSED",
+    }:
+        try:
+            subject = (
+                "BXK Trader Pro access request "
+                + status.lower()
+            )
+
+            if status == "APPROVED":
+                message = (
+                    "Your BXK Trader Pro access "
+                    "request has been approved. "
+                    "Account credentials are issued "
+                    "separately by BXK."
+                )
+            elif status == "DECLINED":
+                message = (
+                    "Your BXK Trader Pro access "
+                    "request has been declined."
+                )
+            else:
+                message = (
+                    "Your BXK Trader Pro access "
+                    "request has been closed."
+                )
+
+            send_operational_email(
+                item.email,
+                subject=subject,
+                text=message,
+            )
+        except Exception:
+            pass
+
     return {
         "id": str(item.id),
         "status": item.status,
