@@ -269,7 +269,7 @@ def test_access_request_notification_is_best_effort(
 
     assert response.status_code == 202
     assert response.json()["accepted"] is True
-    assert len(calls) == 1
+    assert len(calls) == 2
 
     with factory() as session:
         item = session.execute(
