@@ -149,6 +149,18 @@ BXK_BILLING_ENABLED = (
     in {"1", "true", "yes", "on"}
 )
 
+
+# Commercial reviewer demo. Keep disabled in production.
+BXK_REVIEW_DEMO_ENABLED = (
+    os.getenv(
+        "BXK_REVIEW_DEMO_ENABLED",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
 STRIPE_SECRET_KEY = os.getenv(
     "STRIPE_SECRET_KEY",
     "",
