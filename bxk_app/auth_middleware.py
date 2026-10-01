@@ -20,6 +20,7 @@ PUBLIC_PATHS = {
     "/api/broker-connection/tastytrade/callback",
     "/product",
     "/support",
+    "/review-demo",
     "/login",
     "/forgot-password",
     "/application-access",
