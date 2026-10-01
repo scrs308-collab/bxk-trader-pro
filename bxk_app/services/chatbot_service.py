@@ -10,7 +10,7 @@ OPENAI_RESPONSES_URL = (
     "https://api.openai.com/v1/responses"
 )
 
-DEFAULT_MODEL = "gpt-5.6-luna"
+DEFAULT_MODEL = "gpt-6-luna"
 MAX_MESSAGE_CHARS = 2000
 MAX_HISTORY_ITEMS = 8
 MAX_HISTORY_CHARS = 8000
