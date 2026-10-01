@@ -213,6 +213,7 @@ def test_subscriber_alert_uses_user_broker_and_phone(
                     "role": "BETA",
                 },
                 "phone_e164": "+15553271020",
+                "alert_mode": "ALL",
             }
         ],
     )
