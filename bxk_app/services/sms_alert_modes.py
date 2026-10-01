@@ -2,7 +2,10 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import uuid
 
+from sqlalchemy import select
+
 from bxk_app.database import get_session_factory
+from bxk_app.db_models.sms_alert_delivery import SmsAlertDelivery
 from bxk_app.db_models.user import User
 
 
@@ -21,6 +24,8 @@ VALID_MODES = {
 }
 
 DEFAULT_MODE = AFTER_HOURS
+DAYTIME_ALERT_LIMIT = 3
+DAYTIME_WINDOW_MINUTES = 60
 
 
 def normalize_mode(value):
@@ -138,3 +143,168 @@ def allows_daytime(mode, state):
 
 def allows_overnight(mode):
     return normalize_mode(mode) != OFF
+
+
+def _recent_daytime_deliveries(
+    session,
+    user_id,
+    *,
+    now,
+):
+    cutoff = now - timedelta(
+        minutes=DAYTIME_WINDOW_MINUTES
+    )
+
+    statement = (
+        select(SmsAlertDelivery)
+        .where(
+            SmsAlertDelivery.user_id == user_id,
+            SmsAlertDelivery.kind == "DAYTIME",
+            SmsAlertDelivery.sent_at >= cutoff,
+        )
+        .order_by(
+            SmsAlertDelivery.sent_at.asc()
+        )
+    )
+
+    return list(
+        session.scalars(statement).all()
+    )
+
+
+def daytime_delivery_decision(
+    user_id,
+    state,
+    *,
+    session_factory=None,
+):
+    factory = session_factory or get_session_factory()
+    parsed = _user_id(user_id)
+    now = datetime.now(timezone.utc)
+    state = str(state or "").strip().upper()
+
+    with factory() as session:
+        user = session.get(User, parsed)
+
+        if user is None:
+            return {
+                "allowed": False,
+                "reason": "NO_USER",
+            }
+
+        mode = normalize_mode(
+            user.sms_alert_mode
+        )
+
+        if not allows_daytime(mode, state):
+            return {
+                "allowed": False,
+                "reason": "MODE",
+            }
+
+        snoozed_until = _as_utc(
+            user.sms_snoozed_until
+        )
+
+        deliveries = _recent_daytime_deliveries(
+            session,
+            user.id,
+            now=now,
+        )
+
+        critical_recent = any(
+            str(
+                delivery.state or ""
+            ).upper() == "CRITICAL"
+            for delivery in deliveries
+        )
+
+        if (
+            snoozed_until
+            and snoozed_until > now
+        ):
+            if (
+                state == "CRITICAL"
+                and not critical_recent
+            ):
+                return {
+                    "allowed": True,
+                    "reason":
+                        "CRITICAL_BREAKTHROUGH",
+                }
+
+            return {
+                "allowed": False,
+                "reason": "SNOOZED",
+            }
+
+        if (
+            len(deliveries)
+            < DAYTIME_ALERT_LIMIT
+        ):
+            return {
+                "allowed": True,
+                "reason": "AVAILABLE",
+            }
+
+        if (
+            state == "CRITICAL"
+            and not critical_recent
+        ):
+            return {
+                "allowed": True,
+                "reason":
+                    "CRITICAL_BREAKTHROUGH",
+            }
+
+        return {
+            "allowed": False,
+            "reason": "RATE_LIMITED",
+        }
+
+
+def record_delivery(
+    user_id,
+    kind,
+    state,
+    *,
+    session_factory=None,
+):
+    factory = session_factory or get_session_factory()
+    parsed = _user_id(user_id)
+
+    with factory() as session:
+        session.add(
+            SmsAlertDelivery(
+                user_id=parsed,
+                kind=str(
+                    kind or ""
+                ).strip().upper(),
+                state=str(
+                    state or ""
+                ).strip().upper()
+                or None,
+                sent_at=datetime.now(
+                    timezone.utc
+                ),
+            )
+        )
+        session.commit()
+
+
+def overnight_delivery_allowed(
+    user_id,
+    *,
+    session_factory=None,
+):
+    preferences = get_preferences(
+        user_id,
+        session_factory=session_factory,
+    )
+
+    if preferences["snoozed"]:
+        return False
+
+    return allows_overnight(
+        preferences["alert_mode"]
+    )
