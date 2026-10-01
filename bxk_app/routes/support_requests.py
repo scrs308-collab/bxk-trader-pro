@@ -14,6 +14,12 @@ router = APIRouter(
 )
 
 
+class SupportRequestStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+
+
 class SupportRequestCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,4 +105,67 @@ def list_support_requests(
             }
             for item in items
         ]
+    }
+
+
+
+@router.patch("/{request_id}/status")
+def update_support_request_status(
+    request_id: str,
+    request_data: SupportRequestStatusUpdate,
+    _owner: dict = Depends(require_owner),
+    session: Session = Depends(get_db),
+):
+    allowed = {
+        "OPEN",
+        "RESOLVED",
+        "CLOSED",
+    }
+
+    status = str(
+        request_data.status or ""
+    ).strip().upper()
+
+    if status not in allowed:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported support-request status.",
+        )
+
+    try:
+        import uuid
+
+        parsed_id = uuid.UUID(
+            str(request_id)
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=404,
+            detail="Support request not found.",
+        ) from exc
+
+    item = session.get(
+        SupportRequest,
+        parsed_id,
+    )
+
+    if item is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=404,
+            detail="Support request not found.",
+        )
+
+    item.status = status
+    session.commit()
+    session.refresh(item)
+
+    return {
+        "id": str(item.id),
+        "status": item.status,
     }
