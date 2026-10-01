@@ -60,6 +60,12 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 - [ ] Support contact
 - [ ] Screenshots or short walkthrough, if requested
 
+## Validation
+- [x] GitHub Actions pytest workflow added to the PR branch
+- [ ] Full pytest suite passing on the commercial-readiness PR
+- [ ] New database migrations reviewed and applied in a non-production environment
+- [ ] Public customer journey smoke-tested end to end
+
 ## Release rule
 
 Do not merge this branch into production until the public copy, subscription presentation, application-access flow, and broker-review disclosures have been reviewed as one customer-facing experience.
