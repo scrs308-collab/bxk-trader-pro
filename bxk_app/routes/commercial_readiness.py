@@ -49,6 +49,9 @@ def commercial_readiness(
         "live_trading_enabled": bool(
             config.BXK_LIVE_TRADING_ENABLED
         ),
+        "review_demo_enabled": bool(
+            config.BXK_REVIEW_DEMO_ENABLED
+        ),
     }
 
     schwab = {
@@ -170,6 +173,9 @@ def commercial_readiness(
         ]),
         "reviewer_safe_mode": not bool(
             config.BXK_LIVE_TRADING_ENABLED
+        ),
+        "production_demo_hidden": not bool(
+            config.BXK_REVIEW_DEMO_ENABLED
         ),
         "operational_email_ready": all([
             operational_email[
