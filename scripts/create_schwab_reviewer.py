@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import uuid
 
 from sqlalchemy import func, select
 
@@ -136,7 +137,9 @@ def create_reviewer(*, apply: bool) -> int:
 
         user = session.get(
             User,
-            created["id"],
+            uuid.UUID(
+                created["id"]
+            ),
         )
 
         if user is None:
