@@ -2951,6 +2951,31 @@ function bindAccountStatusActions(
         }
 
         if (
+          action === "disconnect-schwab"
+        ) {
+          const confirmed =
+            window.confirm(
+              "Disconnect Schwab from BXK Trader Pro? " +
+              "Stored Schwab authorization and linked " +
+              "account data will be removed from BXK."
+            );
+
+          if (!confirmed) {
+            button.disabled = false;
+            button.textContent =
+              originalText;
+            return;
+          }
+
+          await fetchBrokerJson(
+            "/api/broker-connection/schwab",
+            {
+              method: "DELETE",
+            },
+          );
+        }
+
+        if (
           action === "select-broker"
         ) {
           const brokerName =
@@ -3350,6 +3375,14 @@ async function refreshAccountStatusBanner() {
         "connect-schwab",
       );
 
+    const schwabDisconnectAction =
+      schwabConnected
+        ? brokerActionButton(
+            "Disconnect Schwab",
+            "disconnect-schwab",
+          )
+        : "";
+
     let executionNote = "";
 
     if (live) {
@@ -3694,6 +3727,8 @@ async function refreshAccountStatusBanner() {
             "
           >
             ${schwabConnectAction}
+
+              ${schwabDisconnectAction}
             ${schwabDataAction}
           </div>
 
