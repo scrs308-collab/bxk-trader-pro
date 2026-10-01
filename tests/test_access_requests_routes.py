@@ -157,3 +157,61 @@ def test_beta_cannot_list_access_requests(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+
+def test_owner_can_update_access_request_status(monkeypatch):
+    factory = make_session_factory()
+    owner_id = add_user(factory, UserRole.OWNER)
+    configure_auth(monkeypatch, factory)
+
+    create_response = TestClient(app).post(
+        "/api/access-requests",
+        json={
+            "full_name": "Review User",
+            "email": "review-status@example.com",
+            "broker": "Schwab",
+            "intended_use": None,
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    response = client_with_user(owner_id).patch(
+        f"/api/access-requests/{request_id}/status",
+        json={"status": "APPROVED"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "APPROVED"
+
+
+def test_beta_cannot_update_access_request_status(monkeypatch):
+    factory = make_session_factory()
+    beta_id = add_user(factory, UserRole.BETA)
+    configure_auth(monkeypatch, factory)
+
+    create_response = TestClient(app).post(
+        "/api/access-requests",
+        json={
+            "full_name": "Review User",
+            "email": "review-beta@example.com",
+            "broker": None,
+            "intended_use": None,
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    response = client_with_user(beta_id).patch(
+        f"/api/access-requests/{request_id}/status",
+        json={"status": "APPROVED"},
+    )
+
+    assert response.status_code == 403
