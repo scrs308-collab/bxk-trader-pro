@@ -858,8 +858,22 @@ def disconnect_schwab(
         # Trader Pro's backward-compatible Tastytrade default.
         user.preferred_broker = None
 
-    # BrokerAccount rows are deleted by the database
-    # relationship's ON DELETE CASCADE.
+    linked_accounts = list(
+        session.scalars(
+            select(BrokerAccount)
+            .where(
+                BrokerAccount
+                .broker_connection_id
+                == connection.id
+            )
+        ).all()
+    )
+
+    for account in linked_accounts:
+        session.delete(
+            account
+        )
+
     session.delete(
         connection
     )
