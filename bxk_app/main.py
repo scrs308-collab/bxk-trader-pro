@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if config.BXK_PREVIEW_MODE:
+        logger.info(
+            "BXK preview mode enabled. Background "
+            "market/SMS monitors are disabled."
+        )
+        yield
+        return
+
     try:
         pending_sms = (
             provision_sms_phones_from_environment()
@@ -110,10 +118,22 @@ async def bxk_authentication_middleware(
     request,
     call_next,
 ):
-    return await enforce_bxk_authentication(
+    response = await enforce_bxk_authentication(
         request,
         call_next,
     )
+
+    if config.BXK_PREVIEW_MODE:
+        response.headers[
+            "X-Robots-Tag"
+        ] = (
+            "noindex, nofollow, noarchive"
+        )
+        response.headers[
+            "Cache-Control"
+        ] = "no-store"
+
+    return response
 
 
 app.include_router(router)
