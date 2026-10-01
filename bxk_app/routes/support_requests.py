@@ -198,6 +198,29 @@ def update_support_request_status(
     session.commit()
     session.refresh(item)
 
+    if status in {
+        "RESOLVED",
+        "CLOSED",
+    }:
+        try:
+            subject = (
+                "BXK Trader Pro support request "
+                + status.lower()
+            )
+
+            message = (
+                "Your BXK Trader Pro support "
+                f"request has been {status.lower()}."
+            )
+
+            send_operational_email(
+                item.email,
+                subject=subject,
+                text=message,
+            )
+        except Exception:
+            pass
+
     return {
         "id": str(item.id),
         "status": item.status,
