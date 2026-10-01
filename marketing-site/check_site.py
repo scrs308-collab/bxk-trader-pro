@@ -20,6 +20,12 @@ REQUIRED_EXTERNAL_LINKS = {
     "https://app.bxktraderpro.com/support",
 }
 
+FORBIDDEN_PUBLIC_LANGUAGE = {
+    "commercial draft",
+    "draft for product development",
+    "pre-launch legal review",
+}
+
 
 class LinkParser(HTMLParser):
     def __init__(self):
@@ -77,12 +83,21 @@ def main():
     all_links = set()
 
     for html_path in sorted(ROOT.glob("*.html")):
-        parser = LinkParser()
-        parser.feed(
-            html_path.read_text(
-                encoding="utf-8"
-            )
+        text = html_path.read_text(
+            encoding="utf-8"
         )
+
+        lowered = text.lower()
+
+        for phrase in FORBIDDEN_PUBLIC_LANGUAGE:
+            if phrase in lowered:
+                raise SystemExit(
+                    f"{html_path.name}: public page exposes "
+                    f"internal review language: {phrase}"
+                )
+
+        parser = LinkParser()
+        parser.feed(text)
 
         for href in parser.links:
             all_links.add(href)
