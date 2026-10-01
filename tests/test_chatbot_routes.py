@@ -134,3 +134,52 @@ def test_chat_cors_preflight(monkeypatch):
         ]
         == "https://bxktraderpro.com"
     )
+
+
+
+class _FakeResponse:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_openai_quota_error_is_actionable():
+    response = _FakeResponse(
+        429,
+        {
+            "error": {
+                "type":
+                    "insufficient_quota"
+            }
+        },
+    )
+
+    message = (
+        chatbot_service
+        ._openai_error_message(response)
+    )
+
+    assert "billing" in message.lower()
+    assert "quota" in message.lower()
+
+
+def test_openai_auth_error_is_actionable():
+    response = _FakeResponse(
+        401,
+        {
+            "error": {
+                "type":
+                    "invalid_api_key"
+            }
+        },
+    )
+
+    message = (
+        chatbot_service
+        ._openai_error_message(response)
+    )
+
+    assert "api key" in message.lower()
