@@ -1,4 +1,4 @@
-import { initializeAuthUi } from "./auth-ui.js?v=3";
+import { initializeAuthUi } from "./auth-ui.js?v=4";
 
 import {
   getAccessContext,

@@ -63,10 +63,17 @@
     button.className = "theme-toggle";
     button.type = "button";
 
+    const authControl =
+      document.getElementById("bxkAuthControl");
+
     apiStatus.parentNode.insertBefore(
       controls,
       apiStatus,
     );
+
+    if (authControl) {
+      controls.appendChild(authControl);
+    }
 
     controls.appendChild(button);
     controls.appendChild(apiStatus);

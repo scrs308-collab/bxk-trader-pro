@@ -1,4 +1,25 @@
-﻿function createAuthControl(username) {
+﻿function mountAuthControl(control) {
+    const controls = document.querySelector(
+        ".topbar-controls"
+    );
+
+    if (controls) {
+        const themeToggle =
+            document.getElementById("themeToggle");
+
+        controls.insertBefore(
+            control,
+            themeToggle || controls.firstChild
+        );
+
+        return;
+    }
+
+    mountAuthControl(control);
+}
+
+
+function createAuthControl(username) {
     if (document.getElementById("bxkAuthControl")) {
         return;
     }

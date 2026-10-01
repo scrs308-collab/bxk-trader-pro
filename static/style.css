@@ -5607,18 +5607,20 @@ body[data-theme="light"]
 /* BXK AUTH CONTROL V2 */
 
 .bxk-auth-control {
-    position: fixed !important;
-    top: 78px !important;
-    right: 18px !important;
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
     bottom: auto !important;
     left: auto !important;
 
-    z-index: 10000 !important;
+    z-index: auto !important;
 
     display: flex !important;
     align-items: center !important;
     gap: 10px !important;
+    flex: 0 0 auto !important;
 
+    margin: 0 !important;
     padding: 8px 9px 8px 13px !important;
 
     border: 1px solid rgba(100, 116, 139, 0.38) !important;
@@ -5627,7 +5629,7 @@ body[data-theme="light"]
     background: rgba(15, 23, 42, 0.96) !important;
 
     box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.28) !important;
+        0 8px 24px rgba(0, 0, 0, 0.20) !important;
 }
 
 .bxk-auth-user {
@@ -5675,8 +5677,7 @@ body[data-theme="light"]
 
 @media (max-width: 700px) {
     .bxk-auth-control {
-        top: 72px !important;
-        right: 8px !important;
+        padding-left: 9px !important;
     }
 
     .bxk-auth-user {
