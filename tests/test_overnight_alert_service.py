@@ -529,6 +529,11 @@ def test_subscriber_overnight_uses_user_broker_and_phone(
             (message, recipient)
         ),
     )
+    monkeypatch.setattr(
+        service,
+        "overnight_delivery_allowed",
+        lambda user_id, **kwargs: True,
+    )
 
     results = service._run_subscriber_overnight_checks(
         session_factory=factory,
