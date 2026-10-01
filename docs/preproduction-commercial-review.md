@@ -2,6 +2,15 @@
 
 Use this checklist before merging the Schwab/commercial-readiness work into production.
 
+## Reviewer demo safety
+
+The populated simulated reviewer page is controlled by `BXK_REVIEW_DEMO_ENABLED`.
+
+- Preview service: set to `true`
+- Production: leave unset or `false`
+- The route returns 404 when disabled
+- The demo contains simulated data only and must never be used as a substitute for real production-state validation
+
 ## Application deployment candidate
 
 Source branch:
