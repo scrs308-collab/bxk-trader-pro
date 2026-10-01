@@ -70,6 +70,8 @@ BXK Trader Pro includes:
 
 Create a dedicated reviewer-safe account before submitting the product for Schwab review.
 
+A dry-run-by-default helper is available at `scripts/create_schwab_reviewer.py`. It requires the reviewer username, email, and temporary password through environment variables, does not print the password, requires `--apply` before writing to the database, grants controlled reviewer subscription access, requires a password change on first login, and leaves Broker Connect, SMS alerts, and live trading disabled.
+
 Recommended properties:
 
 - Role: VIEWER or specially controlled BETA account
