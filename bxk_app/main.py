@@ -138,6 +138,13 @@ def support_page():
     )
 
 
+@app.get("/review-demo")
+def review_demo_page():
+    return FileResponse(
+        "static/review-demo.html"
+    )
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(
