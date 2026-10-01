@@ -822,3 +822,62 @@ def select_schwab_account(
         "is_active":
             True,
     }
+
+
+
+def disconnect_schwab(
+    session: Session,
+    *,
+    user_id,
+) -> bool:
+    """Remove the user's stored Schwab authorization and linked account metadata."""
+    connection = get_schwab_connection(
+        session,
+        user_id=user_id,
+    )
+
+    if connection is None:
+        return False
+
+    from bxk_app.db_models.user import User
+
+    user = session.get(
+        User,
+        user_id,
+    )
+
+    if (
+        user is not None
+        and str(
+            user.preferred_broker
+            or ""
+        ).strip().lower()
+        == SCHWAB_BROKER_NAME
+    ):
+        # Clearing the preference returns the account to
+        # Trader Pro's backward-compatible Tastytrade default.
+        user.preferred_broker = None
+
+    linked_accounts = list(
+        session.scalars(
+            select(BrokerAccount)
+            .where(
+                BrokerAccount
+                .broker_connection_id
+                == connection.id
+            )
+        ).all()
+    )
+
+    for account in linked_accounts:
+        session.delete(
+            account
+        )
+
+    session.delete(
+        connection
+    )
+
+    session.commit()
+
+    return True

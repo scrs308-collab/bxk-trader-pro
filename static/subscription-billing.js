@@ -126,7 +126,7 @@ function renderStatus(data) {
 
   if (!billing.enabled) {
     showMessage(
-      "Self-service billing is not open yet. Existing approved access remains unchanged.",
+      "BXK Trader Pro is currently invite-only. Public paid enrollment is not open, and existing approved beta access remains unchanged.",
     );
   }
 }

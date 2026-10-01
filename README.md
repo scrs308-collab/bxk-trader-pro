@@ -145,6 +145,15 @@ See the **docs** folder for:
 - Roadmap
 - Change Log
 
+### Commercial Readiness
+
+- `docs/schwab-commercial-readiness.md`
+- `docs/schwab-reviewer-package.md`
+- `docs/preproduction-commercial-review.md`
+- `docs/production-commercial-config-gap.md`
+- `docs/prelaunch-security-audit.md`
+- `docs/commercial-release-rollback.md`
+
 Stripe production setup and rollout instructions are in
 [`docs/stripe-billing.md`](docs/stripe-billing.md).
 

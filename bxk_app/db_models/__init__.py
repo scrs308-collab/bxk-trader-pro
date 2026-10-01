@@ -1,3 +1,5 @@
+from bxk_app.db_models.access_request import AccessRequest
+from bxk_app.db_models.support_request import SupportRequest
 from bxk_app.db_models.broker_connection import (
     BrokerConnection,
 )
@@ -25,6 +27,8 @@ from bxk_app.db_models.trade_journal import TradeJournal
 
 
 __all__ = [
+    "AccessRequest",
+    "SupportRequest",
     "BrokerConnection",
     "BrokerAccount",
     "ExecutionAudit",

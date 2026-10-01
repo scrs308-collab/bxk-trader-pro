@@ -18,6 +18,9 @@ PASSWORD_CHANGE_ALLOWED_PATHS = {
 
 PUBLIC_PATHS = {
     "/api/broker-connection/tastytrade/callback",
+    "/product",
+    "/support",
+    "/review-demo",
     "/login",
     "/forgot-password",
     "/application-access",
@@ -60,9 +63,18 @@ async def enforce_bxk_authentication(
         )
     )
 
+    is_public_form_submission = (
+        request.method.upper() == "POST"
+        and path in {
+            "/api/access-requests",
+            "/api/support-requests",
+        }
+    )
+
     if (
         path in PUBLIC_PATHS
         or is_schwab_root_callback
+        or is_public_form_submission
     ):
         return await call_next(request)
 

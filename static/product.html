@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BXK Trader Pro | SPX Options Decision Support</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      line-height: 1.6;
+    }
+    a { color: #93c5fd; }
+    .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; }
+    header {
+      border-bottom: 1px solid #1e293b;
+      background: rgba(2,6,23,.96);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .nav {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { font-weight: 900; letter-spacing: .03em; }
+    .navlinks { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .navlinks a { text-decoration: none; color: #cbd5e1; font-size: 14px; }
+    .button {
+      display: inline-block;
+      padding: 11px 16px;
+      border-radius: 9px;
+      background: #2563eb;
+      color: white !important;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .hero { padding: 82px 0 58px; }
+    .eyebrow {
+      color: #60a5fa;
+      text-transform: uppercase;
+      letter-spacing: .13em;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    h1 { font-size: clamp(38px, 6vw, 64px); line-height: 1.05; margin: 14px 0 20px; max-width: 920px; }
+    .lead { max-width: 790px; color: #cbd5e1; font-size: 20px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+    .secondary {
+      display: inline-block;
+      padding: 11px 16px;
+      border: 1px solid #334155;
+      border-radius: 9px;
+      color: #e5e7eb;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    section { padding: 52px 0; }
+    h2 { font-size: 32px; margin: 0 0 12px; }
+    .muted { color: #94a3b8; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 26px;
+    }
+    .card {
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 22px;
+      background: #0f172a;
+    }
+    .card h3 { margin-top: 0; }
+    .card p { color: #cbd5e1; margin-bottom: 0; }
+    .review {
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 24px;
+      background: #111827;
+    }
+    footer {
+      border-top: 1px solid #1e293b;
+      padding: 30px 0 42px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .footerlinks { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
+      .nav { align-items: flex-start; padding: 16px 0; }
+      .navlinks { justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="shell nav">
+    <div class="brand">BXK Trader Pro</div>
+    <nav class="navlinks" aria-label="Public site navigation">
+      <a href="#features">Features</a>
+      <a href="#brokers">Broker Connectivity</a>
+      <a href="#security">Security</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/support">Support</a>
+      <a class="button" href="/login">Sign In</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="shell">
+      <div class="eyebrow">Options trading decision-support software</div>
+      <h1>Live market intelligence, defined-risk trade construction, and position monitoring in one workspace.</h1>
+      <p class="lead">
+        BXK Trader Pro is designed for active options traders who want a structured workflow for market analysis,
+        trade construction, broker connectivity, position monitoring, alerts, and performance review.
+      </p>
+      <div class="actions">
+        <a class="button" href="/application-access">Request Account Access</a>
+        <a class="secondary" href="/login">Existing User Sign In</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="shell">
+      <h2>Core platform features</h2>
+      <p class="muted">The application combines market context with trade-building and risk-management tools.</p>
+      <div class="grid">
+        <article class="card">
+          <h3>Market Intelligence</h3>
+          <p>SPX and supported-underlying analysis, expected move, volatility context, market scoring, and live option-chain inputs.</p>
+        </article>
+        <article class="card">
+          <h3>Trade Construction</h3>
+          <p>Defined-risk strategies including iron condors, credit spreads, debit spreads, butterflies, and configurable probability targets.</p>
+        </article>
+        <article class="card">
+          <h3>Position Monitoring</h3>
+          <p>Open-position monitoring, risk-state analysis, profit and loss context, threatened-side detection, and configurable alerts.</p>
+        </article>
+        <article class="card">
+          <h3>Performance Tools</h3>
+          <p>Trade journaling and performance-oriented workflows designed to help users review how their trading process is behaving over time.</p>
+        </article>
+        <article class="card">
+          <h3>SMS Alerts</h3>
+          <p>Optional transactional text alerts for monitored trading-risk conditions. SMS enrollment requires explicit user consent.</p>
+        </article>
+        <article class="card">
+          <h3>Subscription Access</h3>
+          <p>Account-based access with monthly and annual billing options through Stripe-hosted checkout and customer billing management.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="brokers">
+    <div class="shell">
+      <h2>Broker connectivity</h2>
+      <div class="review">
+        <p>
+          BXK Trader Pro uses a broker-abstraction architecture so supported users can connect their own brokerage accounts.
+          Broker authorization is user-specific and is intended to use broker-provided authentication and authorization flows.
+        </p>
+        <p>
+          Current production connectivity includes Tastytrade integration. Schwab Trader API connectivity is being prepared
+          for commercial review and is not represented as generally available until the applicable commercial onboarding and approvals are complete.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="security">
+    <div class="shell">
+      <h2>Account and security controls</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Per-user access</h3>
+          <p>Accounts, broker connections, trading permissions, subscriptions, and optional alerts are associated with the authenticated user.</p>
+        </article>
+        <article class="card">
+          <h3>Protected credentials</h3>
+          <p>Broker-connection credentials are handled through application-side security controls rather than being exposed in the browser UI.</p>
+        </article>
+        <article class="card">
+          <h3>User control</h3>
+          <p>Users remain responsible for their brokerage accounts, orders, positions, and risk, including reviewing order details before submission.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shell review">
+      <h2>Important trading disclosure</h2>
+      <p>
+        BXK Trader Pro is a decision-support and trading-workflow platform. Trading options involves substantial risk and is not suitable for every investor.
+        Platform calculations, market data, alerts, and trade structures may be delayed, unavailable, or affected by third-party services.
+        Users are responsible for evaluating trades and monitoring their own brokerage accounts.
+      </p>
+      <p>
+        BXK Trader Pro does not guarantee investment results or that any market condition, trade condition, or risk event will be detected.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="shell">
+    <div class="footerlinks">
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms &amp; Conditions</a>
+      <a href="/sms-opt-in">SMS Disclosure &amp; Opt-In</a>
+      <a href="/support">Support</a>
+      <a href="/login">Sign In</a>
+    </div>
+    <div>BXK Trader Pro · BXK Capital Trading LLC · © 2026</div>
+  </div>
+</footer>
+</body>
+</html>

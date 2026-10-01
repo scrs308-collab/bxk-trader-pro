@@ -281,6 +281,6 @@ def test_authenticated_subscription_page_loads(
     )
 
     assert response.status_code == 200
-    assert "BXK Trader Pro Billing" in response.text
+    assert "BXK Trader Pro Access & Billing" in response.text
     assert "Choose Monthly" in response.text
     assert "Manage Billing" in response.text

@@ -631,6 +631,35 @@ def select_tastytrade_account(
     }
 
 
+@router.delete("/schwab")
+def disconnect_schwab(
+    user_context: dict = Depends(
+        require_owner_or_beta
+    ),
+    session: Session = Depends(
+        get_db
+    ),
+):
+    user_id = _database_user_id(
+        user_context
+    )
+
+    disconnected = (
+        schwab_connection_service
+        .disconnect_schwab(
+            session,
+            user_id=user_id,
+        )
+    )
+
+    return {
+        "broker": "schwab",
+        "disconnected": disconnected,
+        "local_authorization_removed":
+            disconnected,
+    }
+
+
 @router.get("/schwab/accounts")
 def schwab_accounts(
     user_context: dict = Depends(

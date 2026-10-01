@@ -640,3 +640,190 @@ def test_user_cannot_select_another_users_schwab_account(
         "9999000011112222"
         not in response.text
     )
+
+
+
+def test_schwab_disconnect_removes_local_authorization(
+    monkeypatch,
+):
+    session_factory = make_session_factory()
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    user_id = add_user(
+        session_factory,
+        username="schwabdisconnect",
+    )
+
+    with session_factory() as session:
+        user = session.get(
+            User,
+            uuid.UUID(user_id),
+        )
+        user.preferred_broker = "schwab"
+
+        connection = BrokerConnection(
+            user_id=uuid.UUID(user_id),
+            broker="schwab",
+            client_secret_encrypted=None,
+            refresh_token_encrypted=(
+                "encrypted-refresh"
+            ),
+            access_token_encrypted=(
+                "encrypted-access"
+            ),
+            account_number=(
+                "1111222233334444"
+            ),
+            base_url=(
+                "https://api.schwabapi.com"
+            ),
+            is_active=True,
+            is_verified=True,
+            live_trading_enabled=False,
+        )
+
+        session.add(connection)
+        session.flush()
+
+        session.add(
+            BrokerAccount(
+                broker_connection_id=(
+                    connection.id
+                ),
+                account_number=(
+                    "1111222233334444"
+                ),
+                broker_account_key="HASH1",
+                is_default=True,
+                is_active=True,
+            )
+        )
+
+        session.commit()
+
+    response = client_with_user(
+        user_id
+    ).delete(
+        "/api/broker-connection/schwab"
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.json()["disconnected"]
+        is True
+    )
+
+    with session_factory() as session:
+        connection = session.scalar(
+            select(BrokerConnection)
+            .where(
+                BrokerConnection.user_id
+                == uuid.UUID(user_id),
+                BrokerConnection.broker
+                == "schwab",
+            )
+        )
+
+        assert connection is None
+
+        accounts = list(
+            session.scalars(
+                select(BrokerAccount)
+            ).all()
+        )
+
+        assert accounts == []
+
+        user = session.get(
+            User,
+            uuid.UUID(user_id),
+        )
+
+        assert user.preferred_broker is None
+
+
+def test_schwab_disconnect_is_user_scoped(
+    monkeypatch,
+):
+    session_factory = make_session_factory()
+
+    configure_auth(
+        monkeypatch,
+        session_factory,
+    )
+
+    alpha_id = add_user(
+        session_factory,
+        username="disconnectalpha",
+    )
+
+    bravo_id = add_user(
+        session_factory,
+        username="disconnectbravo",
+    )
+
+    with session_factory() as session:
+        for user_id in (
+            alpha_id,
+            bravo_id,
+        ):
+            session.add(
+                BrokerConnection(
+                    user_id=uuid.UUID(
+                        user_id
+                    ),
+                    broker="schwab",
+                    client_secret_encrypted=None,
+                    refresh_token_encrypted=(
+                        "encrypted-refresh"
+                    ),
+                    access_token_encrypted=(
+                        "encrypted-access"
+                    ),
+                    account_number=None,
+                    base_url=(
+                        "https://api.schwabapi.com"
+                    ),
+                    is_active=True,
+                    is_verified=True,
+                    live_trading_enabled=False,
+                )
+            )
+
+        session.commit()
+
+    response = client_with_user(
+        alpha_id
+    ).delete(
+        "/api/broker-connection/schwab"
+    )
+
+    assert response.status_code == 200
+
+    with session_factory() as session:
+        alpha = session.scalar(
+            select(BrokerConnection)
+            .where(
+                BrokerConnection.user_id
+                == uuid.UUID(alpha_id),
+                BrokerConnection.broker
+                == "schwab",
+            )
+        )
+
+        bravo = session.scalar(
+            select(BrokerConnection)
+            .where(
+                BrokerConnection.user_id
+                == uuid.UUID(bravo_id),
+                BrokerConnection.broker
+                == "schwab",
+            )
+        )
+
+        assert alpha is None
+        assert bravo is not None

@@ -46,6 +46,14 @@ import {
   initializeAdminUsers,
 } from "./admin-users.js?v=4";
 
+import {
+  initializeAdminRequests,
+} from "./admin-requests.js?v=1";
+
+import {
+  initializeCommercialReadiness,
+} from "./commercial-readiness.js?v=1";
+
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;
 let backendOffline = false;
@@ -2951,6 +2959,31 @@ function bindAccountStatusActions(
         }
 
         if (
+          action === "disconnect-schwab"
+        ) {
+          const confirmed =
+            window.confirm(
+              "Disconnect Schwab from BXK Trader Pro? " +
+              "Stored Schwab authorization and linked " +
+              "account data will be removed from BXK."
+            );
+
+          if (!confirmed) {
+            button.disabled = false;
+            button.textContent =
+              originalText;
+            return;
+          }
+
+          await fetchBrokerJson(
+            "/api/broker-connection/schwab",
+            {
+              method: "DELETE",
+            },
+          );
+        }
+
+        if (
           action === "select-broker"
         ) {
           const brokerName =
@@ -3350,6 +3383,14 @@ async function refreshAccountStatusBanner() {
         "connect-schwab",
       );
 
+    const schwabDisconnectAction =
+      schwabConnected
+        ? brokerActionButton(
+            "Disconnect Schwab",
+            "disconnect-schwab",
+          )
+        : "";
+
     let executionNote = "";
 
     if (live) {
@@ -3694,6 +3735,8 @@ async function refreshAccountStatusBanner() {
             "
           >
             ${schwabConnectAction}
+
+              ${schwabDisconnectAction}
             ${schwabDataAction}
           </div>
 
@@ -3836,6 +3879,10 @@ async function initializeDashboardApplication() {
   if (hasOwnerAccess()) {
     initializeSystemSettings();
     initializeAdminUsers();
+
+  initializeAdminRequests();
+
+  initializeCommercialReadiness();
   }
 
   startDashboardRefresh();
