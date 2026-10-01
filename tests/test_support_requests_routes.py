@@ -157,3 +157,61 @@ def test_beta_cannot_list_support_requests(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+
+def test_owner_can_update_support_request_status(monkeypatch):
+    factory = make_session_factory()
+    owner_id = add_user(factory, UserRole.OWNER)
+    configure_auth(monkeypatch, factory)
+
+    create_response = TestClient(app).post(
+        "/api/support-requests",
+        json={
+            "name": "Review User",
+            "email": "support-status@example.com",
+            "subject": "Question",
+            "message": "Please review this request.",
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    response = client_with_user(owner_id).patch(
+        f"/api/support-requests/{request_id}/status",
+        json={"status": "RESOLVED"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "RESOLVED"
+
+
+def test_beta_cannot_update_support_request_status(monkeypatch):
+    factory = make_session_factory()
+    beta_id = add_user(factory, UserRole.BETA)
+    configure_auth(monkeypatch, factory)
+
+    create_response = TestClient(app).post(
+        "/api/support-requests",
+        json={
+            "name": "Review User",
+            "email": "support-beta@example.com",
+            "subject": "Question",
+            "message": "Please review this request.",
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    response = client_with_user(beta_id).patch(
+        f"/api/support-requests/{request_id}/status",
+        json={"status": "RESOLVED"},
+    )
+
+    assert response.status_code == 403
