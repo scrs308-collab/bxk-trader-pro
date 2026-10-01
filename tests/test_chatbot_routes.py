@@ -105,3 +105,32 @@ def test_chat_service_never_requires_private_account_data():
         "Schwab commercial approval"
         in instructions
     )
+
+
+
+def test_chat_cors_preflight(monkeypatch):
+    monkeypatch.setattr(
+        config,
+        "BXK_AUTH_ENABLED",
+        True,
+    )
+
+    response = TestClient(app).options(
+        "/api/chat",
+        headers={
+            "Origin":
+                "https://bxktraderpro.com",
+            "Access-Control-Request-Method":
+                "POST",
+            "Access-Control-Request-Headers":
+                "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers[
+            "access-control-allow-origin"
+        ]
+        == "https://bxktraderpro.com"
+    )
