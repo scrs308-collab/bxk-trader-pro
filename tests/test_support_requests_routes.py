@@ -215,3 +215,67 @@ def test_beta_cannot_update_support_request_status(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+
+def test_support_request_notification_is_best_effort(
+    monkeypatch,
+):
+    factory = make_session_factory()
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    import bxk_app.routes.support_requests as route
+
+    monkeypatch.setattr(
+        route,
+        "owner_notification_email",
+        lambda: "owner@example.com",
+    )
+
+    calls = []
+
+    def fake_send(
+        recipient,
+        *,
+        subject,
+        text,
+    ):
+        calls.append(
+            (recipient, subject, text)
+        )
+        raise RuntimeError(
+            "notification unavailable"
+        )
+
+    monkeypatch.setattr(
+        route,
+        "send_operational_email",
+        fake_send,
+    )
+
+    response = TestClient(app).post(
+        "/api/support-requests",
+        json={
+            "name": "Notification User",
+            "email": "support-notify@example.com",
+            "subject": "Test request",
+            "message": "Please review.",
+            "website": None,
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is True
+    assert len(calls) == 1
+
+    with factory() as session:
+        item = session.execute(
+            select(SupportRequest)
+        ).scalar_one()
+
+        assert item.email == (
+            "support-notify@example.com"
+        )
