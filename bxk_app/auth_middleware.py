@@ -33,6 +33,8 @@ PUBLIC_PATHS = {
     "/api/auth/status",
     "/api/auth/forgot-password",
     "/api/billing/webhook",
+    "/api/chat",
+    "/api/chat/status",
     "/api/broker-connection/schwab/callback",
 }
 
