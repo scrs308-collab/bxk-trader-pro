@@ -38,6 +38,13 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 - [ ] Prepare reviewer-safe demo account and workflow
 - [ ] Do not advertise Schwab connectivity as generally available before approval
 
+## Production configuration
+- [x] Railway production variable-name audit completed
+- [x] Missing commercial variables documented in `docs/production-commercial-config-gap.md`
+- [ ] Add Schwab production client ID/secret only after commercial approval
+- [ ] Configure Stripe test-mode variables and validate billing
+- [ ] Configure production Stripe variables before public paid enrollment
+
 ## Security and operational controls
 - [x] Authenticated application routes
 - [x] Per-user broker access boundaries
