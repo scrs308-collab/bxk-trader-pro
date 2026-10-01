@@ -86,6 +86,15 @@ function renderAccess(items) {
       actionButton("access", item.id, "Approve", "APPROVED") +
       actionButton("access", item.id, "Decline", "DECLINED") +
       actionButton("access", item.id, "Close", "CLOSED") +
+      '<button type="button" data-prepare-user-from-access="true" ' +
+      'data-access-name="' + escapeHtml(item.full_name) + '" ' +
+      'data-access-email="' + escapeHtml(item.email) + '" ' +
+      'style="padding:7px 10px;border-radius:7px;' +
+      'border:1px solid rgba(59,130,246,.4);' +
+      'background:rgba(37,99,235,.18);color:inherit;' +
+      'cursor:pointer;font-size:11px;font-weight:700;">' +
+      'Prepare User' +
+      '</button>' +
       '</div></article>';
   }).join("");
 }
@@ -160,6 +169,65 @@ export function initializeAdminRequests() {
   card.hidden = false;
 
   card.addEventListener("click", async function(event) {
+    const prepare =
+      event.target.closest(
+        "button[data-prepare-user-from-access]"
+      );
+
+    if (prepare) {
+      const email =
+        prepare.dataset.accessEmail || "";
+      const name =
+        prepare.dataset.accessName || "";
+
+      const suggestedUsername =
+        name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ".")
+          .replace(/^\.+|\.+$/g, "")
+          .slice(0, 100);
+
+      const usernameField =
+        byId("bxkAdminUsername");
+      const emailField =
+        byId("bxkAdminEmail");
+      const roleField =
+        byId("bxkAdminRole");
+
+      if (usernameField) {
+        usernameField.value =
+          suggestedUsername;
+      }
+
+      if (emailField) {
+        emailField.value = email;
+      }
+
+      if (roleField) {
+        roleField.value = "BETA";
+      }
+
+      const message =
+        byId("bxkAdminRequestsMessage");
+
+      if (message) {
+        message.textContent =
+          "User Administration prefilled. Review the username, generate a temporary password, then create the user.";
+      }
+
+      const adminCard =
+        byId("adminUsersCard");
+
+      if (adminCard) {
+        adminCard.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+
+      return;
+    }
+
     const button = event.target.closest("button[data-request-type]");
     if (!button) return;
 
