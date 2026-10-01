@@ -27,3 +27,6 @@ def test_owner_request_admin_ui_is_wired():
     assert "/api/access-requests" in admin_requests
     assert "/api/support-requests" in admin_requests
     assert 'method: "PATCH"' in admin_requests
+    assert "Prepare User" in admin_requests
+    assert "bxkAdminUsername" in admin_requests
+    assert "bxkAdminEmail" in admin_requests
