@@ -529,6 +529,11 @@ def test_subscriber_overnight_uses_user_broker_and_phone(
             (message, recipient)
         ),
     )
+    monkeypatch.setattr(
+        service,
+        "overnight_delivery_allowed",
+        lambda user_id, **kwargs: True,
+    )
 
     results = service._run_subscriber_overnight_checks(
         session_factory=factory,
@@ -537,3 +542,24 @@ def test_subscriber_overnight_uses_user_broker_and_phone(
     assert results[0]["action"] == "ALERTED"
     assert sent[0][1] == "+15553271020"
     assert "OVERNIGHT" in sent[0][0]
+
+
+def test_overnight_send_gate_suppresses_delivery():
+    factory = make_factory()
+    sent = []
+
+    result = process_overnight_risk(
+        payload("RED"),
+        session_factory=factory,
+        send_func=sent.append,
+        send_allowed_func=lambda state: False,
+    )
+
+    assert result["action"] == "STATE_UPDATED"
+    assert result["alert_sent"] is False
+    assert sent == []
+
+    stored = read_state(factory)
+
+    assert stored.state == "RED"
+    assert stored.last_alerted_state is None

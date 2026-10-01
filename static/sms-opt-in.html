@@ -128,6 +128,79 @@
       font-size: 14px;
     }
 
+    .settings-panel {
+      display: none;
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      background: #111827;
+    }
+
+    .settings-panel.visible {
+      display: block;
+    }
+
+    .settings-panel h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      color: #ffffff;
+    }
+
+    .settings-panel p {
+      margin: 0 0 16px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .settings-panel label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .settings-panel select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      background: #020617;
+      color: #ffffff;
+      font-size: 15px;
+    }
+
+    .settings-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .settings-actions button {
+      margin-top: 0;
+      padding: 11px 8px;
+      background: #1e293b;
+      border: 1px solid #475569;
+    }
+
+    .settings-actions button:hover {
+      background: #334155;
+    }
+
+    #preferenceStatus {
+      min-height: 22px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    @media (max-width: 560px) {
+      .settings-actions {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .success {
       color: #86efac;
     }
@@ -228,6 +301,62 @@
 
     <div id="status"></div>
 
+    <section
+      id="settingsPanel"
+      class="settings-panel"
+      aria-label="SMS alert preferences"
+    >
+      <h2>Alert Preferences</h2>
+      <p>
+        Choose which trading-risk events can send
+        text messages to this account.
+      </p>
+
+      <label for="alertMode">
+        SMS Alert Mode
+      </label>
+
+      <select id="alertMode">
+        <option value="AFTER_HOURS">
+          After-Hours Only (Default)
+        </option>
+        <option value="AFTER_HOURS_CRITICAL">
+          After-Hours + Critical Daytime
+        </option>
+        <option value="ALL">
+          All Risk Alerts
+        </option>
+        <option value="OFF">
+          Off
+        </option>
+      </select>
+
+      <div class="settings-actions">
+        <button
+          type="button"
+          data-snooze="ONE_HOUR"
+        >
+          Snooze 1 Hour
+        </button>
+
+        <button
+          type="button"
+          data-snooze="UNTIL_TOMORROW"
+        >
+          Snooze Until Tomorrow
+        </button>
+
+        <button
+          type="button"
+          data-snooze="RESUME"
+        >
+          Resume Alerts
+        </button>
+      </div>
+
+      <div id="preferenceStatus"></div>
+    </section>
+
     <div class="legal">
       No marketing or promotional SMS messages
       are sent. Mobile opt-in information is not
@@ -254,6 +383,21 @@
     const phoneInput =
       document.getElementById(
         "phoneNumber"
+      );
+
+    const settingsPanel =
+      document.getElementById(
+        "settingsPanel"
+      );
+
+    const alertMode =
+      document.getElementById(
+        "alertMode"
+      );
+
+    const preferenceStatus =
+      document.getElementById(
+        "preferenceStatus"
       );
 
     async function loadSubscription() {
@@ -285,12 +429,31 @@
           phoneInput.required = false;
         }
 
+        if (subscription.alert_mode) {
+          alertMode.value =
+            subscription.alert_mode;
+        }
+
         if (subscription.enabled) {
           statusElement.className = "success";
           statusElement.textContent =
             `SMS alerts are enabled for ${subscription.phone}.`;
           button.textContent =
             "SMS ALERTS ENABLED";
+          settingsPanel.classList.add(
+            "visible"
+          );
+        }
+
+        if (subscription.snoozed) {
+          preferenceStatus.textContent =
+            "Alerts are snoozed until " +
+            new Date(
+              subscription.snoozed_until
+            ).toLocaleString();
+        } else {
+          preferenceStatus.textContent =
+            "Alerts are active under the selected mode.";
         }
       } catch (error) {
         // The disclosure remains available if status
@@ -355,6 +518,12 @@
           button.textContent =
             "SMS ALERTS ENABLED";
 
+          settingsPanel.classList.add(
+            "visible"
+          );
+
+          await loadSubscription();
+
         } catch (error) {
           statusElement.className =
             "error";
@@ -366,6 +535,103 @@
           button.textContent =
             "ENABLE SMS ALERTS";
         }
+      }
+    );
+
+    alertMode.addEventListener(
+      "change",
+      async () => {
+        preferenceStatus.textContent =
+          "Saving alert mode...";
+
+        try {
+          const response = await fetch(
+            "/api/sms/preferences",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+              body: JSON.stringify({
+                mode: alertMode.value
+              })
+            }
+          );
+
+          const result =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              result.detail ||
+              "Unable to save alert mode."
+            );
+          }
+
+          preferenceStatus.textContent =
+            "Alert mode saved.";
+
+        } catch (error) {
+          preferenceStatus.textContent =
+            error.message;
+        }
+      }
+    );
+
+    document.querySelectorAll(
+      "[data-snooze]"
+    ).forEach(
+      (snoozeButton) => {
+        snoozeButton.addEventListener(
+          "click",
+          async () => {
+            preferenceStatus.textContent =
+              "Updating snooze...";
+
+            try {
+              const response = await fetch(
+                "/api/sms/snooze",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+                  body: JSON.stringify({
+                    action:
+                      snoozeButton.dataset.snooze
+                  })
+                }
+              );
+
+              const result =
+                await response.json();
+
+              if (!response.ok) {
+                throw new Error(
+                  result.detail ||
+                  "Unable to update snooze."
+                );
+              }
+
+              if (result.snoozed) {
+                preferenceStatus.textContent =
+                  "Alerts snoozed until " +
+                  new Date(
+                    result.snoozed_until
+                  ).toLocaleString();
+              } else {
+                preferenceStatus.textContent =
+                  "Alerts resumed.";
+              }
+
+            } catch (error) {
+              preferenceStatus.textContent =
+                error.message;
+            }
+          }
+        );
       }
     );
   </script>

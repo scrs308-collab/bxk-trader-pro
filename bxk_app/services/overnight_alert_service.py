@@ -25,6 +25,10 @@ from bxk_app.services.sms_consent_service import (
 from bxk_app.services.broker_connection_service import (
     resolve_preferred_broker,
 )
+from bxk_app.services.sms_alert_modes import (
+    get_owner_preferences,
+    overnight_delivery_allowed,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -477,6 +481,7 @@ def process_overnight_risk(
     session_factory=None,
     send_func=send_bxk_sms,
     scope=ALERT_SCOPE,
+    send_allowed_func=None,
 ):
     factory = (
         session_factory
@@ -524,36 +529,51 @@ def process_overnight_risk(
                 "RED",
                 "CRITICAL",
             }:
-                message = build_overnight_sms(
-                    None,
-                    current_state,
-                    payload,
+                delivery_allowed = (
+                    send_allowed_func is None
+                    or send_allowed_func(
+                        current_state
+                    )
                 )
 
-                # Never silently baseline a dangerous
-                # first observation. Send before commit
-                # so a failed SMS remains retryable.
-                send_func(message)
+                if delivery_allowed:
+                    message = build_overnight_sms(
+                        None,
+                        current_state,
+                        payload,
+                    )
+
+                    # Never silently baseline a dangerous
+                    # first observation when alerts are
+                    # enabled. Send before commit so a
+                    # failed SMS remains retryable.
+                    send_func(message)
+
+                    state.last_alerted_state = (
+                        current_state
+                    )
+                    state.last_alerted_at = (
+                        datetime.now(
+                            EASTERN
+                        )
+                    )
 
                 state.state = current_state
                 state.reason_code = reason_code
-                state.last_alerted_state = (
-                    current_state
-                )
-                state.last_alerted_at = (
-                    datetime.now(
-                        EASTERN
-                    )
-                )
 
                 session.commit()
 
                 return {
-                    "action": "ALERTED",
+                    "action": (
+                        "ALERTED"
+                        if delivery_allowed
+                        else "STATE_UPDATED"
+                    ),
                     "previous_state": None,
                     "current_state":
                         current_state,
-                    "alert_sent": True,
+                    "alert_sent":
+                        delivery_allowed,
                 }
 
             state.state = current_state
@@ -618,25 +638,39 @@ def process_overnight_risk(
                 "RED",
                 "CRITICAL",
             }:
-                message = build_overnight_sms(
-                    None,
-                    current_state,
-                    payload,
-                )
-
-                send_func(message)
-
-                state.last_alerted_state = (
-                    current_state
-                )
-                state.last_alerted_at = (
-                    datetime.now(
-                        EASTERN
+                delivery_allowed = (
+                    send_allowed_func is None
+                    or send_allowed_func(
+                        current_state
                     )
                 )
 
-                action = "ALERTED"
-                alert_sent = True
+                if delivery_allowed:
+                    message = build_overnight_sms(
+                        None,
+                        current_state,
+                        payload,
+                    )
+
+                    send_func(message)
+
+                    state.last_alerted_state = (
+                        current_state
+                    )
+                    state.last_alerted_at = (
+                        datetime.now(
+                            EASTERN
+                        )
+                    )
+
+                action = (
+                    "ALERTED"
+                    if delivery_allowed
+                    else "STATE_UPDATED"
+                )
+                alert_sent = (
+                    delivery_allowed
+                )
 
             else:
                 action = "BASELINE"
@@ -683,7 +717,17 @@ def process_overnight_risk(
             )
         )
 
-        if should_alert:
+        delivery_allowed = (
+            should_alert
+            and (
+                send_allowed_func is None
+                or send_allowed_func(
+                    current_state
+                )
+            )
+        )
+
+        if delivery_allowed:
             message = (
                 build_overnight_sms(
                     previous_state,
@@ -716,7 +760,7 @@ def process_overnight_risk(
         return {
             "action": (
                 "ALERTED"
-                if should_alert
+                if delivery_allowed
                 else "STATE_UPDATED"
             ),
             "previous_state":
@@ -724,7 +768,7 @@ def process_overnight_risk(
             "current_state":
                 current_state,
             "alert_sent":
-                should_alert,
+                delivery_allowed,
         }
 
 
@@ -783,6 +827,14 @@ def _run_subscriber_overnight_checks(
                     "USER_OVERNIGHT:"
                     + user_id.replace("-", "")[:12]
                 ),
+                send_allowed_func=(
+                    lambda state,
+                    uid=user_id:
+                        overnight_delivery_allowed(
+                            uid,
+                            session_factory=factory,
+                        )
+                ),
             )
 
         except Exception as exc:
@@ -819,8 +871,26 @@ def run_overnight_alert_check():
         get_live_overnight_risk()
     )
 
+    owner_preferences = (
+        get_owner_preferences()
+    )
+
+    owner_user_id = (
+        owner_preferences.get("user_id")
+    )
+
     owner_result = process_overnight_risk(
-        payload
+        payload,
+        send_allowed_func=(
+            (
+                lambda state:
+                    overnight_delivery_allowed(
+                        owner_user_id
+                    )
+            )
+            if owner_user_id
+            else None
+        ),
     )
 
     subscriber_results = (

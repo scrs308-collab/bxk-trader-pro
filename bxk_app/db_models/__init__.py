@@ -15,6 +15,9 @@ from bxk_app.db_models.overnight_alert_state import (
 from bxk_app.db_models.sms_consent import (
     SmsConsent,
 )
+from bxk_app.db_models.sms_alert_delivery import (
+    SmsAlertDelivery,
+)
 from bxk_app.db_models.subscription import (
     BillingWebhookEvent,
     SubscriptionPlan,
@@ -35,6 +38,7 @@ __all__ = [
     "TradeJournal",
     "OvernightAlertState",
     "SmsConsent",
+    "SmsAlertDelivery",
     "BillingWebhookEvent",
     "SubscriptionPlan",
     "SubscriptionProvider",

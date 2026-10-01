@@ -213,6 +213,7 @@ def test_subscriber_alert_uses_user_broker_and_phone(
                     "role": "BETA",
                 },
                 "phone_e164": "+15553271020",
+                "alert_mode": "ALL",
             }
         ],
     )
@@ -245,6 +246,19 @@ def test_subscriber_alert_uses_user_broker_and_phone(
         lambda message, *, recipient: sent.append(
             (message, recipient)
         ),
+    )
+    monkeypatch.setattr(
+        service,
+        "daytime_delivery_decision",
+        lambda user_id, state, **kwargs: {
+            "allowed": True,
+            "reason": "TEST",
+        },
+    )
+    monkeypatch.setattr(
+        service,
+        "record_delivery",
+        lambda user_id, kind, state, **kwargs: None,
     )
 
     results = service._run_subscriber_daytime_checks(

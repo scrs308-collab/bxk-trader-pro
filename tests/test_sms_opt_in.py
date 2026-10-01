@@ -196,3 +196,22 @@ def test_sms_opt_in_records_consent(
     assert captured["user_id"] == TEST_USER_ID
 
     app.dependency_overrides.clear()
+
+
+def test_sms_opt_in_page_has_alert_preferences():
+    source = Path(
+        "static/sms-opt-in.html"
+    ).read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "Alert Preferences" in source
+    assert "After-Hours Only (Default)" in source
+    assert "After-Hours + Critical Daytime" in source
+    assert "All Risk Alerts" in source
+    assert 'value="OFF"' in source
+    assert 'data-snooze="ONE_HOUR"' in source
+    assert 'data-snooze="UNTIL_TOMORROW"' in source
+    assert 'data-snooze="RESUME"' in source
+    assert "/api/sms/preferences" in source
+    assert "/api/sms/snooze" in source
