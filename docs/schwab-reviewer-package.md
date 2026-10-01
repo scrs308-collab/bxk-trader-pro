@@ -91,7 +91,7 @@ Record the reviewer username and delivery method separately from source control.
 6. Show trade construction without submitting a live order unless review specifically requires it.
 7. Show Position Monitor and account-isolation behavior.
 8. Show Billing and SMS consent as separate optional features.
-9. Show the broker disconnect/revoke path.
+9. Show the broker disconnect path. BXK removes the user's stored Schwab tokens and linked account metadata locally. Any separate Schwab-side authorization revocation mechanism remains subject to the final commercial API capabilities and Schwab's approved workflow.
 10. Provide Privacy and Terms URLs again in the reviewer response.
 
 ## Items to confirm before submission
