@@ -106,6 +106,67 @@ class ChatbotRateLimitError(RuntimeError):
     pass
 
 
+def _openai_error_message(response) -> str:
+    status = int(
+        getattr(response, "status_code", 0)
+        or 0
+    )
+
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+
+    error = (
+        payload.get("error", {})
+        if isinstance(payload, dict)
+        else {}
+    )
+
+    code = str(
+        error.get("code")
+        or error.get("type")
+        or ""
+    ).strip().lower()
+
+    if status == 401:
+        return (
+            "BXK Assistant authentication with the AI service failed. "
+            "The OpenAI API key needs to be checked."
+        )
+
+    if status == 429:
+        if (
+            "quota" in code
+            or "billing" in code
+            or "insufficient" in code
+        ):
+            return (
+                "BXK Assistant has no available OpenAI API quota. "
+                "OpenAI API billing or credits need to be enabled."
+            )
+
+        return (
+            "BXK Assistant is temporarily rate-limited by the AI service."
+        )
+
+    if status == 400:
+        return (
+            "BXK Assistant sent a request the AI service could not accept. "
+            "The configured model or request settings need to be checked."
+        )
+
+    if status == 403:
+        return (
+            "BXK Assistant does not currently have permission to use "
+            "the configured AI model."
+        )
+
+    return (
+        "BXK Assistant is temporarily unavailable."
+    )
+
+
 def chatbot_config() -> dict:
     return {
         "enabled": bool(
@@ -319,7 +380,7 @@ def ask_chatbot(
 
     if response.status_code >= 400:
         raise RuntimeError(
-            "BXK Assistant is temporarily unavailable."
+            _openai_error_message(response)
         )
 
     answer = _extract_output_text(
