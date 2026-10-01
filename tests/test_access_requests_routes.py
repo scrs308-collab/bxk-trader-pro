@@ -277,3 +277,59 @@ def test_access_request_notification_is_best_effort(
         ).scalar_one()
 
         assert item.email == "notify@example.com"
+
+
+
+def test_access_decision_notification_does_not_block_status_update(
+    monkeypatch,
+):
+    factory = make_session_factory()
+    owner_id = add_user(
+        factory,
+        UserRole.OWNER,
+    )
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    create_response = TestClient(app).post(
+        "/api/access-requests",
+        json={
+            "full_name": "Decision User",
+            "email": "decision@example.com",
+            "broker": "Schwab",
+            "intended_use": None,
+            "website": None,
+        },
+    )
+
+    request_id = create_response.json()[
+        "request_id"
+    ]
+
+    import bxk_app.routes.access_requests as route
+
+    monkeypatch.setattr(
+        route,
+        "send_operational_email",
+        lambda *args, **kwargs: (
+            (_ for _ in ()).throw(
+                RuntimeError(
+                    "email unavailable"
+                )
+            )
+        ),
+    )
+
+    response = client_with_user(
+        owner_id
+    ).patch(
+        f"/api/access-requests/{request_id}/status",
+        json={
+            "status": "APPROVED",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "APPROVED"
