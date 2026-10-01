@@ -161,6 +161,17 @@ BXK_REVIEW_DEMO_ENABLED = (
     in {"1", "true", "yes", "on"}
 )
 
+
+BXK_PREVIEW_MODE = (
+    os.getenv(
+        "BXK_PREVIEW_MODE",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
 STRIPE_SECRET_KEY = os.getenv(
     "STRIPE_SECRET_KEY",
     "",
