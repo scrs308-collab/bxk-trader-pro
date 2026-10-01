@@ -140,6 +140,12 @@ def support_page():
 
 @app.get("/review-demo")
 def review_demo_page():
+    if not config.BXK_REVIEW_DEMO_ENABLED:
+        raise HTTPException(
+            status_code=404,
+            detail="Not found.",
+        )
+
     return FileResponse(
         "static/review-demo.html"
     )
