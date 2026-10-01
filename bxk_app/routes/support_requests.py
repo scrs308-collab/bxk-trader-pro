@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 from bxk_app.authorization import require_owner
 from bxk_app.database import get_db
 from bxk_app.db_models.support_request import SupportRequest
+from bxk_app.services.email_service import (
+    owner_notification_email,
+    send_operational_email,
+)
 
 
 router = APIRouter(
@@ -70,6 +74,35 @@ def create_support_request(
     session.add(item)
     session.commit()
     session.refresh(item)
+
+    notification_email = (
+        owner_notification_email()
+    )
+
+    if notification_email:
+        try:
+            send_operational_email(
+                notification_email,
+                subject=(
+                    "New BXK Trader Pro "
+                    "support request"
+                ),
+                text=(
+                    "A new BXK Trader Pro support "
+                    "request was submitted.\n\n"
+                    f"Name: {item.name}\n"
+                    f"Email: {item.email}\n"
+                    f"Subject: {item.subject}\n"
+                    f"Request ID: {item.id}\n\n"
+                    "Review it in Trader Pro under "
+                    "System > Access & Support Requests."
+                ),
+            )
+        except Exception:
+            # Support persistence must not fail
+            # because email notification delivery
+            # is temporarily unavailable.
+            pass
 
     return {
         "accepted": True,
