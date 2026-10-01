@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from bxk_app.database import get_session_factory
 from bxk_app.db_models.sms_alert_delivery import SmsAlertDelivery
-from bxk_app.db_models.user import User
+from bxk_app.db_models.user import User, UserRole
 
 
 EASTERN = ZoneInfo("America/New_York")
@@ -308,3 +308,39 @@ def overnight_delivery_allowed(
     return allows_overnight(
         preferences["alert_mode"]
     )
+
+
+
+def get_owner_preferences(
+    *,
+    session_factory=None,
+):
+    factory = session_factory or get_session_factory()
+
+    with factory() as session:
+        owner = session.scalar(
+            select(User).where(
+                User.role == UserRole.OWNER,
+                User.is_active.is_(True),
+            )
+        )
+
+        if owner is None:
+            return {
+                "user_id": None,
+                "alert_mode": DEFAULT_MODE,
+                "snoozed": False,
+                "snoozed_until": None,
+                "daytime_enabled": False,
+                "overnight_enabled": True,
+            }
+
+        result = get_preferences(
+            owner.id,
+            session_factory=factory,
+        )
+
+        return {
+            "user_id": str(owner.id),
+            **result,
+        }
