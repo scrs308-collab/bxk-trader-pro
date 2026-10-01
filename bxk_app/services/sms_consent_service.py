@@ -571,6 +571,13 @@ def list_active_sms_subscriptions(
                     },
                     "phone_e164":
                         consent.phone_e164,
+                    "alert_mode":
+                        str(
+                            user.sms_alert_mode
+                            or "AFTER_HOURS"
+                        ).strip().upper(),
+                    "sms_snoozed_until":
+                        user.sms_snoozed_until,
                 }
             )
 
