@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 import time
@@ -16,6 +17,8 @@ MAX_HISTORY_ITEMS = 8
 MAX_HISTORY_CHARS = 8000
 RATE_LIMIT_REQUESTS = 20
 RATE_LIMIT_WINDOW_SECONDS = 60
+
+logger = logging.getLogger(__name__)
 
 _rate_lock = threading.Lock()
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
@@ -104,6 +107,48 @@ class ChatbotConfigurationError(RuntimeError):
 
 class ChatbotRateLimitError(RuntimeError):
     pass
+
+
+def _log_openai_error(response) -> None:
+    status = int(
+        getattr(response, "status_code", 0)
+        or 0
+    )
+
+    try:
+        payload = response.json()
+    except Exception:
+        payload = {}
+
+    error = (
+        payload.get("error", {})
+        if isinstance(payload, dict)
+        else {}
+    )
+
+    headers = getattr(response, "headers", {}) or {}
+
+    logger.warning(
+        "OpenAI chatbot request failed: status=%s type=%s code=%s "
+        "request_id=%s limit_requests=%s remaining_requests=%s "
+        "limit_tokens=%s remaining_tokens=%s reset_requests=%s "
+        "reset_tokens=%s message=%s",
+        status,
+        str(error.get("type") or "")[:120],
+        str(error.get("code") or "")[:120],
+        str(
+            headers.get("x-request-id")
+            or headers.get("request-id")
+            or ""
+        )[:160],
+        str(headers.get("x-ratelimit-limit-requests") or "")[:80],
+        str(headers.get("x-ratelimit-remaining-requests") or "")[:80],
+        str(headers.get("x-ratelimit-limit-tokens") or "")[:80],
+        str(headers.get("x-ratelimit-remaining-tokens") or "")[:80],
+        str(headers.get("x-ratelimit-reset-requests") or "")[:80],
+        str(headers.get("x-ratelimit-reset-tokens") or "")[:80],
+        str(error.get("message") or "")[:500],
+    )
 
 
 def _openai_error_message(response) -> str:
@@ -379,6 +424,7 @@ def ask_chatbot(
         ) from exc
 
     if response.status_code >= 400:
+        _log_openai_error(response)
         raise RuntimeError(
             _openai_error_message(response)
         )
