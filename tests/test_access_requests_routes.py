@@ -215,3 +215,65 @@ def test_beta_cannot_update_access_request_status(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+
+def test_access_request_notification_is_best_effort(
+    monkeypatch,
+):
+    factory = make_session_factory()
+    configure_auth(
+        monkeypatch,
+        factory,
+    )
+
+    import bxk_app.routes.access_requests as route
+
+    monkeypatch.setattr(
+        route,
+        "owner_notification_email",
+        lambda: "owner@example.com",
+    )
+
+    calls = []
+
+    def fake_send(
+        recipient,
+        *,
+        subject,
+        text,
+    ):
+        calls.append(
+            (recipient, subject, text)
+        )
+        raise RuntimeError(
+            "notification unavailable"
+        )
+
+    monkeypatch.setattr(
+        route,
+        "send_operational_email",
+        fake_send,
+    )
+
+    response = TestClient(app).post(
+        "/api/access-requests",
+        json={
+            "full_name": "Notification User",
+            "email": "notify@example.com",
+            "broker": "Schwab",
+            "intended_use": None,
+            "website": None,
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is True
+    assert len(calls) == 1
+
+    with factory() as session:
+        item = session.execute(
+            select(AccessRequest)
+        ).scalar_one()
+
+        assert item.email == "notify@example.com"
