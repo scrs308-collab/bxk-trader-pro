@@ -578,6 +578,67 @@
   </section>
 
 
+
+  <section
+    class="card"
+    id="adminRequestsCard"
+    data-owner-only="true"
+    hidden
+  >
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+      "
+    >
+      <div class="card-label">
+        Access &amp; Support Requests
+      </div>
+
+      <button
+        id="bxkRefreshAdminRequests"
+        type="button"
+      >
+        Refresh
+      </button>
+    </div>
+
+    <div
+      style="
+        display:grid;
+        grid-template-columns:
+          repeat(auto-fit,minmax(280px,1fr));
+        gap:14px;
+        margin-top:12px;
+      "
+    >
+      <div>
+        <strong>Access Requests</strong>
+        <div id="bxkAccessRequestsList">
+          Loading...
+        </div>
+      </div>
+
+      <div>
+        <strong>Support Requests</strong>
+        <div id="bxkSupportRequestsList">
+          Loading...
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="bxkAdminRequestsMessage"
+      style="
+        margin-top:10px;
+        font-size:12px;
+        opacity:.75;
+      "
+    ></div>
+  </section>
+
   <section
     class="card"
     id="adminUsersCard"
