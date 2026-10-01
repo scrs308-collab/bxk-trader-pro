@@ -72,9 +72,12 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 - [ ] Screenshots or short walkthrough, if requested
 
 ## Validation
+- [x] Application preview URL: https://bxk-trader-pro-preview-production.up.railway.app
+- [x] Populated reviewer demo: https://bxk-trader-pro-preview-production.up.railway.app/review-demo
+- [x] Marketing preview URL: https://bxk-marketing-preview-production.up.railway.app
 - [x] Marketing-site PR validation passes for required pages and critical app links
 - [x] GitHub Actions pytest workflow added to the PR branch
-- [x] Full pytest suite passing on the commercial-readiness PR (874 passed)
+- [x] Full pytest suite passing on the commercial-readiness PR (893 passed)
 - [x] New database migrations validated against temporary PostgreSQL in CI
 - [ ] Public customer journey smoke-tested end to end (automated page smoke tests added; deployed review still pending)
 
