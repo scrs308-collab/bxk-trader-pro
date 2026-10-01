@@ -27,6 +27,13 @@ from bxk_app.services.sms_service import (
 from bxk_app.services.sms_consent_service import (
     list_active_sms_subscriptions,
 )
+from bxk_app.services.sms_alert_modes import (
+    AFTER_HOURS,
+    OFF,
+    daytime_delivery_decision,
+    get_owner_preferences,
+    record_delivery,
+)
 from bxk_app.services.broker_connection_service import (
     resolve_preferred_broker,
 )
@@ -322,6 +329,9 @@ def process_position_threat(
     session_factory=None,
     send_func=send_bxk_sms,
     scope_prefix: str = ALERT_SCOPE_PREFIX,
+    allowed_alert_states=None,
+    send_allowed_func=None,
+    sent_func=None,
 ):
     risk = classify_position_threat(
         position
@@ -406,13 +416,33 @@ def process_position_threat(
                 "alert_sent": False,
             }
 
-        should_alert = _should_alert(
+        candidate_alert = _should_alert(
             previous_state,
             current_state,
             stored.last_alerted_state,
             previous_side,
             current_side,
         )
+
+        allowed_states = (
+            ALERT_STATES
+            if allowed_alert_states is None
+            else set(allowed_alert_states)
+        )
+
+        should_alert = (
+            candidate_alert
+            and current_state in allowed_states
+        )
+
+        if (
+            should_alert
+            and send_allowed_func is not None
+            and not send_allowed_func(
+                current_state
+            )
+        ):
+            should_alert = False
 
         if should_alert:
             message = build_daytime_sms(
@@ -422,6 +452,11 @@ def process_position_threat(
             # Send before committing state so a failed
             # SMS remains retryable on the next poll.
             send_func(message)
+
+            if sent_func is not None:
+                sent_func(
+                    current_state
+                )
 
             stored.last_alerted_state = (
                 current_state
@@ -468,6 +503,9 @@ def _process_daytime_monitor(
     session_factory=None,
     send_func=send_bxk_sms,
     scope_prefix: str = ALERT_SCOPE_PREFIX,
+    allowed_alert_states=None,
+    send_allowed_func=None,
+    sent_func=None,
 ):
     if (
         not isinstance(
@@ -492,6 +530,9 @@ def _process_daytime_monitor(
             session_factory=session_factory,
             send_func=send_func,
             scope_prefix=scope_prefix,
+            allowed_alert_states=allowed_alert_states,
+            send_allowed_func=send_allowed_func,
+            sent_func=sent_func,
         )
         for position in positions
         if isinstance(
@@ -551,6 +592,34 @@ def _run_subscriber_daytime_checks(
             user_context["user_id"]
         )
 
+        mode = str(
+            subscription.get(
+                "alert_mode",
+                AFTER_HOURS,
+            )
+            or AFTER_HOURS
+        ).strip().upper()
+
+        if mode in {
+            AFTER_HOURS,
+            OFF,
+        }:
+            results.append(
+                {
+                    "username":
+                        user_context.get("username"),
+                    "action": "MODE_IDLE",
+                    "alert_sent": False,
+                }
+            )
+            continue
+
+        allowed_states = (
+            {"CRITICAL"}
+            if mode == "AFTER_HOURS_CRITICAL"
+            else ALERT_STATES
+        )
+
         try:
             with factory() as session:
                 broker_client = (
@@ -579,6 +648,27 @@ def _run_subscriber_daytime_checks(
                 scope_prefix=(
                     "USER_DAY:"
                     + user_id.replace("-", "")[:12]
+                ),
+                allowed_alert_states=
+                    allowed_states,
+                send_allowed_func=(
+                    lambda state,
+                    uid=user_id:
+                        daytime_delivery_decision(
+                            uid,
+                            state,
+                            session_factory=factory,
+                        )["allowed"]
+                ),
+                sent_func=(
+                    lambda state,
+                    uid=user_id:
+                        record_delivery(
+                            uid,
+                            "DAYTIME",
+                            state,
+                            session_factory=factory,
+                        )
                 ),
             )
 
@@ -618,9 +708,63 @@ def run_daytime_alert_check():
             "alert_sent": False,
         }
 
-    owner_result = _process_daytime_monitor(
-        get_position_monitor()
+    owner_preferences = (
+        get_owner_preferences()
     )
+
+    owner_user_id = (
+        owner_preferences.get("user_id")
+    )
+
+    owner_mode = str(
+        owner_preferences.get(
+            "alert_mode",
+            AFTER_HOURS,
+        )
+        or AFTER_HOURS
+    ).strip().upper()
+
+    if (
+        owner_user_id
+        and owner_mode not in {
+            AFTER_HOURS,
+            OFF,
+        }
+    ):
+        owner_allowed_states = (
+            {"CRITICAL"}
+            if owner_mode
+            == "AFTER_HOURS_CRITICAL"
+            else ALERT_STATES
+        )
+
+        owner_result = _process_daytime_monitor(
+            get_position_monitor(),
+            allowed_alert_states=
+                owner_allowed_states,
+            send_allowed_func=(
+                lambda state:
+                    daytime_delivery_decision(
+                        owner_user_id,
+                        state,
+                    )["allowed"]
+            ),
+            sent_func=(
+                lambda state:
+                    record_delivery(
+                        owner_user_id,
+                        "DAYTIME",
+                        state,
+                    )
+            ),
+        )
+    else:
+        owner_result = {
+            "action": "MODE_IDLE",
+            "alert_count": 0,
+            "alert_sent": False,
+            "results": [],
+        }
 
     subscriber_results = (
         _run_subscriber_daytime_checks()
