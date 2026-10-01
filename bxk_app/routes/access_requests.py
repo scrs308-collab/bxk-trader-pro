@@ -14,6 +14,12 @@ router = APIRouter(
 )
 
 
+class AccessRequestStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+
+
 class AccessRequestCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -127,4 +133,62 @@ def list_access_requests(
             }
             for item in requests
         ]
+    }
+
+
+
+@router.patch("/{request_id}/status")
+def update_access_request_status(
+    request_id: str,
+    request_data: AccessRequestStatusUpdate,
+    _owner: dict = Depends(require_owner),
+    session: Session = Depends(get_db),
+):
+    allowed = {
+        "PENDING",
+        "APPROVED",
+        "DECLINED",
+        "CLOSED",
+    }
+
+    status = str(
+        request_data.status or ""
+    ).strip().upper()
+
+    if status not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported access-request status.",
+        )
+
+    try:
+        import uuid
+
+        parsed_id = uuid.UUID(
+            str(request_id)
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Access request not found.",
+        ) from exc
+
+    item = session.get(
+        AccessRequest,
+        parsed_id,
+    )
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Access request not found.",
+        )
+
+    item.status = status
+    session.commit()
+    session.refresh(item)
+
+    return {
+        "id": str(item.id),
+        "status": item.status,
     }
