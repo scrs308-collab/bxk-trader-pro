@@ -34,7 +34,7 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 - [x] Schwab callback and connection foundation
 - [ ] Complete Schwab commercial onboarding
 - [ ] Confirm final Schwab scopes and production redirect URI
-- [ ] Verify disconnect/revoke experience
+- [x] Verify BXK-local Schwab disconnect experience (token/account cleanup + user isolation). Separate Schwab-side revocation remains dependent on final approved API workflow.
 - [ ] Prepare reviewer-safe demo account and workflow
 - [ ] Do not advertise Schwab connectivity as generally available before approval
 
@@ -62,7 +62,7 @@ This branch tracks work required to present BXK Trader Pro as a finished commerc
 
 ## Validation
 - [x] GitHub Actions pytest workflow added to the PR branch
-- [x] Full pytest suite passing on the commercial-readiness PR (862 passed)
+- [x] Full pytest suite passing on the commercial-readiness PR (874 passed)
 - [x] New database migrations validated against temporary PostgreSQL in CI
 - [ ] Public customer journey smoke-tested end to end (automated page smoke tests added; deployed review still pending)
 
