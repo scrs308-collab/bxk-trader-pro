@@ -247,6 +247,19 @@ def test_subscriber_alert_uses_user_broker_and_phone(
             (message, recipient)
         ),
     )
+    monkeypatch.setattr(
+        service,
+        "daytime_delivery_decision",
+        lambda user_id, state, **kwargs: {
+            "allowed": True,
+            "reason": "TEST",
+        },
+    )
+    monkeypatch.setattr(
+        service,
+        "record_delivery",
+        lambda user_id, kind, state, **kwargs: None,
+    )
 
     results = service._run_subscriber_daytime_checks(
         session_factory=factory,
