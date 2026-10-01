@@ -123,6 +123,25 @@ def submit_access_request(
             # provider is unavailable.
             pass
 
+    try:
+        send_operational_email(
+            access_request.email,
+            subject=(
+                "BXK Trader Pro access request received"
+            ),
+            text=(
+                "We received your BXK Trader Pro "
+                "access request.\n\n"
+                f"Request ID: {access_request.id}\n\n"
+                "Access requests are reviewed before "
+                "an account is issued. If approved, "
+                "account credentials are provided "
+                "separately by BXK."
+            ),
+        )
+    except Exception:
+        pass
+
     return {
         "accepted": True,
         "request_id": str(access_request.id),
