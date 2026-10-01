@@ -93,6 +93,18 @@ class User(Base):
         server_default="false",
     )
 
+    sms_alert_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="AFTER_HOURS",
+        server_default="AFTER_HOURS",
+    )
+
+    sms_snoozed_until: Mapped[object | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
