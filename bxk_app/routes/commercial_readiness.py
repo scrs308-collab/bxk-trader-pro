@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends
 
 from bxk_app import config
@@ -64,6 +66,33 @@ def commercial_readiness(
             ),
         "commercial_approval":
             "PENDING_EXTERNAL_APPROVAL",
+    }
+
+    operational_email = {
+        "recipient_configured": _configured(
+            os.getenv(
+                "BXK_SUPPORT_EMAIL",
+                os.getenv(
+                    "BXK_APP_EMAIL",
+                    "",
+                ),
+            )
+        ),
+        "sender_configured": _configured(
+            os.getenv(
+                "BXK_SMTP_FROM",
+                "",
+            )
+        ),
+        "provider_key_configured": _configured(
+            os.getenv(
+                "BXK_RESEND_API_KEY",
+                os.getenv(
+                    "BXK_SMTP_PASSWORD",
+                    "",
+                ),
+            )
+        ),
     }
 
     stripe = {
@@ -142,6 +171,17 @@ def commercial_readiness(
         "reviewer_safe_mode": not bool(
             config.BXK_LIVE_TRADING_ENABLED
         ),
+        "operational_email_ready": all([
+            operational_email[
+                "recipient_configured"
+            ],
+            operational_email[
+                "sender_configured"
+            ],
+            operational_email[
+                "provider_key_configured"
+            ],
+        ]),
     }
 
     ready_count = sum(
@@ -158,4 +198,6 @@ def commercial_readiness(
         "security": security,
         "schwab": schwab,
         "stripe": stripe,
+        "operational_email":
+            operational_email,
     }
