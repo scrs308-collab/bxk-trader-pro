@@ -46,6 +46,10 @@ import {
   initializeAdminUsers,
 } from "./admin-users.js?v=4";
 
+import {
+  initializeAdminRequests,
+} from "./admin-requests.js?v=1";
+
 let lastSuccessfulUpdate = null;
 let consecutiveNetworkFailures = 0;
 let backendOffline = false;
@@ -3871,6 +3875,8 @@ async function initializeDashboardApplication() {
   if (hasOwnerAccess()) {
     initializeSystemSettings();
     initializeAdminUsers();
+
+  initializeAdminRequests();
   }
 
   startDashboardRefresh();
