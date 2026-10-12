@@ -26,6 +26,8 @@ from bxk_app.services.sms_consent_service import (
 )
 
 
+from bxk_app.services.stop_audit_service import run_stop_audit_monitor
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,9 +86,17 @@ async def lifespan(app: FastAPI):
         daytime_alert_task
     )
 
+    stop_audit_task = asyncio.create_task(run_stop_audit_monitor(), name="bxk-stop-audit")
+    app.state.stop_audit_task = stop_audit_task
+
     try:
         yield
     finally:
+        stop_audit_task.cancel()
+        try:
+            await stop_audit_task
+        except asyncio.CancelledError:
+            pass
         daytime_alert_task.cancel()
         overnight_alert_task.cancel()
         heartbeat_task.cancel()

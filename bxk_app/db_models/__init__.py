@@ -27,6 +27,7 @@ from bxk_app.db_models.subscription import (
 )
 from bxk_app.db_models.user import User, UserRole
 from bxk_app.db_models.trade_journal import TradeJournal
+from bxk_app.db_models.stop_audit import StopAudit, StopAuditSample
 
 
 __all__ = [
@@ -36,6 +37,8 @@ __all__ = [
     "BrokerAccount",
     "ExecutionAudit",
     "TradeJournal",
+    "StopAudit",
+    "StopAuditSample",
     "OvernightAlertState",
     "SmsConsent",
     "SmsAlertDelivery",

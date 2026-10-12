@@ -6,7 +6,7 @@
 
   <title>BXK Trader Pro</title>
 
-  <link rel="stylesheet" href="/static/style.css?v=29" />
+  <link rel="stylesheet" href="/static/style.css?v=30" />
   <link rel="stylesheet" href="/static/position-v10.css?v=1" />
   <link rel="icon" href="/static/favicon.ico" />
 </head>
@@ -530,6 +530,68 @@
       Performance history has not been loaded yet.
     </div>
   </section>
+
+  <section class="card stop-audit" id="stopAuditSection" aria-labelledby="stopAuditHeading">
+    <div class="journal-header-row">
+      <div>
+        <h2 class="card-label" id="stopAuditHeading">Stop Audit</h2>
+        <p class="stop-audit-subtitle">Observe the hypothetical hold after a confirmed stop-out.</p>
+        <p id="stopAuditStatus" class="stop-audit-status" role="status" aria-live="polite">
+          Stop Audit loads when this tab is opened.
+        </p>
+      </div>
+      <button id="stopAuditRefreshButton" class="journal-refresh-button" type="button">REFRESH</button>
+    </div>
+
+    <div class="stop-audit-notice">
+      <strong>Observation only. No positions reopened or orders placed.</strong>
+      <p>First release: account-verified Tastytrade SPXW PM-settled iron condors. A closed trade is not automatically a stop-out. Sampling starts only when you explicitly enroll it; the earlier gap is unobserved.</p>
+      <p>Regular-session quotes are sampled about once a minute. Midpoint marks are estimates, not executable fills. Breakeven, profit, best and worst values refer only to valid observed samples, not every moment of the hold. Expiration P/L requires verified settlement data; an unavailable value is never treated as $0.</p>
+    </div>
+
+    <h3 class="stop-audit-section-heading">Tracked stop-outs</h3>
+    <div id="stopAuditList" class="stop-audit-list">
+      <p class="stop-audit-empty">Open Performance to load your audits.</p>
+    </div>
+
+    <div class="stop-audit-enrollment">
+      <h3 class="stop-audit-section-heading">Enroll a closed condor</h3>
+      <p id="stopAuditCandidateStatus" class="stop-audit-subtitle">Eligible closed trades will appear here for your confirmation.</p>
+      <form id="stopAuditForm" hidden>
+        <fieldset id="stopAuditFields">
+          <legend class="stop-audit-sr-only">Confirm a stop-out and enter total estimated costs</legend>
+          <label class="stop-audit-field" for="stopAuditCandidate">
+            <span>Closed trade</span>
+            <select id="stopAuditCandidate" name="journal_id" required aria-describedby="stopAuditCandidateSummary"></select>
+          </label>
+          <p id="stopAuditCandidateSummary" class="stop-audit-subtitle"></p>
+
+          <p id="stopAuditCostHelp" class="stop-audit-cost-help">Enter your estimated fees and commissions in USD, total for the entire position. All three amounts are required. Enter 0 only if you estimate no cost.</p>
+          <div class="stop-audit-cost-grid">
+            <label class="stop-audit-field" for="stopAuditEntryCosts">
+              <span>Entry costs ($ total)</span>
+              <input id="stopAuditEntryCosts" name="entry_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+            <label class="stop-audit-field" for="stopAuditActualExitCosts">
+              <span>Actual stop-close costs ($ total)</span>
+              <input id="stopAuditActualExitCosts" name="actual_exit_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+            <label class="stop-audit-field" for="stopAuditHypotheticalExitCosts">
+              <span>Hypothetical exit costs ($ total)</span>
+              <input id="stopAuditHypotheticalExitCosts" name="hypothetical_exit_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+          </div>
+          <p class="stop-audit-subtitle">These are user estimates, not broker-verified costs. Hypothetical net P/L subtracts entry and hypothetical exit costs, and excludes the actual stop-close fee.</p>
+          <label class="stop-audit-confirm" for="stopAuditConfirm">
+            <input id="stopAuditConfirm" name="confirm_stop_out" type="checkbox" required />
+            <span>I confirm this selected position was closed because my stop was hit.</span>
+          </label>
+          <button id="stopAuditEnrollButton" class="stop-audit-primary" type="submit">Confirm stop-out and track</button>
+        </fieldset>
+      </form>
+      <p id="stopAuditFormMessage" class="stop-audit-form-message" role="status" aria-live="polite"></p>
+    </div>
+  </section>
 </div>
 
 <div
@@ -690,7 +752,7 @@
   </section>
 </div>
 </div>
-<script type="module" src="/static/dashboard.js?v=37"></script>
+<script type="module" src="/static/dashboard.js?v=38"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
    
