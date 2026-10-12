@@ -89,3 +89,6 @@ router.include_router(sms_consent_router)
 router.include_router(trade_journal_router)
 router.include_router(billing_router)
 router.include_router(buying_power_settings_router)
+
+from bxk_app.routes.stop_audit import router as stop_audit_router
+router.include_router(stop_audit_router)

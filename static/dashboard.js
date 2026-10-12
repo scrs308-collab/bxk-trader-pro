@@ -1,3 +1,4 @@
+import { loadStopAudit } from "./stop-audit.js?v=1";
 import { initializeAuthUi } from "./auth-ui.js?v=4";
 
 import {
@@ -2408,6 +2409,7 @@ function initializeDashboardTabs() {
         && hasTradingAccess()
       ) {
         loadTradeJournalPerformance();
+        loadStopAudit();
       }
     });
   });
