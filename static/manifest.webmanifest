@@ -1,0 +1,16 @@
+{
+  "name": "BXK Trader Pro",
+  "short_name": "BXK",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101b32",
+  "theme_color": "#101b32",
+  "icons": [
+    {
+      "src": "/static/bxk-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
