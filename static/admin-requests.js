@@ -66,7 +66,10 @@ function renderAccess(items) {
     return;
   }
 
-  container.innerHTML = items.map(function(item) {
+  container.innerHTML = '<p style="font-size:12px;line-height:1.5;">' +
+    'Approve sends a status notification; it does not create an account or send a password setup link. ' +
+    'To onboard a user: Prepare User, review and Create User, then Send Setup Link in User Administration.' +
+    '</p>' + items.map(function(item) {
     const intended = item.intended_use
       ? '<div style="margin-top:6px;"><strong>Use:</strong> ' +
         escapeHtml(item.intended_use) + '</div>'
@@ -157,6 +160,11 @@ async function updateRequest(type, id, status) {
   );
 
   await loadRequests();
+  if (type === "access" && status === "APPROVED") {
+    const message = byId("bxkAdminRequestsMessage");
+    if (message) message.textContent =
+      "Request approved. The approval status notification was requested. No account was created and no setup link was sent. Choose Prepare User, then Create User, then Send Setup Link.";
+  }
 }
 
 export function initializeAdminRequests() {
@@ -207,12 +215,15 @@ export function initializeAdminRequests() {
         roleField.value = "BETA";
       }
 
+      const passwordField = byId("bxkAdminTemporaryPassword");
+      if (passwordField) passwordField.value = "";
+
       const message =
         byId("bxkAdminRequestsMessage");
 
       if (message) {
         message.textContent =
-          "User Administration prefilled. Review the username, generate a temporary password, then create the user.";
+          "User Administration prefilled. Review the username and email, generate a temporary password, then Create User. The temporary password is not emailed. After creation, choose Send Setup Link so the user can set their own password.";
       }
 
       const adminCard =
@@ -229,7 +240,7 @@ export function initializeAdminRequests() {
     }
 
     const button = event.target.closest("button[data-request-type]");
-    if (!button) return;
+    if (!button || button.disabled) return;
 
     button.disabled = true;
 

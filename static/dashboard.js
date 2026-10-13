@@ -45,11 +45,11 @@ import {
 
 import {
   initializeAdminUsers,
-} from "./admin-users.js?v=4";
+} from "./admin-users.js?v=5";
 
 import {
   initializeAdminRequests,
-} from "./admin-requests.js?v=1";
+} from "./admin-requests.js?v=2";
 
 import {
   initializeCommercialReadiness,

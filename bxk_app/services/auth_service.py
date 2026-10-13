@@ -257,6 +257,7 @@ def authenticate_database_credentials(
         "role": None,
         "broker_oauth_enabled": False,
         "must_change_password": False,
+        "session_version": None,
         "subscription": None,
     }
 
@@ -323,6 +324,7 @@ def authenticate_database_credentials(
                 "must_change_password": bool(
                     user.must_change_password
                 ),
+                "session_version": user.session_version,
                 "subscription": (
                     get_subscription_access(
                         session,
@@ -530,6 +532,7 @@ def create_session_token(
 def create_database_session_token(
     user_id: str,
     *,
+    expected_session_version: int | None = None,
     now: int | None = None,
 ) -> str:
     secret = str(
@@ -548,6 +551,43 @@ def create_database_session_token(
             "Database user ID is required."
         )
 
+    user_uuid = uuid.UUID(subject)
+
+    if not database_configured():
+        raise ValueError(
+            "Database authentication is unavailable."
+        )
+
+    session_factory = get_session_factory()
+
+    with session_factory() as session:
+        user = session.get(User, user_uuid)
+
+        if user is None or not user.is_active:
+            raise ValueError(
+                "Database user is unavailable."
+            )
+
+        session_version = user.session_version
+
+        if (
+            type(session_version) is not int
+            or session_version < 0
+        ):
+            raise ValueError(
+                "Database session version is invalid."
+            )
+
+        # Bind login to the credential revision that was actually
+        # verified, while always using the authoritative DB revision.
+        if expected_session_version is not None and (
+            type(expected_session_version) is not int
+            or expected_session_version != session_version
+        ):
+            raise ValueError(
+                "Account credentials changed. Sign in again."
+            )
+
     issued_at = int(
         time.time()
         if now is None
@@ -562,6 +602,7 @@ def create_database_session_token(
     payload = {
         "v": DATABASE_SESSION_VERSION,
         "sub": subject,
+        "session_version": session_version,
         "iat": issued_at,
         "exp": expires_at,
         "nonce": secrets.token_urlsafe(12),
@@ -619,6 +660,9 @@ def verify_session_token(
                 encoded_payload
             ).decode("utf-8")
         )
+
+        if not isinstance(payload, dict):
+            return None
 
         version = int(
             payload.get("v")
@@ -696,6 +740,16 @@ def verify_session_token(
 
         # Database-backed multi-user session.
         if version == DATABASE_SESSION_VERSION:
+            # Pre-migration v2 cookies remain valid only until the first
+            # password change. Explicit malformed values fail closed.
+            session_version = payload.get("session_version", 0)
+
+            if (
+                type(session_version) is not int
+                or session_version < 0
+            ):
+                return None
+
             user_id = str(
                 payload.get("sub") or ""
             ).strip()
@@ -721,6 +775,7 @@ def verify_session_token(
                 if (
                     user is None
                     or not user.is_active
+                    or user.session_version != session_version
                 ):
                     return None
 

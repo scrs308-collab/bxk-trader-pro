@@ -1,7 +1,7 @@
 import os
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from bxk_app import config
@@ -181,11 +181,32 @@ def change_user_password(
             "from the current password."
         )
 
-    user.password_hash = hash_app_password(
-        new_value
+    # Compare the credentials that were verified and increment in SQL.
+    # A concurrent password change or invitation redemption must not
+    # be overwritten, and all previous sessions/setup links are revoked
+    # in the same transaction as the password change.
+    result = session.execute(
+        update(User)
+        .where(
+            User.id == parsed_user_id,
+            User.is_active.is_(True),
+            User.password_hash == user.password_hash,
+            User.session_version == user.session_version,
+        )
+        .values(
+            password_hash=hash_app_password(new_value),
+            must_change_password=False,
+            session_version=User.session_version + 1,
+        )
+        .execution_options(synchronize_session=False)
     )
 
-    user.must_change_password = False
+    if result.rowcount != 1:
+        session.rollback()
+        raise ValueError(
+            "Account credentials changed. Sign in again "
+            "before changing your password."
+        )
 
     session.commit()
     session.refresh(user)

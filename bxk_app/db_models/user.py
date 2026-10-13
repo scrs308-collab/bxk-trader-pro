@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Numeric,
+    Integer,
     Enum,
     String,
     Text,
@@ -115,6 +116,10 @@ class User(Base):
         Boolean,
         nullable=False,
         default=False,
+    )
+
+    session_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0",
     )
 
     created_at: Mapped[object] = mapped_column(

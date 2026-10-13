@@ -74,6 +74,10 @@ def serialize_user(
     }
 
     if session is not None:
+        from bxk_app.db_models.setup_invitation import SetupInvitation
+        from bxk_app.services.setup_invitation_service import invitation_eligible, invitation_metadata
+        payload["setup_invitation_eligible"] = invitation_eligible(user)
+        payload["setup_invitation"] = invitation_metadata(session.get(SetupInvitation, user.id))
         payload["subscription"] = (
             get_subscription_access(
                 session,

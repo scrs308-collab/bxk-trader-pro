@@ -264,9 +264,13 @@ def login(
         authentication["auth_source"]
         == "DATABASE"
     ):
-        token = create_database_session_token(
-            authentication["user_id"]
-        )
+        try:
+            token = create_database_session_token(
+                authentication["user_id"],
+                expected_session_version=authentication["session_version"],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=401, detail="Invalid username or password.") from exc
     else:
         token = create_session_token(
             authentication["username"]
@@ -315,6 +319,7 @@ def login(
 def change_password(
     request_data: ChangePasswordRequest,
     request: Request,
+    response: Response,
     session: Session = Depends(
         get_db
     ),
@@ -375,8 +380,11 @@ def change_password(
             detail=str(exc),
         ) from exc
 
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/", httponly=True,
+                           secure=bool(config.BXK_AUTH_COOKIE_SECURE), samesite="strict")
     return {
         "password_changed": True,
+        "reauthentication_required": True,
         **result,
     }
 

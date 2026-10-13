@@ -27,6 +27,13 @@ class StockOnlyBroker:
 def test_stock_positions_are_not_reported_as_unsupported(
     monkeypatch,
 ):
+    # Empty snapshots trigger a live-market fallback. Keep this stock-only
+    # grouping test isolated from real broker authentication and quotes.
+    monkeypatch.setattr(
+        position_service.market_engine,
+        "update",
+        lambda: {},
+    )
     monkeypatch.setattr(
         position_service.market_data,
         "get_snapshot",

@@ -2,6 +2,10 @@ const USERS_URL = "/api/admin/users";
 const AUTH_STATUS_URL = "/api/auth/status";
 
 let initialized = false;
+let userListRevision = 0;
+const usersById = new Map();
+const pendingInvitations = new Set();
+const uncertainInvitations = new Set();
 
 
 function byId(id) {
@@ -135,8 +139,9 @@ function renderShell() {
         </label>
 
         <div class="bxk-admin-users-note">
-          New users must change this password
-          on their first login.
+          The temporary password is not emailed. After creating the account,
+          use SEND SETUP LINK below so the user can choose their own password.
+          A temporary-password login still requires a password change.
         </div>
 
         <button
@@ -153,6 +158,14 @@ function renderShell() {
           Existing Users
         </div>
 
+        <button
+          id="bxkRefreshAdminUsers"
+          class="bxk-admin-users-button secondary"
+          type="button"
+        >
+          REFRESH USERS
+        </button>
+
         <div
           id="bxkAdminUsersList"
           class="bxk-admin-users-list"
@@ -166,6 +179,8 @@ function renderShell() {
     <div
       id="bxkAdminUsersMessage"
       class="bxk-admin-users-message"
+      role="status"
+      aria-live="polite"
     ></div>
   `;
 
@@ -179,6 +194,11 @@ function renderUsers(users) {
 
   if (!container) {
     return;
+  }
+
+  usersById.clear();
+  if (Array.isArray(users)) {
+    users.forEach((user) => usersById.set(String(user.id), user));
   }
 
   if (
@@ -394,6 +414,7 @@ function renderUsers(users) {
 
             ${brokerStatus}
             ${subscriptionStatus}
+            ${renderInvitationStatus(user.setup_invitation)}
           </div>
 
           <div class="bxk-admin-user-action">
@@ -401,11 +422,20 @@ function renderUsers(users) {
             ${brokerOAuthAction}
             ${liveTradingAction}
             ${subscriptionAction}
+            ${renderInvitationAction(user)}
           </div>
 
         </div>
       `;
     }).join("");
+
+  container
+    .querySelectorAll("button[data-invitation-user-id]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        return sendSetupInvitation(button.dataset.invitationUserId);
+      });
+    });
 
   container
     .querySelectorAll(
@@ -494,6 +524,158 @@ function renderUsers(users) {
         },
       );
     });
+}
+
+
+function isInvitationEligible(user) {
+  return user?.setup_invitation_eligible === true &&
+    user.is_active === true &&
+    user.must_change_password === true &&
+    ["BETA", "VIEWER"].includes(String(user.role || "").toUpperCase());
+}
+
+
+function invitationDate(value) {
+  if (!value) return "unavailable";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "unavailable" : date.toLocaleString();
+}
+
+
+function renderInvitationStatus(invitation) {
+  if (!invitation) return "";
+  const labels = {
+    ACCEPTED: "SETUP EMAIL: ACCEPTED BY PROVIDER (DELIVERY NOT CONFIRMED)",
+    FAILED: "SETUP EMAIL: FAILED",
+    UNKNOWN: "SETUP EMAIL: SUBMISSION STATUS UNKNOWN",
+    USED: "SETUP LINK: USED",
+    EXPIRED: "SETUP LINK: EXPIRED",
+  };
+  const label = labels[invitation.status] || "SETUP EMAIL: STATUS UNAVAILABLE";
+  const expiresAt = new Date(invitation.expires_at || "");
+  const expired = Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() <= Date.now();
+  return `
+    <span class="bxk-admin-password-status">
+      ${escapeHtml(label)}<br>
+      Requested: ${escapeHtml(invitationDate(invitation.created_at))}<br>
+      ${expired ? "Link expired" : "Link expires"}: ${escapeHtml(invitationDate(invitation.expires_at))}
+    </span>
+  `;
+}
+
+
+function renderInvitationAction(user) {
+  if (!isInvitationEligible(user)) return "";
+  const userId = String(user.id);
+  const pending = pendingInvitations.has(userId);
+  const uncertain = uncertainInvitations.has(userId);
+  return `
+    <button
+      class="bxk-admin-users-button secondary"
+      type="button"
+      data-invitation-user-id="${escapeHtml(userId)}"
+      ${pending || uncertain ? "disabled" : ""}
+    >
+      ${pending ? "SENDING SETUP LINK..." : uncertain ? "REFRESH USERS BEFORE RETRY" : "SEND SETUP LINK"}
+    </button>
+  `;
+}
+
+
+function redrawUsers() {
+  renderUsers(Array.from(usersById.values()));
+}
+
+
+async function sendSetupInvitation(userId) {
+  userId = String(userId);
+  const user = usersById.get(userId);
+  if (!isInvitationEligible(user) || pendingInvitations.has(userId) || uncertainInvitations.has(userId)) {
+    return;
+  }
+
+  const previous = user.setup_invitation
+    ? "\nA new link replaces any previous setup link. An unknown submission may already have sent an email."
+    : "";
+  if (!window.confirm(
+    `Send a secure password setup link?\n\nUsername: ${user.username}\nEmail: ${user.email}` +
+    "\n\nVerify this account and email address before sending. The user will choose their own password." +
+    previous
+  )) {
+    return;
+  }
+
+  pendingInvitations.add(userId);
+  userListRevision += 1;
+  redrawUsers();
+  setMessage(`Submitting setup email for ${user.username}...`);
+
+  try {
+    const response = await fetch(
+      `${USERS_URL}/${encodeURIComponent(userId)}/setup-invitation`,
+      {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expected_email: user.email,
+          expected_username: user.username,
+        }),
+      },
+    );
+    const data = await response.json();
+    userListRevision += 1;
+    if (!response.ok && response.status >= 400 && response.status < 500) {
+      const detail = typeof data.detail === "string"
+        ? data.detail
+        : "Refresh the account and confirm the username and email before trying again.";
+      await loadUsers({ reportErrors: false });
+      setMessage(`Setup email request was rejected. ${detail}`, "error");
+      return;
+    }
+    const status = data.invitation?.status;
+    if (!response.ok || !["ACCEPTED", "FAILED", "UNKNOWN"].includes(status)) {
+      throw new Error("Setup email submission could not be confirmed.");
+    }
+    if (data.user && String(data.user.id) === userId) {
+      usersById.set(userId, data.user);
+    } else {
+      usersById.set(userId, { ...user, setup_invitation: data.invitation });
+    }
+
+    if (status === "ACCEPTED") {
+      setMessage(
+        `Setup email for ${user.username} accepted by the mail provider. Delivery is not confirmed. ` +
+        `Link expires: ${invitationDate(data.invitation.expires_at)}.`,
+        "success",
+      );
+    } else if (status === "FAILED") {
+      setMessage(
+        `Setup email for ${user.username} failed. Review the account and email address before retrying.`,
+        "error",
+      );
+    } else {
+      setMessage(
+        `Setup email submission for ${user.username} is unknown. It may have been sent. ` +
+        "Check with the recipient before sending another link; a new link replaces the previous one.",
+        "error",
+      );
+    }
+  } catch (_) {
+    // Never automatically repeat an email submission after an uncertain response.
+    uncertainInvitations.add(userId);
+    const refreshed = await loadUsers({ reportErrors: false });
+    setMessage(
+      "Setup email submission could not be confirmed and may have been sent. " +
+      (refreshed
+        ? "The user list has been refreshed. Review the status and check with the recipient before retrying; a new link replaces the previous one."
+        : "Use REFRESH USERS to check the status before retrying."),
+      "error",
+    );
+  } finally {
+    pendingInvitations.delete(userId);
+    redrawUsers();
+  }
 }
 
 
@@ -658,7 +840,8 @@ async function setBrokerLiveTrading(
 }
 
 
-async function loadUsers() {
+async function loadUsers({ reportErrors = true } = {}) {
+  const revision = ++userListRevision;
   try {
     const response =
       await fetch(
@@ -678,13 +861,20 @@ async function loadUsers() {
       );
     }
 
-    renderUsers(data.users || []);
+    if (!Array.isArray(data.users)) {
+      throw new Error("Unable to verify the current user list.");
+    }
+    // A stale read must not erase a newer send outcome or unlock uncertain retries.
+    if (revision !== userListRevision) return false;
+    uncertainInvitations.clear();
+    renderUsers(data.users);
+    return true;
 
   } catch (error) {
-    setMessage(
-      error.message,
-      "error",
-    );
+    if (reportErrors && revision === userListRevision) {
+      setMessage(error.message, "error");
+    }
+    return false;
   }
 }
 
@@ -711,6 +901,8 @@ async function createUser() {
 
   const button =
     byId("bxkCreateUserButton");
+
+  if (button?.disabled) return;
 
   if (
     !username ||
@@ -767,7 +959,8 @@ async function createUser() {
     ).value = "";
 
     setMessage(
-      `User ${data.user.username} created successfully.`,
+      `User ${data.user.username} created successfully. No email has been sent. ` +
+      "Review the account below and choose SEND SETUP LINK so the user can set their own password.",
       "success",
     );
 
@@ -881,6 +1074,17 @@ async function initializeOwnerAccess() {
       "click",
       createUser,
     );
+
+    byId("bxkRefreshAdminUsers")?.addEventListener("click", async () => {
+      const button = byId("bxkRefreshAdminUsers");
+      if (button.disabled) return;
+      button.disabled = true;
+      try {
+        if (await loadUsers()) setMessage("User list and setup email status refreshed.");
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     await loadUsers();
 
