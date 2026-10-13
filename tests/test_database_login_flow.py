@@ -7,6 +7,7 @@ from bxk_app import config
 from bxk_app.database import Base
 from bxk_app.db_models.user import User, UserRole
 from bxk_app.main import app
+from bxk_app.routes import auth as auth_routes
 from bxk_app.services import auth_service
 from bxk_app.services.system_settings_service import (
     hash_app_password,
@@ -269,3 +270,43 @@ def test_database_session_dies_when_user_disabled(
         )
         is None
     )
+
+
+def test_concurrent_password_change_during_login_requires_reauthentication(
+    monkeypatch,
+):
+    import uuid
+
+    session_factory = make_session_factory()
+    user_id = add_beta(session_factory)
+    configure_auth(monkeypatch, session_factory)
+
+    def change_credentials_before_issuance(
+        issued_user_id, *, expected_session_version,
+    ):
+        assert issued_user_id == user_id
+        assert expected_session_version == 0
+        with session_factory() as session:
+            user = session.get(User, uuid.UUID(user_id))
+            user.password_hash = hash_app_password("ChangedPassword123!")
+            user.session_version += 1
+            session.commit()
+        return auth_service.create_database_session_token(
+            issued_user_id,
+            expected_session_version=expected_session_version,
+        )
+
+    monkeypatch.setattr(
+        auth_routes,
+        "create_database_session_token",
+        change_credentials_before_issuance,
+    )
+    client = TestClient(app)
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "beta1", "password": "BetaPassword123!"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid username or password."
+    assert auth_service.SESSION_COOKIE_NAME not in client.cookies

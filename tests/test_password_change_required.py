@@ -301,6 +301,8 @@ def test_successful_change_clears_requirement(
         },
     )
 
+    old_token = client.cookies.get(auth_service.SESSION_COOKIE_NAME)
+
     response = client.post(
         "/api/auth/change-password",
         json={
@@ -310,6 +312,9 @@ def test_successful_change_clears_requirement(
     )
 
     assert response.status_code == 200
+    assert response.json()["reauthentication_required"] is True
+    assert auth_service.SESSION_COOKIE_NAME not in client.cookies
+    assert auth_service.verify_session_token(old_token) is None
     assert (
         response.json()[
             "must_change_password"
@@ -340,14 +345,29 @@ def test_successful_change_clears_requirement(
             user.password_hash,
         )
 
-    # Existing session should become unrestricted
-    # because session verification re-reads the user.
+        assert user.session_version == 1
+
+    # A session created with the temporary password must never become
+    # unrestricted when a different holder sets the final password.
     home = client.get(
         "/",
         follow_redirects=False,
     )
 
-    assert home.status_code == 200
+    assert home.status_code == 303
+    assert home.headers["location"] == "/login"
+
+    login = client.post(
+        "/api/auth/login",
+        json={
+            "username": "beta1",
+            "password": "NewPassword123!",
+        },
+    )
+
+    assert login.status_code == 200
+    assert login.json()["must_change_password"] is False
+    assert client.get("/", follow_redirects=False).status_code == 200
 
     app.dependency_overrides.clear()
 

@@ -262,3 +262,21 @@ def owner_notification_email() -> str:
             ),
         )
     ).strip()
+
+
+def send_setup_invitation_email(recipient: str, *, username: str, setup_url: str, expires_hours: int = 24):
+    """First-password invitation, distinct from the legacy reset-password email."""
+    return _send_resend_email(
+        recipient,
+        subject="Set up your BXK Trader Pro password",
+        text=(
+            "The BXK owner invited you to set your account password.\n\n"
+            f"Username: {username}\n\n"
+            f"Choose your password: {setup_url}\n\n"
+            f"This single-use link expires in {expires_hours} hours. "
+            "If another setup email is requested, only the latest link works.\n\n"
+            "After setting your password, sign in normally. "
+            "If you were not expecting this invitation, do not use or forward the link."
+        ),
+        sender_name="BXK Trader Pro Security",
+    )

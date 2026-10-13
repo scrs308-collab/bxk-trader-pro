@@ -92,3 +92,5 @@ router.include_router(buying_power_settings_router)
 
 from bxk_app.routes.stop_audit import router as stop_audit_router
 router.include_router(stop_audit_router)
+from bxk_app.routes.setup_invitations import router as setup_invitations_router
+router.include_router(setup_invitations_router)

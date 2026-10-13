@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 from bxk_app import config
 from bxk_app.auth_middleware import (
@@ -123,6 +126,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(RequestValidationError)
+async def protect_setup_validation_inputs(request: Request, exc: RequestValidationError):
+    if request.url.path == "/api/auth/setup-password":
+        # Default validation errors echo input values, including secret fields.
+        return JSONResponse(status_code=422, content={"detail": "Enter a setup link and a valid password.", "code": "INVALID_PASSWORD"},
+                            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+    return await request_validation_exception_handler(request, exc)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -145,6 +157,12 @@ async def bxk_authentication_middleware(
         request,
         call_next,
     )
+
+    if request.url.path in {"/setup-password", "/static/setup-password.html", "/api/auth/setup-password"}:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"
 
     if config.BXK_PREVIEW_MODE:
         response.headers[
@@ -207,6 +225,11 @@ def forgot_password_page():
     return FileResponse(
         "static/forgot-password.html"
     )
+
+
+@app.get("/setup-password")
+def setup_password_page():
+    return FileResponse("static/setup-password.html")
 
 
 @app.get("/application-access")

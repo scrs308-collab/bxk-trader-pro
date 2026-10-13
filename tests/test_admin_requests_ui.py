@@ -23,7 +23,7 @@ def test_owner_request_admin_ui_is_wired():
     assert 'id="adminRequestsCard"' in index
     assert 'data-owner-only="true"' in index
     assert "initializeAdminRequests" in dashboard
-    assert "./admin-requests.js?v=1" in dashboard
+    assert "./admin-requests.js?v=2" in dashboard
     assert "/api/access-requests" in admin_requests
     assert "/api/support-requests" in admin_requests
     assert 'method: "PATCH"' in admin_requests
