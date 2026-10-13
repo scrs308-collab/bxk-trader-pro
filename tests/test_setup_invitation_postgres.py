@@ -76,6 +76,26 @@ def test_postgres_guard_accepts_explicit_local_test_database(host):
     assert url.database == "bxk_test"
 
 
+def _local_connect_args(url):
+    # libpq's PGHOSTADDR bypasses DNS and can override a localhost URL. Pin the
+    # transport address explicitly for both schema administration and tests.
+    return {
+        "connect_timeout": 5,
+        "hostaddr": "::1" if url.host == "::1" else "127.0.0.1",
+    }
+
+
+@pytest.mark.parametrize("host,expected_address", [
+    ("localhost", "127.0.0.1"),
+    ("127.0.0.1", "127.0.0.1"),
+    ("[::1]", "::1"),
+])
+def test_postgres_transport_address_overrides_environment(monkeypatch, host, expected_address):
+    monkeypatch.setenv("PGHOSTADDR", "203.0.113.1")
+    url = _safe_test_url(f"postgresql://bxk:synthetic@{host}:5432/bxk_test")
+    assert _local_connect_args(url)["hostaddr"] == expected_address
+
+
 @pytest.fixture
 def postgres_factory():
     value = os.environ.get("BXK_TEST_POSTGRES_URL")
@@ -83,7 +103,7 @@ def postgres_factory():
         pytest.skip("Set BXK_TEST_POSTGRES_URL to run isolated PostgreSQL concurrency tests.")
     url = _safe_test_url(value)
     schema = f"bxk_setup_test_{uuid.uuid4().hex}"
-    admin_engine = create_engine(url, connect_args={"connect_timeout": 5})
+    admin_engine = create_engine(url, connect_args=_local_connect_args(url))
     engine = None
     created = False
     try:
@@ -92,7 +112,7 @@ def postgres_factory():
             connection.execute(text(f'CREATE SCHEMA "{schema}"'))
             created = True
         engine = create_engine(url, connect_args={
-            "connect_timeout": 5,
+            **_local_connect_args(url),
             "options": f"-csearch_path={schema} -clock_timeout=10000 -cstatement_timeout=15000",
         })
         with engine.connect() as connection:
