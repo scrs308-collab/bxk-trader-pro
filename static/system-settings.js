@@ -5,6 +5,9 @@ const SMS_TEST_URL = "/api/sms-test";
 
 let currentSettings = null;
 let initialized = false;
+let settingsDirty = false;
+const dirtyFields = new Set();
+let settingsSaving = false;
 
 
 function byId(id) {
@@ -308,8 +311,8 @@ function renderSettingsShell() {
         </div>
 
         <div class="bxk-settings-note">
-          Changes require a BXK restart before the
-          trading engine uses the new limits.
+          Click SAVE RISK CONTROLS after editing. Saved limits
+          apply immediately and remain after a page refresh.
         </div>
 
         <label class="bxk-settings-field">
@@ -346,6 +349,14 @@ function renderSettingsShell() {
             step="100"
           />
         </label>
+
+        <button
+          id="bxkSaveRiskButton"
+          class="bxk-settings-button primary"
+          type="button"
+        >SAVE RISK CONTROLS</button>
+        <div id="bxkRiskSaveStatus" role="status" aria-live="polite"
+          class="bxk-settings-message"></div>
 
         <div class="bxk-settings-static-row">
           <span>Live Trading</span>
@@ -472,6 +483,8 @@ function renderSettingsShell() {
 
 function applySettings(data) {
   currentSettings = data;
+  settingsDirty = false;
+  dirtyFields.clear();
 
   const app = data.app_access || {};
   const tasty = data.tastytrade || {};
@@ -936,6 +949,10 @@ function numberChanged(
     return null;
   }
 
+  if (!input.value.trim() || !input.checkValidity()) {
+    throw new Error("Enter a valid number for each risk control.");
+  }
+
   const value = Number(input.value);
 
   if (!Number.isFinite(value)) {
@@ -1099,13 +1116,32 @@ function buildPayload() {
 }
 
 
-async function saveSystemSettings() {
+function setRiskStatus(message, state = "") {
+  const element = byId("bxkRiskSaveStatus");
+  if (element) {
+    element.textContent = message;
+    element.className = "bxk-settings-message" + (state ? ` ${state}` : "");
+  }
+}
+
+async function saveSystemSettings(riskOnly = false) {
+  if (settingsSaving) return;
   const button = byId(
     "bxkSaveSettingsButton"
   );
 
   try {
-    const payload = buildPayload();
+    const payload = riskOnly ? {} : buildPayload();
+    if (riskOnly) {
+      for (const [id, key] of [
+        ["bxkMaxOrderRisk", "max_order_risk"],
+        ["bxkMinOrderCredit", "min_order_credit"],
+        ["bxkMinBuyingPower", "min_remaining_buying_power"],
+      ]) {
+        const value = numberChanged(id, currentSettings?.risk?.[key]);
+        if (value !== null) payload[key] = value;
+      }
+    }
 
     if (
       Object.keys(payload).length === 0
@@ -1116,6 +1152,9 @@ async function saveSystemSettings() {
       return;
     }
 
+    settingsSaving = true;
+    byId("bxkSaveRiskButton").disabled = true;
+    setRiskStatus("Saving...", "warning");
     if (button) {
       button.disabled = true;
       button.textContent = "SAVING...";
@@ -1146,7 +1185,23 @@ async function saveSystemSettings() {
       );
     }
 
-    applySettings(data);
+    const verification = await fetch(SETTINGS_URL, { cache: "no-store" });
+    if (!verification.ok) throw new Error("Unable to verify saved settings. Try saving again.");
+    const persisted = await verification.json();
+    for (const key of ["max_order_risk", "min_order_credit", "min_remaining_buying_power"]) {
+      if (key in payload && Number(persisted.risk?.[key]) !== payload[key]) {
+        throw new Error("The server did not retain the new risk limits. Try saving again.");
+      }
+    }
+    if (riskOnly) {
+      currentSettings.risk = persisted.risk;
+      // Other unsaved fields must remain untouched.
+      for (const id of ["bxkMaxOrderRisk", "bxkMinOrderCredit", "bxkMinBuyingPower"]) dirtyFields.delete(id);
+      settingsDirty = dirtyFields.size > 0;
+    } else {
+      applySettings(persisted);
+    }
+    setRiskStatus("Risk controls saved and verified. Limits apply immediately.", "success");
 
     const appPassword =
       byId("bxkAppPassword");
@@ -1154,11 +1209,11 @@ async function saveSystemSettings() {
     const confirm =
       byId("bxkAppPasswordConfirm");
 
-    if (appPassword) {
+    if (!riskOnly && appPassword) {
       appPassword.value = "";
     }
 
-    if (confirm) {
+    if (!riskOnly && confirm) {
       confirm.value = "";
     }
 
@@ -1172,6 +1227,7 @@ async function saveSystemSettings() {
     );
 
   } catch (error) {
+    setRiskStatus(error.message || "Unable to save settings.", "error");
     console.error(
       "System settings save failed:",
       error,
@@ -1184,6 +1240,8 @@ async function saveSystemSettings() {
     );
 
   } finally {
+    settingsSaving = false;
+    byId("bxkSaveRiskButton").disabled = false;
     if (button) {
       button.disabled = false;
       button.textContent =
@@ -1284,7 +1342,7 @@ export function initializeSystemSettings() {
     "bxkSaveSettingsButton"
   )?.addEventListener(
     "click",
-    saveSystemSettings,
+    () => saveSystemSettings(),
   );
 
   byId(
@@ -1301,6 +1359,21 @@ export function initializeSystemSettings() {
     sendSmsTest,
   );
 
+  byId("bxkSaveRiskButton")?.addEventListener("click", () => saveSystemSettings(true));
+  byId("systemSettingsPanel")?.addEventListener("input", (event) => {
+    if (event.target.tagName !== "INPUT") return;
+    settingsDirty = true;
+    dirtyFields.add(event.target.id);
+    setStatus("Unsaved changes. Click SAVE SETTINGS before refreshing.", "warning");
+    if (["bxkMaxOrderRisk", "bxkMinOrderCredit", "bxkMinBuyingPower"].includes(event.target.id)) {
+      setRiskStatus("Unsaved changes. Click SAVE RISK CONTROLS before refreshing.", "warning");
+    }
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (!settingsDirty && !settingsSaving) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
   loadSystemSettings();
   loadSmsDiagnostics();
 }

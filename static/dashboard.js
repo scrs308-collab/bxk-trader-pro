@@ -40,7 +40,7 @@ import {
 
 import {
   initializeSystemSettings,
-} from "./system-settings.js?v=2";
+} from "./system-settings.js?v=3";
 
 
 import {
