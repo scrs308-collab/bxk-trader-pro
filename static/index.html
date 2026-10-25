@@ -37,7 +37,7 @@
     class="dashboard-tab active"
     data-tab="tradeSetup"
   >
-    Trade Setup
+    Trade Workbench
   </button>
 
   <button
@@ -105,6 +105,28 @@
   id="tradeSetup"
   class="dashboard-tab-panel active"
 >
+<section class="card" id="unifiedWorkbench" aria-label="Trade Workbench">
+  <div class="card-label">TRADE WORKBENCH</div>
+  <div class="bxk-workbench-modes" role="group" aria-label="Trading method">
+    <button type="button" class="bxk-mode active" data-workbench-mode="auto" aria-pressed="true">BXK Auto</button>
+    <button type="button" class="bxk-mode" data-workbench-mode="search" aria-pressed="false">Condor Search</button>
+    <button type="button" class="bxk-mode" data-workbench-mode="custom" aria-pressed="false">Custom Builder</button>
+  </div>
+  <p id="workbenchModeDescription">Existing BXK trading engine and market analysis.</p>
+  <div id="workbenchManual" hidden>
+    <p class="bxk-workbench-warning">Manual analysis only. No broker orders are submitted from this panel. Quotes and POP are not available until a verified market-data adapter is connected.</p>
+    <div class="bxk-workbench-fields">
+      <label>Short put <input id="wbShortPut" type="number" step="5" value="7500"></label>
+      <label>Short call <input id="wbShortCall" type="number" step="5" value="7700"></label>
+      <label>Put wing <input id="wbPutWing" type="number" min="1" step="5" value="10"></label>
+      <label>Call wing <input id="wbCallWing" type="number" min="1" step="5" value="10"></label>
+      <label>Net credit (points) <input id="wbCredit" type="number" min="0" step=".05" value="2.50"></label>
+      <label>Contracts <input id="wbContracts" type="number" min="1" max="100" step="1" value="1"></label>
+    </div>
+    <div id="workbenchResults" aria-live="polite"></div>
+    <p id="workbenchSearchNote" hidden>Live Condor Search requires validated chain quotes and a documented POP model. Use Custom Builder for hypothetical payoff analysis until the data adapter is available.</p>
+  </div>
+</section>
  <div class="trade-parameters">
   <div class="trade-parameter">
     <label for="underlyingSelector">
@@ -755,6 +777,7 @@
   </section>
 </div>
 </div>
+<script src="/static/unified-workbench.js?v=1" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
