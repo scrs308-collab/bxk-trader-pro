@@ -24,7 +24,7 @@
       Number.isInteger(p.Contracts) && p.Contracts >= 1 && p.Contracts <= 100 &&
       p.Credit <= Math.max(p.PutWing, p.CallWing);
     if (!valid) {
-      results.textContent = "Enter valid strikes, positive wing widths, a credit no greater than the widest wing, and 1–100 contracts.";
+      results.textContent = "Enter valid strikes, positive wing widths, a premium no greater than the widest wing, and 1–100 contracts.";
       return;
     }
     const maxProfit = p.Credit * 100 * p.Contracts;
@@ -48,7 +48,7 @@
       <line x1="0" x2="600" y1="${scaleY(0)}" y2="${scaleY(0)}" stroke="currentColor" opacity=".45" />
       <polyline points="${polyline}" fill="none" stroke="#22c55e" stroke-width="3" />
     </svg>
-    <small>Expiration payoff, before commissions and fees. Illustrative credit entered by user; not a live quote. Short put ${p.ShortPut}, long put ${p.ShortPut-p.PutWing}, short call ${p.ShortCall}, long call ${p.ShortCall+p.CallWing}.</small>`;
+    <small>Expiration payoff, before commissions and fees. Illustrative premium entered by user; not a live quote. Short put ${p.ShortPut}, long put ${p.ShortPut-p.PutWing}, short call ${p.ShortCall}, long call ${p.ShortCall+p.CallWing}.</small>`;
   }
   function setMode(mode) {
     buttons.forEach(b => {
@@ -128,7 +128,7 @@
     if (!Number.isFinite(spot) || spot <= 0 || !expiry || !Number.isFinite(minCredit) ||
       !Number.isFinite(maxCredit) || minCredit < 0 || maxCredit < minCredit ||
       putWidth <= 0 || callWidth <= 0) {
-      searchStatus.textContent = "Select an expiration and valid reference price, widths, and credit range.";
+      searchStatus.textContent = "Select an expiration and valid reference price, widths, and premium range.";
       searchResults.replaceChildren();
       return;
     }
@@ -160,7 +160,7 @@
     if (!candidates.length) return;
     const table = document.createElement("table");
     table.className="bxk-workbench-table";
-    table.innerHTML="<thead><tr><th>Short put</th><th>Short call</th><th>Est. credit</th><th>Max loss / contract</th><th>POP</th><th>Analysis</th></tr></thead>";
+    table.innerHTML="<thead><tr><th>Short put</th><th>Short call</th><th>Est. premium</th><th>Max loss / contract</th><th>POP</th><th>Analysis</th></tr></thead>";
     const body = document.createElement("tbody");
     candidates.slice(page*10,page*10+10).forEach(q=>{
       const tr=document.createElement("tr");
