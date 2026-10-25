@@ -69,5 +69,28 @@
   }
   buttons.forEach(b => b.addEventListener("click", () => setMode(b.dataset.workbenchMode)));
   fields.forEach(k => document.getElementById("wb" + k).addEventListener("input", render));
+  const connectButton = document.getElementById("wbConnectMarket");
+  const connectionStatus = document.getElementById("wbSearchStatus");
+  connectButton.addEventListener("click", async () => {
+    connectButton.disabled = true;
+    connectionStatus.textContent = "Checking authenticated tastytrade SPXW chain access...";
+    try {
+      const response = await fetch("/api/workbench/expirations", {credentials:"same-origin",cache:"no-store"});
+      if (!response.ok) {
+        connectionStatus.textContent = response.status === 403 || response.status === 401
+          ? "Sign in as the BXK owner to access tastytrade market data."
+          : "Tastytrade data unavailable in staging (" + response.status + ").";
+        return;
+      }
+      const data = await response.json();
+      connectionStatus.textContent = data.expirations?.length
+        ? "SPXW chain connected: " + data.expirations.length + " listed expirations. Live option quotes and POP not yet connected."
+        : "SPXW connected, but no expirations were returned.";
+    } catch {
+      connectionStatus.textContent = "Could not reach the workbench market-data endpoint.";
+    } finally {
+      connectButton.disabled = false;
+    }
+  });
   setMode("auto");
 })();
