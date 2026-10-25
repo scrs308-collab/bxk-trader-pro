@@ -56,6 +56,7 @@
       b.classList.toggle("active", active);
       b.setAttribute("aria-pressed", String(active));
     });
+    document.getElementById("tradeSetup").classList.toggle("bxk-manual-mode", mode !== "auto");
     manual.hidden = mode === "auto";
     note.hidden = mode !== "search";
     searchPanel.hidden = mode !== "search";
@@ -152,7 +153,7 @@
     renderSearch();
   }
   function renderSearch() {
-    searchStatus.textContent = `${quotes.length} valid imported quotes; ${candidates.length} matching condors. Midpoint estimates, POP unavailable.`;
+    searchStatus.textContent = `${quotes.length} valid imported quotes; ${candidates.length} matching condors. Midpoint estimates, POP unavailable. Quotes are not verified as current.`;
     searchResults.replaceChildren();
     if (!candidates.length) return;
     const table = document.createElement("table");
