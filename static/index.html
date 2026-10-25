@@ -118,7 +118,14 @@
     <p class="bxk-workbench-warning">Analysis only. No broker orders can be submitted from this panel. Premium and POP require authorized tastytrade quotes.</p>
     <div id="workbenchSearch" hidden>
       <p class="bxk-workbench-warning">Tastytrade option-chain integration is pending. No live or delayed quotes are connected to this staging service. Search results will appear here when authorized market data is available.</p>
+      <div class="bxk-workbench-fields">
+        <label>Expiration <select id="wbLiveExpiry" aria-label="SPXW expiration"><option value="">Connect to load expirations</option></select></label>
+        <label>SPX reference price <input id="wbLiveSpot" type="number" min="1" step=".01" placeholder="Enter current SPX"></label>
+        <label>Strike range (+/- points) <select id="wbLiveRange"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select></label>
+      </div>
       <button type="button" class="bxk-mode" id="wbConnectMarket">Check tastytrade market data</button>
+      <button type="button" class="bxk-mode" id="wbLoadQuotes" disabled>Load SPXW quotes</button>
+      <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
     <div class="bxk-workbench-fields">
@@ -783,7 +790,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=7" defer></script>
+<script src="/static/unified-workbench.js?v=8" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
