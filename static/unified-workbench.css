@@ -16,3 +16,6 @@
 #wbSearchResults {overflow-x:auto}
 .bxk-mode:disabled {opacity:.4;cursor:not-allowed}
 #workbenchSearch[hidden] {display:none!important}
+
+/* Keep legacy BXK Auto cards intact, but show only the user-directed workbench in manual modes. */
+#tradeSetup.bxk-manual-mode > :not(#unifiedWorkbench) { display:none!important; }
