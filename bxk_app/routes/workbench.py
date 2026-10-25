@@ -35,7 +35,7 @@ def workbench_expirations(user=Depends(require_owner)):
 
 @router.get("/chain")
 def workbench_chain(
-    expiration: str = Query(..., pattern=r"^\\d{4}-\\d{2}-\\d{2}$"),
+    expiration: str = Query(..., pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
     user=Depends(require_owner),
 ):
     if not config.BXK_AUTH_ENABLED:
