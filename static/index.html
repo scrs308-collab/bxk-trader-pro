@@ -125,6 +125,7 @@
         <label>Maximum combined credit (points)<input id="wbMaxCredit" type="number" min="0" step=".05" value="10"></label>
       </div>
       <p class="bxk-workbench-warning">Imported snapshots only. Required CSV columns: expiration,type,strike,bid,ask. Optional timestamp. Prices are midpoint estimates; no live feed or POP model is connected. File stays in this browser.</p>
+      <button type="button" id="wbCsvTemplate" class="bxk-mode">Download CSV template</button>
       <div id="wbSearchStatus" role="status" aria-live="polite">Import a quote snapshot to find complete condors.</div>
       <div id="wbSearchResults"></div>
     </div>
@@ -790,7 +791,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=3" defer></script>
+<script src="/static/unified-workbench.js?v=4" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
