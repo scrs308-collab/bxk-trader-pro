@@ -116,6 +116,18 @@
   <p id="workbenchModeDescription">Existing BXK trading engine and market analysis.</p>
   <div id="workbenchManual" hidden>
     <p class="bxk-workbench-warning">Manual analysis only. No broker orders are submitted from this panel. Quotes and POP are not available until a verified market-data adapter is connected.</p>
+    <div id="workbenchSearch" hidden>
+      <div class="bxk-workbench-fields">
+        <label>Option quote CSV (local file)<input id="wbQuoteFile" type="file" accept=".csv,text/csv"></label>
+        <label>Underlying reference price<input id="wbSpot" type="number" min="1" step=".01" value="7623.68"></label>
+        <label>Expiration (YYYY-MM-DD)<input id="wbExpiry" type="date"></label>
+        <label>Minimum combined credit (points)<input id="wbMinCredit" type="number" min="0" step=".05" value="0"></label>
+        <label>Maximum combined credit (points)<input id="wbMaxCredit" type="number" min="0" step=".05" value="10"></label>
+      </div>
+      <p class="bxk-workbench-warning">Imported snapshots only. Required CSV columns: expiration,type,strike,bid,ask. Optional timestamp. Prices are midpoint estimates; no live feed or POP model is connected. File stays in this browser.</p>
+      <div id="wbSearchStatus" role="status" aria-live="polite">Import a quote snapshot to find complete condors.</div>
+      <div id="wbSearchResults"></div>
+    </div>
     <div class="bxk-workbench-fields">
       <label>Short put <input id="wbShortPut" type="number" step="5" value="7500"></label>
       <label>Short call <input id="wbShortCall" type="number" step="5" value="7700"></label>
@@ -778,7 +790,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=1" defer></script>
+<script src="/static/unified-workbench.js?v=2" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
