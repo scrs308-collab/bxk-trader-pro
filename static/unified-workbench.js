@@ -83,6 +83,15 @@
         return;
       }
       const data = await response.json();
+      const expirySelect = document.getElementById("wbLiveExpiry");
+      expirySelect.replaceChildren();
+      for (const expiry of data.expirations || []) {
+        const opt = document.createElement("option");
+        opt.value = expiry.date;
+        opt.textContent = expiry.date + " (" + expiry.dte + " DTE)";
+        expirySelect.appendChild(opt);
+      }
+      document.getElementById("wbLoadQuotes").disabled = !data.expirations?.length;
       connectionStatus.textContent = data.expirations?.length
         ? "SPXW chain connected: " + data.expirations.length + " listed expirations. Live option quotes and POP not yet connected."
         : "SPXW connected, but no expirations were returned.";
@@ -90,6 +99,46 @@
       connectionStatus.textContent = "Could not reach the workbench market-data endpoint.";
     } finally {
       connectButton.disabled = false;
+    }
+  });
+  document.getElementById("wbLoadQuotes").addEventListener("click", async () => {
+    const spot = Number(document.getElementById("wbLiveSpot").value);
+    const range = Number(document.getElementById("wbLiveRange").value);
+    const expiry = document.getElementById("wbLiveExpiry").value;
+    const output = document.getElementById("wbQuoteResults");
+    output.replaceChildren();
+    if (!Number.isFinite(spot) || spot <= 0 || !expiry) {
+      output.textContent = "Enter a current SPX reference price and select an expiration.";
+      return;
+    }
+    const params = new URLSearchParams({expiration:expiry,
+      min_strike:String(spot-range), max_strike:String(spot+range)});
+    try {
+      const response = await fetch("/api/workbench/quotes?" + params, {credentials:"same-origin",cache:"no-store"});
+      if (!response.ok) {output.textContent = "Quotes unavailable ("+response.status+").";return;}
+      const data = await response.json();
+      if (!data.quotes?.length) {
+        output.textContent = "No usable bid/ask quotes returned. Verify SPXW quote permissions and market session.";
+        return;
+      }
+      const table = document.createElement("table");
+      table.className = "bxk-workbench-table";
+      table.innerHTML = "<thead><tr><th>Type</th><th>Strike</th><th>Bid</th><th>Ask</th><th>Quote timestamp</th></tr></thead>";
+      const tbody = document.createElement("tbody");
+      for (const quote of data.quotes.slice(0,160)) {
+        const row = document.createElement("tr");
+        for (const value of [quote.type, quote.strike, quote.bid, quote.ask, quote.timestamp || "Not provided"]) {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          row.appendChild(cell);
+        }
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      output.appendChild(table);
+      connectionStatus.textContent = data.received_quotes + " SPXW quotes from tastytrade. Check timestamps before use. Order placement remains disabled.";
+    } catch {
+      output.textContent = "Could not retrieve SPXW option quotes.";
     }
   });
   setMode("auto");
