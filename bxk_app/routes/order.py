@@ -3275,6 +3275,15 @@ def order_submit_api(
         get_db
     ),
 ):
+    # Defense in depth: preview deployments cannot send real orders,
+    # even if live-trading credentials are accidentally configured.
+    from bxk_app import config
+    if config.BXK_PREVIEW_MODE:
+        raise HTTPException(
+            status_code=403,
+            detail="Live order submission is disabled in preview mode.",
+        )
+
     role_value = user_context.get(
         "role"
     )
