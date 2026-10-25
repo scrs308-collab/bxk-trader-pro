@@ -118,7 +118,8 @@
     <p class="bxk-workbench-warning">Analysis only. No broker orders can be submitted from this panel. Premium and POP require authorized tastytrade quotes.</p>
     <div id="workbenchSearch" hidden>
       <p class="bxk-workbench-warning">Tastytrade option-chain integration is pending. No live or delayed quotes are connected to this staging service. Search results will appear here when authorized market data is available.</p>
-      <div id="wbSearchStatus" role="status">Waiting for tastytrade market-data connection.</div>
+      <button type="button" class="bxk-mode" id="wbConnectMarket">Check tastytrade market data</button>
+      <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
     <div class="bxk-workbench-fields">
       <label>Short put <input id="wbShortPut" type="number" step="5" value="7500"></label>
@@ -782,7 +783,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=6" defer></script>
+<script src="/static/unified-workbench.js?v=7" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
