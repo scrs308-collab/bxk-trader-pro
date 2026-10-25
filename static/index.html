@@ -121,8 +121,8 @@
         <label>Option quote CSV (local file)<input id="wbQuoteFile" type="file" accept=".csv,text/csv"></label>
         <label>Underlying reference price<input id="wbSpot" type="number" min="1" step=".01" value="7623.68"></label>
         <label>Expiration (YYYY-MM-DD)<input id="wbExpiry" type="date"></label>
-        <label>Minimum combined credit (points)<input id="wbMinCredit" type="number" min="0" step=".05" value="0"></label>
-        <label>Maximum combined credit (points)<input id="wbMaxCredit" type="number" min="0" step=".05" value="10"></label>
+        <label>Minimum combined premium (points)<input id="wbMinCredit" type="number" min="0" step=".05" value="0"></label>
+        <label>Maximum combined premium (points)<input id="wbMaxCredit" type="number" min="0" step=".05" value="10"></label>
       </div>
       <p class="bxk-workbench-warning">Imported snapshots only. Required CSV columns: expiration,type,strike,bid,ask. Optional timestamp. Prices are midpoint estimates; no live feed or POP model is connected. File stays in this browser.</p>
       <button type="button" id="wbCsvTemplate" class="bxk-mode">Download CSV template</button>
@@ -134,7 +134,7 @@
       <label>Short call <input id="wbShortCall" type="number" step="5" value="7700"></label>
       <label>Put wing <input id="wbPutWing" type="number" min="1" step="5" value="10"></label>
       <label>Call wing <input id="wbCallWing" type="number" min="1" step="5" value="10"></label>
-      <label>Net credit (points) <input id="wbCredit" type="number" min="0" step=".05" value="2.50"></label>
+      <label>Net premium (points) <input id="wbCredit" type="number" min="0" step=".05" value="2.50"></label>
       <label>Contracts <input id="wbContracts" type="number" min="1" max="100" step="1" value="1"></label>
     </div>
     <div id="workbenchResults" aria-live="polite"></div>
@@ -791,7 +791,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=4" defer></script>
+<script src="/static/unified-workbench.js?v=5" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
