@@ -10,3 +10,9 @@
 .bxk-workbench-metrics span {display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #64748b;border-radius:8px;min-width:130px}
 #workbenchResults svg {margin-top:14px}
 #workbenchManual[hidden], #workbenchSearchNote[hidden] {display:none!important}
+
+.bxk-workbench-table {width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+.bxk-workbench-table th,.bxk-workbench-table td {text-align:left;padding:10px;border-bottom:1px solid #64748b}
+#wbSearchResults {overflow-x:auto}
+.bxk-mode:disabled {opacity:.4;cursor:not-allowed}
+#workbenchSearch[hidden] {display:none!important}
