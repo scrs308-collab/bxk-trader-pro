@@ -153,7 +153,9 @@
     renderSearch();
   }
   function renderSearch() {
-    searchStatus.textContent = `${quotes.length} valid imported quotes; ${candidates.length} matching condors. Midpoint estimates, POP unavailable. Quotes are not verified as current.`;
+    const times = [...new Set(quotes.map(q => q.timestamp).filter(Boolean))];
+    const freshness = times.length === 0 ? "No quote timestamps supplied" : times.length === 1 ? `Snapshot timestamp: ${times[0]}` : `${times.length} different quote timestamps supplied`;
+    searchStatus.textContent = `${quotes.length} valid imported quotes; ${candidates.length} matching condors. ${freshness}. Midpoint estimates; POP unavailable. Quote freshness not verified.`;
     searchResults.replaceChildren();
     if (!candidates.length) return;
     const table = document.createElement("table");
@@ -186,6 +188,18 @@
     }
     searchResults.appendChild(controls);
   }
+  document.getElementById("wbCsvTemplate").addEventListener("click", () => {
+    const header = "expiration,type,strike,bid,ask,timestamp\\n";
+    const blob = new Blob([header], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "bxk-option-quote-template.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  });
   quoteFile.addEventListener("change",async()=>{
     quotes=[];candidates=[];searchResults.replaceChildren();
     const file=quoteFile.files?.[0];
