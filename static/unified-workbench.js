@@ -120,7 +120,7 @@
       });
       const data=await response.json();
       confirmStatus.textContent=response.ok&&data.simulation_only===true
-        ?"Server acknowledged one-time confirmation. No order created or submitted."
+        ?"Server durably consumed one-time confirmation. No order created or submitted."
         :"Confirmation rejected: "+(data.detail||response.status);
     }catch{
       confirmStatus.textContent="Confirmation request failed. No order submitted.";
