@@ -129,6 +129,40 @@ class OwnerReviewTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             self.ledger.begin_attempt(self.intent)
 
+    def test_new_conflicting_read_supersedes_old_complete_evidence(self):
+        self.proof()
+        old = self.service.refresh(self.intent)
+        row = self.ledger.get(self.intent)
+        self.worker.reader.read.return_value = Snapshot(self.scope, [fixture_match(row), fixture_match(row, broker_id="999")], True)
+        newest = self.service.refresh(self.intent)
+        self.assertEqual(newest["allowed_decisions"], ["KEEP_BLOCKED"])
+        self.service = OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now)
+        with self.assertRaises(HTTPException) as caught:
+            self.resolve(old)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.resolve(newest, "KEEP_BLOCKED")
+        self.assertEqual(self.ledger.get(self.intent)["state"], "MANUAL_REVIEW")
+
+    def test_failed_refresh_invalidates_old_evidence_before_broker_io(self):
+        self.proof()
+        old = self.service.refresh(self.intent)
+        def read(_):
+            with self.assertRaises(HTTPException) as stale:
+                self.resolve(old)
+            self.assertEqual(stale.exception.status_code, 409)
+            raise RuntimeError("injected timeout")
+        self.worker.reader.read.side_effect = read
+        with self.assertRaises(HTTPException) as failed:
+            self.service.refresh(self.intent)
+        self.assertEqual(failed.exception.status_code, 503)
+        self.service = OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now)
+        with self.assertRaises(HTTPException):
+            self.resolve(old)
+        with self.ledger.db() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_owner_resolutions").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_review_evidence").fetchone()[0], 1)
+        self.assertEqual(self.ledger.get(self.intent)["state"], "MANUAL_REVIEW")
+
     def test_wrong_payload_match_or_scope_is_not_bindable(self):
         row = self.ledger.get(self.intent)
         item = fixture_match(row)

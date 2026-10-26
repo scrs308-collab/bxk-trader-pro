@@ -96,10 +96,18 @@ class OwnerReview:
         if not self.worker.lock.acquire(blocking=False):
             raise HTTPException(409, "A broker check is already running")
         try:
-            with self.ledger.db() as db:
+            with self.ledger.db(True) as db:
                 cooldown = db.execute("SELECT blocked_until FROM certification_worker_state WHERE scope=?", (self.scope,)).fetchone()
-            if max(self.worker.blocked_until, cooldown["blocked_until"] if cooldown else 0) > self.clock():
-                raise HTTPException(409, "Broker backoff is active; try after it ends")
+                if max(self.worker.blocked_until, cooldown["blocked_until"] if cooldown else 0) > self.clock():
+                    raise HTTPException(409, "Broker backoff is active; try after it ends")
+                current = self.ledger._row(db, intent)
+                if current["version"] != row["version"] or current["state"] != "MANUAL_REVIEW":
+                    raise HTTPException(409, "Receipt changed; refresh evidence again")
+                # Supersede earlier evidence before I/O, including failed checks.
+                changed = db.execute("UPDATE certification_review_evidence SET expires_at=MIN(expires_at,?) WHERE intent_id=? AND scope=? AND expires_at>?",
+                                     (int(self.clock()), intent, self.scope, int(self.clock())))
+                if changed.rowcount:
+                    self.ledger._event(db, intent, row["state"], "OWNER_PRIOR_EVIDENCE_SUPERSEDED", row["version"])
             try:
                 snapshot = self.worker.reader.read(row)
             except Exception:

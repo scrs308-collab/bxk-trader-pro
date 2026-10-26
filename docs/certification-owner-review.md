@@ -12,6 +12,13 @@ worker or repeated owner click cannot bypass the saved delay. Failed reads creat
 no review evidence and preserve the existing block.
 
 Fresh evidence is stored durably for five minutes, bound to the receipt's scope
+and version. Starting an accepted replacement broker check durably expires all
+earlier evidence before contacting the broker, even if the new check fails or the
+process restarts. Historical evidence remains visible for audit but cannot support
+a resolution. This prevents using an older favorable search after newer conflict
+or uncertainty.
+
+Each review is bound to the receipt's scope
 and version. The resolution endpoint recalculates allowed decisions inside one
 transaction. Stale, expired, consumed, changed-scope or conflicting reviews fail
 closed. Each decision requires acknowledgement and a review note; the actor comes
