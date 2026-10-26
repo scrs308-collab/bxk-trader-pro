@@ -122,22 +122,58 @@
         output.textContent = `No usable bid/ask quotes. Raw items: ${d.raw_quote_items ?? "?"}; matched symbols: ${d.matched_symbols ?? "?"}; missing bid/ask: ${d.missing_bid_ask ?? "?"}; invalid spreads: ${d.invalid_spreads ?? "?"}.`;
         return;
       }
-      const table = document.createElement("table");
-      table.className = "bxk-workbench-table";
-      table.innerHTML = "<thead><tr><th>Type</th><th>Strike</th><th>Bid</th><th>Ask</th><th>Quote timestamp</th></tr></thead>";
-      const tbody = document.createElement("tbody");
-      for (const quote of data.quotes.slice(0,160)) {
-        const row = document.createElement("tr");
-        for (const value of [quote.type, quote.strike, quote.bid, quote.ask, quote.timestamp || "Not provided"]) {
-          const cell = document.createElement("td");
-          cell.textContent = String(value);
-          row.appendChild(cell);
-        }
-        tbody.appendChild(row);
-      }
-      table.appendChild(tbody);
-      output.appendChild(table);
-      connectionStatus.textContent = data.received_quotes + " SPXW quotes from tastytrade. Check timestamps before use. Order placement remains disabled.";
+      const widthPut = Number(document.getElementById("wbPutWing").value);
+      const widthCall = Number(document.getElementById("wbCallWing").value);
+      const validWidths = [widthPut,widthCall].every(x=>Number.isFinite(x)&&x>0);
+      if (!validWidths) {output.textContent="Enter valid put and call wing widths.";return;}
+      const quoteMap = new Map(data.quotes.map(q=>[`${q.type}:${Number(q.strike)}`,q]));
+      const now = Date.now();
+      const fresh = q => {
+        const t = Date.parse(q.timestamp || "");
+        return Number.isFinite(t) && t <= now + 60000 && now-t <= 120000;
+      };
+      const makeSpreads = (type,width) => data.quotes
+        .filter(q=>q.type===type && (type==="put"?q.strike<spot:q.strike>spot))
+        .sort((a,b)=>type==="put"?b.strike-a.strike:a.strike-b.strike)
+        .map(short=>{
+          const long = quoteMap.get(`${type}:${short.strike+(type==="put"?-width:width)}`);
+          if (!long) return null;
+          const premium = (Number(short.bid)+Number(short.ask)-Number(long.bid)-Number(long.ask))/2;
+          if (!(premium>0 && premium<width)) return null;
+          return {type,short:short.strike,long:long.strike,premium,
+            fresh:fresh(short)&&fresh(long),timestamp:short.timestamp||"Missing"};
+        }).filter(Boolean).slice(0,5);
+      const puts=makeSpreads("put",widthPut), calls=makeSpreads("call",widthCall);
+      const combinations=puts.flatMap(p=>calls.map(c=>({
+        put:p,call:c,premium:p.premium+c.premium,
+        maxLoss:(Math.max(widthPut,widthCall)-p.premium-c.premium)*100,
+        fresh:p.fresh&&c.fresh
+      }))).filter(x=>x.maxLoss>=0)
+        .sort((a,b)=>b.premium-a.premium).slice(0,10);
+      const addTable=(heading,columns,rows)=>{
+        const title=document.createElement("h3");title.textContent=heading;output.appendChild(title);
+        const table=document.createElement("table");table.className="bxk-workbench-table";
+        const thead=document.createElement("thead"),tr=document.createElement("tr");
+        columns.forEach(c=>{const th=document.createElement("th");th.textContent=c;tr.appendChild(th);});
+        thead.appendChild(tr);table.appendChild(thead);
+        const tbody=document.createElement("tbody");
+        rows.forEach(cells=>{const row=document.createElement("tr");
+          cells.forEach(cell=>{const td=document.createElement("td");td.textContent=String(cell);row.appendChild(td);});
+          tbody.appendChild(row);});
+        table.appendChild(tbody);output.appendChild(table);
+      };
+      const fmt=n=>Number(n).toFixed(2);
+      addTable("Five put spreads",["Sell put","Buy put","Premium (pts)","Max loss ($)","Quote"],
+        puts.map(p=>[p.short,p.long,fmt(p.premium),fmt((widthPut-p.premium)*100),p.fresh?"Fresh":"Stale/unknown"]));
+      addTable("Five call spreads",["Sell call","Buy call","Premium (pts)","Max loss ($)","Quote"],
+        calls.map(c=>[c.short,c.long,fmt(c.premium),fmt((widthCall-c.premium)*100),c.fresh?"Fresh":"Stale/unknown"]));
+      addTable("Combined iron condors (1 contract)",["Short put","Short call","Premium ($)","Max loss ($)","Breakevens","Quote"],
+        combinations.map(c=>[c.put.short,c.call.short,fmt(c.premium*100),fmt(c.maxLoss),
+          fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),c.fresh?"Fresh":"Stale/unknown"]));
+      const info=document.createElement("p");
+      info.textContent="Indicative midpoint premiums from tastytrade, before fees. Quote freshness threshold: 2 minutes. POP unavailable. Analysis only; no order submission.";
+      output.appendChild(info);
+      connectionStatus.textContent=data.received_quotes+" SPXW quotes received. "+puts.length+" put spreads, "+calls.length+" call spreads, "+combinations.length+" condors. Refresh before any trade review.";
     } catch {
       output.textContent = "Could not retrieve SPXW option quotes.";
     }
