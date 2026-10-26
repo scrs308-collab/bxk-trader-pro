@@ -104,16 +104,29 @@
   confirmCheck.addEventListener("change",()=>{
     confirmButton.disabled=!confirmCheck.checked||!validatedReview;
   });
-  confirmButton.addEventListener("click",()=>{
+  confirmButton.addEventListener("click",async()=>{
     if(!validatedReview||!confirmCheck.checked)return;
-    const elapsed=Date.now()-validatedReview.at;
-    if(elapsed>30000){
+    if(Date.now()-validatedReview.at>30000){
       clearConfirmation();
-      brokerStatus.textContent="Broker dry-run validation expired. Reload quotes and request a new dry-run.";
+      confirmStatus.textContent="Server confirmation expired; reload quotes and repeat dry-run.";
       return;
     }
     confirmButton.disabled=true;
-    confirmStatus.textContent="Review acknowledged for this quote snapshot. Simulation only: no order created or submitted.";
+    try{
+      const response=await fetch("/api/workbench/confirmation-consume",{
+        method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({...validatedReview.order,confirmation_token:validatedReview.token})
+      });
+      const data=await response.json();
+      confirmStatus.textContent=response.ok&&data.simulation_only===true
+        ?"Server acknowledged one-time confirmation. No order created or submitted."
+        :"Confirmation rejected: "+(data.detail||response.status);
+    }catch{
+      confirmStatus.textContent="Confirmation request failed. No order submitted.";
+    }finally{
+      validatedReview=null;
+    }
   });
   const occ=(expiry,type,strike)=>{
     const compact=expiry.slice(2,4)+expiry.slice(5,7)+expiry.slice(8,10);
@@ -136,11 +149,12 @@
       {symbol:occ(expiry,"C",c.call.short),action:"Sell to Open"},
       {symbol:occ(expiry,"C",c.call.long),action:"Buy to Open"}
     ];
+    const orderPayload={legs,quantity:1,limit_price:Number(c.premium.toFixed(2))};
     try{
       const response=await fetch("/api/workbench/order-dry-run",{
         method:"POST",credentials:"same-origin",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({legs,quantity:1,limit_price:Number(c.premium.toFixed(2))})
+        body:JSON.stringify(orderPayload)
       });
       const data=await response.json();
       if(!response.ok){
@@ -190,9 +204,20 @@
       }
       brokerStatus.appendChild(list);
       if(data.all_checks_pass===true && data.server_quote_verified===true && data.execution_authorized===false){
-        validatedReview={at:Date.now()};
-        confirmation.hidden=false;
-        confirmStatus.textContent="All broker checks passed. Explicitly acknowledge this review within 30 seconds; no order will be placed.";
+        // Server repeats fresh quote verification and broker dry-run before issuing token.
+        const issueResponse=await fetch("/api/workbench/confirmation-issue",{
+          method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(orderPayload)
+        });
+        const issued=await issueResponse.json();
+        if(issueResponse.ok&&issued.simulation_only===true&&issued.confirmation_token){
+          validatedReview={at:Date.now(),order:orderPayload,token:issued.confirmation_token};
+          confirmation.hidden=false;
+          confirmStatus.textContent="Server-issued confirmation valid for 30 seconds. Acknowledge this exact order; simulation only.";
+        }else{
+          confirmStatus.textContent="Server confirmation not issued: "+(issued.detail||issueResponse.status);
+        }
       }
     }catch{
       brokerStatus.textContent="Could not contact broker dry-run endpoint. No order submitted.";
