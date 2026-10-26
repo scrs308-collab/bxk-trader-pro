@@ -40,8 +40,10 @@ It is not exposed through the web app and makes GET requests only.
 It reads paginated historical orders over an absolute UTC window overlapping
 the attempt by five minutes, includes today's orders regardless of status, and
 fetches a known order ID when available. Missing/inconsistent pagination or an
-exhausted page cap is incomplete evidence. Per-leg remaining quantity must yield
-consistent, nonnegative fills; account or request mismatches require review.
+exhausted page cap is incomplete evidence. Per-leg execution records establish
+fills, and active-order remaining quantity must reconcile with them. Cancellation
+does not turn removed remaining quantity into an execution. Imbalanced fills,
+account or request mismatches require review.
 Malformed responses, HTTP 401/403/429/5xx and timeouts never authorize a retry.
 Conflicting observations of one order are conservatively escalated rather than
 guessing which response is newest.
@@ -75,7 +77,7 @@ storage failure leaves the web UI available but does not allow reconciliation.
 
 ## Validation
 
-The staging test suite now contains 48 tests. Core tests cover timeout and empty
+The staging test suite now contains 49 tests. Core tests cover timeout and empty
 history, separate-process recovery, concurrent reservation, replacement-key
 blocking, payload/account mismatch, incomplete/repeated pages, lost acceptance,
 partial/terminal fills, stale workers, read throttling, malformed money, live

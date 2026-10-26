@@ -56,7 +56,21 @@ class CertificationOrderReader:
                  "filled-quantity": None}
         try:
             order = canonical(item)
-            filled = [Decimal(str(x["quantity"]))-Decimal(str(x["remaining-quantity"])) for x in item["legs"]]
+            filled = []
+            for leg in item["legs"]:
+                fills = leg["fills"]
+                if not isinstance(fills, list):
+                    return basic
+                quantities = [Decimal(str(fill["quantity"])) for fill in fills]
+                if any(not number.is_finite() or number <= 0 for number in quantities):
+                    return basic
+                executed = sum(quantities, Decimal(0))
+                # Cancelled remaining quantity is not evidence of an execution.
+                if item.get("status") not in {"Cancelled", "Expired", "Rejected"}:
+                    remaining = Decimal(str(leg["remaining-quantity"]))
+                    if not remaining.is_finite() or remaining < 0 or executed+remaining != Decimal(str(leg["quantity"])):
+                        return basic
+                filled.append(executed)
             if len(set(filled)) != 1 or any(not x.is_finite() or x < 0 for x in filled):
                 return basic  # Imbalanced or malformed fills require manual review.
             return {**order, **basic, "filled-quantity": str(filled[0])}

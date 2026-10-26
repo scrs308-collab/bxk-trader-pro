@@ -273,6 +273,7 @@ class CertificationReaderTests(unittest.TestCase):
                      "external-identifier": "fixture-correlation", "status": "Live"}
         for leg in self.item["legs"]:
             leg["remaining-quantity"] = "2"
+            leg["fills"] = []
 
     def page(self, items, page=0, total=1):
         response = Mock(status_code=200)
@@ -301,6 +302,15 @@ class CertificationReaderTests(unittest.TestCase):
         self.assertIsNone(self.reader._normalise(item)["filled-quantity"])
         item["account-number"] = "WRONG0001"
         self.assertEqual(self.reader._normalise(item)["scope"], "INVALID_ACCOUNT")
+
+    def test_cancelled_remaining_quantity_does_not_invent_fills(self):
+        self.item["status"] = "Cancelled"
+        for leg in self.item["legs"]:
+            leg["remaining-quantity"] = "0"
+        self.assertEqual(self.reader._normalise(self.item)["filled-quantity"], "0")
+        for leg in self.item["legs"]:
+            leg["fills"] = [{"quantity": "1"}]
+        self.assertEqual(self.reader._normalise(self.item)["filled-quantity"], "1")
 
     def test_provider_errors_and_scope_mismatch_never_mutate_broker(self):
         for code in (401, 403, 429, 500):
