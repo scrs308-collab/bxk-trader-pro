@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent / "static"
 app = FastAPI(title="BXK Trade Workbench Staging")
@@ -144,6 +144,24 @@ def workbench_quotes(
     """Read-only, bounded bid/ask retrieval. No order/account methods."""
     from staging_market_data import get_quotes
     return get_quotes(expiration, min_strike, max_strike)
+
+
+class PreviewLeg(BaseModel):
+    symbol: str
+    action: str
+
+
+class WorkbenchDryRun(BaseModel):
+    legs: list[PreviewLeg]
+    quantity: int = Field(1, ge=1, le=1)
+    limit_price: float = Field(..., gt=0, le=100)
+
+
+@app.post("/api/workbench/order-dry-run")
+def workbench_order_dry_run(payload: WorkbenchDryRun):
+    """Authenticated broker dry-run only; never creates or submits an order."""
+    from staging_order_preview import preview
+    return preview(payload)
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
