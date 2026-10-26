@@ -46,7 +46,7 @@ def preview(payload):
         try:
             timestamp = datetime.fromisoformat(quote["timestamp"].replace("Z", "+00:00"))
             age = (now - timestamp).total_seconds()
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             raise HTTPException(409, "Invalid broker quote timestamp") from None
         if not -60 <= age <= 120:
             raise HTTPException(409, "Broker quote is stale; refresh and review again")
