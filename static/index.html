@@ -21,10 +21,10 @@
     <header class="topbar">
       <div>
         <h1>BXK Trader Pro</h1>
-        <p>Live Market Intelligence</p>
+        <p>Staging Workbench · tastytrade market data and dry-run previews</p>
       </div>
 
-      <div class="status-pill" id="apiStatus">
+      <div class="status-pill" id="apiStatus" hidden>
         ● Connecting
       </div>
     </header>
@@ -109,8 +109,8 @@
 <section class="card" id="unifiedWorkbench" aria-label="Trade Workbench">
   <div class="card-label">TRADE WORKBENCH</div>
   <div class="bxk-workbench-modes" role="group" aria-label="Trading method">
-    <button type="button" class="bxk-mode active" data-workbench-mode="auto" aria-pressed="true">BXK Auto</button>
-    <button type="button" class="bxk-mode" data-workbench-mode="search" aria-pressed="false">Condor Search</button>
+    <button type="button" class="bxk-mode" data-workbench-mode="auto" aria-pressed="false" disabled title="Legacy BXK Auto APIs are unavailable in isolated staging">BXK Auto</button>
+    <button type="button" class="bxk-mode active" data-workbench-mode="search" aria-pressed="true">Condor Search</button>
     <button type="button" class="bxk-mode" data-workbench-mode="custom" aria-pressed="false">Custom Builder</button>
   </div>
   <p id="workbenchModeDescription">Existing BXK trading engine and market analysis.</p>
@@ -814,7 +814,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=17" defer></script>
+<script src="/static/unified-workbench.js?v=18" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
