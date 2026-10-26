@@ -151,7 +151,8 @@
           const premium = (Number(short.bid)+Number(short.ask)-Number(long.bid)-Number(long.ask))/2;
           if (!(premium>0 && premium<width)) return null;
           return {type,short:short.strike,long:long.strike,premium,
-            fresh:fresh(short)&&fresh(long),timestamp:short.timestamp||"Missing"};
+            fresh:fresh(short)&&fresh(long),timestamp:short.timestamp||"Missing",
+          legTimestamps:[short.timestamp,long.timestamp]};
         }).filter(Boolean).slice(0,25);
       const puts=makeSpreads("put",widthPut), calls=makeSpreads("call",widthCall);
       const expectedMoveField=document.getElementById("wbExpectedMove");
@@ -194,7 +195,9 @@
         const pop=popEnabled?100*Math.max(0,Math.min(1,cdf((upper-spot)/expectedMove)-cdf((lower-spot)/expectedMove))):null;
         return {put:p,call:c,premium,
           maxLoss:(Math.max(widthPut,widthCall)-premium)*100,
-          fresh:p.fresh&&c.fresh,pop};
+          fresh:p.fresh&&c.fresh,pop,
+          oldestQuote:[...p.legTimestamps,...c.legTimestamps].every(Boolean)
+            ? [...p.legTimestamps,...c.legTimestamps].sort()[0] : null};
       })).filter(x=>x.maxLoss>=0 && (!popEnabled || x.pop>=minPop))
         .sort((a,b)=>{
           if(sortMode==="pop" && popEnabled) return b.pop-a.pop || b.premium-a.premium;
@@ -226,7 +229,7 @@
       comboTable.className="bxk-workbench-table";
       const header=document.createElement("thead");
       const headerRow=document.createElement("tr");
-      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Modeled POP","Quote","Oldest short-leg timestamp","Analyze"].forEach(label=>{
+      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Modeled POP","Premium / risk","Quote","Oldest 4-leg timestamp","Analyze"].forEach(label=>{
         const th=document.createElement("th");th.textContent=label;headerRow.appendChild(th);
       });
       header.appendChild(headerRow);comboTable.appendChild(header);
@@ -240,8 +243,9 @@
           fmt(c.maxLoss),
           fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),
           c.pop===null?"Unavailable":fmt(c.pop)+"%",
+          c.maxLoss>0?fmt(c.premium*100/c.maxLoss)+":1":"Undefined",
           c.fresh?"Fresh":"Stale/unknown",
-          [c.put.timestamp,c.call.timestamp].filter(Boolean).sort()[0] || "Unknown"
+          c.oldestQuote || "Unknown"
         ];
         cells.forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
         const actionCell=document.createElement("td");
