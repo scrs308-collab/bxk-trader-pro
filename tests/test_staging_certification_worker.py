@@ -4,11 +4,14 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+import requests
+from fastapi import HTTPException
 
 import staging_confirmation as confirmation
 from staging_certification_worker import CertificationWorker
 from staging_reconciliation import Ledger
 from staging_reconciliation_rehearsal import fixture_order
+from staging_owner_review import OwnerReview
 
 
 class CertificationWorkerTests(unittest.TestCase):
@@ -140,6 +143,33 @@ class CertificationWorkerTests(unittest.TestCase):
             self.worker.tick()
         self.assertEqual(self.worker.last_error, "DURABLE_STORAGE_UNAVAILABLE")
         self.session.get.assert_not_called()
+        self.session.post.assert_not_called()
+
+    def test_owner_network_and_malformed_reads_persist_account_backoff(self):
+        intent = self.unknown()
+        with self.ledger.db(True) as db:
+            db.execute("UPDATE rehearsal_reconciliation SET state='MANUAL_REVIEW' WHERE id=?", (intent,))
+        for failure in (requests.Timeout("private provider detail"), KeyError("private response field")):
+            self.cached_token()
+            self.session.get.side_effect = failure
+            review = OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now)
+            with self.assertRaises(HTTPException) as caught:
+                review.refresh(intent)
+            self.assertEqual(caught.exception.status_code, 503)
+            self.assertNotIn("private", str(caught.exception.detail))
+            calls = self.session.get.call_count
+            self.assertEqual(self.worker.failures, 1)
+            restarted = CertificationWorker(session=self.session, clock=lambda: self.now)
+            with self.assertRaises(HTTPException) as blocked:
+                OwnerReview(restarted, ledger=self.ledger, clock=lambda: self.now).refresh(intent)
+            self.assertEqual(blocked.exception.status_code, 409)
+            self.assertEqual(self.session.get.call_count, calls)
+            self.assertEqual(restarted.status()["backoff_until"], self.now+30)
+            self.assertEqual(self.ledger.get(intent)["state"], "MANUAL_REVIEW")
+            with self.ledger.db() as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_review_evidence").fetchone()[0], 0)
+            self.now += 31
+            self.worker = restarted
         self.session.post.assert_not_called()
 
     def test_terminal_and_manual_review_attempts_are_not_polled(self):

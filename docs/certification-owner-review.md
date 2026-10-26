@@ -6,6 +6,11 @@ broker evidence summaries and owner decisions. Refresh broker evidence uses the
 existing read-only certification reader and respects account cooldown and worker
 locking. No SQLite transaction is held across broker I/O.
 
+Network timeouts, malformed broker responses and OAuth decoding failures during
+owner refreshes use the same durable account backoff as automatic checks. A fresh
+worker or repeated owner click cannot bypass the saved delay. Failed reads create
+no review evidence and preserve the existing block.
+
 Fresh evidence is stored durably for five minutes, bound to the receipt's scope
 and version. The resolution endpoint recalculates allowed decisions inside one
 transaction. Stale, expired, consumed, changed-scope or conflicting reviews fail

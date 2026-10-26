@@ -16,12 +16,18 @@ class ObservedReader(CertificationOrderReader):
         self.worker = worker
         super().__init__(*args, **kwargs)
 
-    def _get(self, suffix, params):
+    def read(self, row):
         try:
-            return super()._get(suffix, params)
+            return super().read(row)
         except BrokerReadError as error:
             self.worker.provider_failure(error)
             raise
+        except Exception:
+            # Network, OAuth decoding and collection-shape failures must also
+            # throttle owner refreshes, which do not pass through worker.tick.
+            error = BrokerReadError()
+            self.worker.provider_failure(error)
+            raise error from None
 
 
 class CertificationWorker:
