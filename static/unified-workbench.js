@@ -95,7 +95,8 @@
   brokerButton.addEventListener("click",async()=>{
     if(!selectedReview)return;
     const {c,expiry,selectedAt}=selectedReview;
-    if(!c.fresh || Date.now()-selectedAt>30000){
+    const quoteAge=Date.now()-Date.parse(c.oldestQuote||"");
+    if(!c.fresh || !Number.isFinite(quoteAge) || quoteAge>120000 || quoteAge< -60000 || Date.now()-selectedAt>30000){
       brokerStatus.textContent="Quote snapshot expired. Reload SPXW quotes before broker dry-run.";
       brokerButton.disabled=true;return;
     }
