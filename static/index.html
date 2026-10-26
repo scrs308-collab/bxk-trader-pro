@@ -147,6 +147,13 @@
         <div id="wbPreviewDetails"></div>
         <button type="button" class="bxk-mode" id="wbBrokerPreview">Check broker buying power (dry-run only)</button>
         <p id="wbBrokerPreviewStatus" role="status"></p>
+        <div id="wbConfirmationRehearsal" hidden>
+          <h4>Final confirmation rehearsal — no live order</h4>
+          <p>Review the four strikes, expiration, limit premium, risk, fees, buying power and broker warnings. This is a UI safeguard test only.</p>
+          <label><input type="checkbox" id="wbConfirmReview"> I reviewed this specific four-leg position and the broker dry-run results.</label>
+          <button type="button" class="bxk-mode" id="wbConfirmSimulation" disabled>Confirm review (simulation only)</button>
+          <p id="wbConfirmationStatus" role="status"></p>
+        </div>
         <button type="button" class="bxk-mode" id="wbClosePreview">Close review</button>
       </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
@@ -814,7 +821,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=21" defer></script>
+<script src="/static/unified-workbench.js?v=22" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
