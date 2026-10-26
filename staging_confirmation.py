@@ -82,13 +82,29 @@ def consume(order, token):
         if updated.rowcount != 1:
             conn.rollback()
             raise HTTPException(409, "Confirmation already consumed")
-        conn.commit()
+        # Record a simulated order intent in the SAME transaction as token consumption.
+        # This is not a live broker order, and no broker submission method is called.
+        conn.execute("""CREATE TABLE IF NOT EXISTS staging_order_intents (
+            key_hash TEXT PRIMARY KEY, fingerprint TEXT NOT NULL,
+            status TEXT NOT NULL, created_at INTEGER NOT NULL
+        )""")
         if not hmac.compare_digest(row[0], _fingerprint(order)):
+            conn.commit()
             raise HTTPException(409, "Order details changed; confirmation consumed")
+        try:
+            conn.execute(
+                "INSERT INTO staging_order_intents (key_hash,fingerprint,status,created_at) VALUES (?,?,?,?)",
+                (_hash(token), row[0], "SIMULATED_NO_SUBMISSION", now)
+            )
+        except sqlite3.IntegrityError:
+            conn.commit()
+            raise HTTPException(409, "Duplicate simulated order intent; no order submitted") from None
+        conn.commit()
     except sqlite3.Error:
         conn.rollback()
         raise HTTPException(503, "Durable confirmation ledger unavailable") from None
     finally:
         conn.close()
     return {"acknowledged": True, "simulation_only": True, "submitted": False,
-            "message": "Durable single-use confirmation consumed; no broker order sent."}
+            "order_intent_status": "SIMULATED_NO_SUBMISSION",
+            "message": "Confirmation and simulated order intent committed atomically; no broker order sent."}
