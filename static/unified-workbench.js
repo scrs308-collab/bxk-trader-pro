@@ -309,7 +309,7 @@
       document.getElementById("wbLoadQuotes").disabled = !data.expirations?.length;
       if(data.expirations?.length) await loadSpot();
       connectionStatus.textContent = data.expirations?.length
-        ? "SPXW chain connected: " + data.expirations.length + " listed expirations. Live option quotes and POP not yet connected."
+        ? "SPXW chain connected: " + data.expirations.length + " listed expirations. Load SPXW quotes for current bid/ask prices and modeled POP."
         : "SPXW connected, but no expirations were returned.";
     } catch {
       connectionStatus.textContent = "Could not reach the workbench market-data endpoint.";
