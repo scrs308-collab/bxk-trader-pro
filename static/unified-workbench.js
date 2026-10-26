@@ -268,14 +268,14 @@
     spotStatus.textContent="Retrieving SPX index quote...";
     try{
       const response=await fetch("/api/workbench/spx-reference",{credentials:"same-origin",cache:"no-store"});
-      if(!response.ok)throw new Error("Unavailable");
       const data=await response.json();
-      if(data.symbol!=="SPX"||data.fresh!==true||!(Number(data.price)>0))throw new Error("Invalid");
+      if(!response.ok)throw new Error(typeof data.detail==="string"?data.detail:"SPX index endpoint unavailable");
+      if(data.symbol!=="SPX"||!(Number(data.price)>0))throw new Error("Invalid SPX price");
       spotInput.value=Number(data.price).toFixed(2);
-      spotStatus.textContent="tastytrade SPX • "+data.timestamp;
+      spotStatus.textContent=(data.fresh?"Fresh":"Stale/reference only")+" tastytrade SPX ("+data.price_field+") • "+(data.timestamp||"Timestamp unavailable");
       return Number(data.price);
-    }catch{
-      spotStatus.textContent="Fresh SPX quote unavailable. Select Manual override.";
+    }catch(error){
+      spotStatus.textContent=(error.message||"SPX quote unavailable")+". Select Manual override.";
       return NaN;
     }
   }
