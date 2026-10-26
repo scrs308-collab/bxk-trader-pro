@@ -1,5 +1,6 @@
 """Isolated staging UI with its own login; never imports trading, DB or broker modules."""
 import base64
+import asyncio
 from contextlib import asynccontextmanager
 import hashlib
 import hmac
@@ -25,7 +26,18 @@ async def reconciliation_lifespan(application):
         application.state.reconciliation_ready = True
     except HTTPException:
         application.state.reconciliation_ready = False
-    yield
+    from staging_certification_worker import CertificationWorker, run_worker
+    worker, stop = CertificationWorker(), asyncio.Event()
+    application.state.certification_worker = worker
+    task = asyncio.create_task(run_worker(worker, stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        try:
+            await asyncio.wait_for(task, timeout=20)
+        except asyncio.TimeoutError:
+            task.cancel()
 
 
 app = FastAPI(title="BXK Trade Workbench Staging", lifespan=reconciliation_lifespan)
@@ -237,6 +249,14 @@ def reconciliation_rehearsal_attempt(intent: str):
     from staging_reconciliation import Ledger
     Ledger().begin_attempt(intent)
     return {"synthetic_data": True, "submitted": False, "attempt_reserved": True}
+
+
+@app.get("/api/workbench/reconciliation-status")
+def certification_reconciliation_status():
+    """Owner-only durable status. This route performs no broker requests."""
+    from staging_certification_worker import CertificationWorker
+    worker = getattr(app.state, "certification_worker", None)
+    return (worker if worker is not None else CertificationWorker()).status()
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

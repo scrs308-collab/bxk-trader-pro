@@ -2,6 +2,54 @@
   "use strict";
   const root = document.getElementById("unifiedWorkbench");
   if (!root) return;
+  const certStatus=document.getElementById("wbCertRecoveryStatus");
+  const certItems=document.getElementById("wbCertRecoveryItems");
+  const certRefresh=document.getElementById("wbRefreshCertRecovery");
+  let certLoading=false;
+  async function loadCertificationRecovery(){
+    if(certLoading)return;
+    certLoading=true;certRefresh.disabled=true;
+    try{
+      const response=await fetch("/api/workbench/reconciliation-status",{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok)throw new Error();
+      const data=await response.json();
+      if(data.environment!=="certification"||data.submission_enabled!==false)throw new Error();
+      const errors={BROKER_RATE_LIMITED:"Broker asked us to wait; checks will resume after backoff.",
+        BROKER_AUTH_UNAVAILABLE:"Broker sign-in is unavailable; recovery remains blocked.",
+        DURABLE_STORAGE_UNAVAILABLE:"Recovery storage is unavailable.",
+        BROKER_READ_UNAVAILABLE:"Broker records are temporarily unavailable."};
+      certStatus.textContent=!data.configured?"Certification connection is not configured."
+        :!data.enabled?"Automatic certification checks are paused."
+        :data.last_error?(errors[data.last_error]||"Recovery checks are temporarily unavailable.")
+        :data.account_blocked?"Automatic checks are active. Unresolved attempts block replacement orders."
+        :"Automatic certification checks are active. No unresolved attempts.";
+      certItems.replaceChildren();
+      if(!data.items.length){const p=document.createElement("p");p.textContent="No certification attempts recorded.";certItems.appendChild(p);return;}
+      const table=document.createElement("table");table.className="bxk-workbench-table";
+      const head=document.createElement("thead"),header=document.createElement("tr");
+      ["Receipt","Status","Filled quantity","Next check","Detail"].forEach(label=>{const th=document.createElement("th");th.textContent=label;header.appendChild(th);});
+      head.appendChild(header);table.appendChild(head);
+      const body=document.createElement("tbody");
+      const labels={SUBMITTING:"Awaiting recovery",UNKNOWN:"Checking broker",ACKNOWLEDGED:"Working at broker",MANUAL_REVIEW:"Needs owner review",READY:"Prepared"};
+      data.items.forEach(item=>{
+        const row=document.createElement("tr");
+        const active=["UNKNOWN","ACKNOWLEDGED"].includes(item.state);
+        const state=item.state==="TERMINAL"?(item.broker_status||"Completed"):(labels[item.state]||"Unavailable");
+        const detail=item.state==="MANUAL_REVIEW"?"Review required. Resubmission stays blocked."
+          :item.reason==="NO_MATCH_YET"?"No matching broker order found yet. Retry remains blocked."
+          :Number(item.filled)>0?"Recorded fills remain exposure; a completed order does not mean the position is closed."
+          :item.reason==="INCOMPLETE_HISTORY"?"Waiting for complete broker records.":"Original attempt retained.";
+        const due=Math.max(Number(item.next_read)||0,Number(data.backoff_until)||0);
+        [String(item.id).slice(0,8),state,String(item.filled),active&&due?new Date(due*1000).toLocaleTimeString():"—",detail].forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
+        body.appendChild(row);
+      });
+      table.appendChild(body);certItems.appendChild(table);
+    }catch{certStatus.textContent="Recovery status is unavailable. Sign in or refresh to check again.";certItems.replaceChildren();}
+    finally{certLoading=false;certRefresh.disabled=false;}
+  }
+  certRefresh.addEventListener("click",loadCertificationRecovery);
+  loadCertificationRecovery();
+  setInterval(()=>{if(!document.hidden)loadCertificationRecovery();},15000);
   const runRecovery=document.getElementById("wbRunReconciliation");
   const verifyRecovery=document.getElementById("wbVerifyReconciliation");
   const recoveryStatus=document.getElementById("wbReconciliationStatus");

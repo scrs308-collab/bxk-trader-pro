@@ -96,6 +96,9 @@ class Ledger:
                 sequence INTEGER PRIMARY KEY AUTOINCREMENT, intent_id TEXT NOT NULL,
                 state TEXT NOT NULL, reason TEXT NOT NULL, version INTEGER NOT NULL,
                 occurred_at INTEGER NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS certification_worker_state (
+                scope TEXT PRIMARY KEY, blocked_until INTEGER NOT NULL,
+                last_error TEXT)""")
             if write:
                 db.execute("BEGIN IMMEDIATE")
             yield db
@@ -180,16 +183,24 @@ class Ledger:
             version = row["version"]+1
             db.execute("UPDATE rehearsal_reconciliation SET lease=?,lease_until=?,version=? WHERE id=?", (lease, now+60, version, intent))
         # No SQLite lock is held across provider I/O. Errors never authorize a POST.
+        retry_delay = 0
         try:
             snapshot = reader.read(row)
             state, reason, broker_id, status, filled = self._decide(row, snapshot)
-        except Exception:
+        except Exception as error:
             state, reason, broker_id, status, filled = row["state"], "READ_UNAVAILABLE", row["broker_id"], row["broker_status"], row["filled"]
+            code = getattr(error, "status_code", None)
+            if code in (401, 403):
+                reason = "BROKER_AUTH_UNAVAILABLE"
+            elif code == 429:
+                reason = "BROKER_RATE_LIMITED"
+            delay = getattr(error, "retry_after", 0)
+            retry_delay = delay if type(delay) is int and delay >= 0 else 0
         reads = row["reads"]+1
         if state == "UNKNOWN" and reads >= self.max_reads:
             state, reason = "MANUAL_REVIEW", "RECOVERY_READ_LIMIT"
         # Backoff applies to reads only. There is no mutation transport to retry.
-        due = int(self.clock()) + min(300, 2**min(reads, 8)) + self.jitter()
+        due = int(self.clock()) + max(retry_delay, min(300, 2**min(reads, 8)) + self.jitter())
         with self.db(True) as db:
             changed = db.execute("UPDATE rehearsal_reconciliation SET state=?,reason=?,broker_id=?,broker_status=?,filled=?,reads=?,next_read=?,lease=NULL,lease_until=0,version=version+1 WHERE id=? AND version=? AND lease=?",
                                  (state, reason, broker_id, status, filled, reads, due, intent, version, lease))

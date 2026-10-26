@@ -8,11 +8,32 @@ from decimal import Decimal
 import hashlib
 import re
 import time
+from email.utils import parsedate_to_datetime
 
 import requests
 from staging_reconciliation import Snapshot, canonical
 
 CERT = "https://api.cert.tastyworks.com"
+
+
+class BrokerReadError(RuntimeError):
+    """Safe provider status; never retain response bodies or credentials."""
+    def __init__(self, status_code=None, retry_after=0):
+        super().__init__("Certification broker read unavailable")
+        self.status_code = status_code
+        self.retry_after = retry_after
+
+
+def retry_seconds(value, now):
+    if not isinstance(value, str):
+        return 0
+    try:
+        return max(0, int(value))
+    except ValueError:
+        try:
+            return max(0, int(parsedate_to_datetime(value).timestamp()-now)+1)
+        except (ValueError, TypeError, OverflowError):
+            return 0
 
 
 class CertificationOrderReader:
@@ -28,7 +49,7 @@ class CertificationOrderReader:
         response = self.session.get(CERT+"/accounts/"+self.account+"/orders"+suffix,
                                     params=params, headers=self.headers(), timeout=15, allow_redirects=False)
         if response.status_code != 200:
-            raise RuntimeError("Certification order read unavailable")
+            raise BrokerReadError(response.status_code, retry_seconds(response.headers.get("Retry-After"), self.clock()))
         return response.json()
 
     def _pages(self, suffix, params):

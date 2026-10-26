@@ -138,6 +138,14 @@ with patch("staging_confirmation.os.path.ismount", return_value=True):
         with self.assertRaises(HTTPException):
             self.observe(final, [fixture_match(row)])
 
+    def test_cancelled_partial_order_retains_executed_exposure(self):
+        row = self.unknown()
+        partial = self.observe(row, [fixture_match(row, "Partially Filled", "1")])
+        self.now += 10
+        result = self.observe(partial, [fixture_match(row, "Cancelled", "1")])
+        self.assertEqual((result["state"], result["filled"]), ("TERMINAL", "1"))
+        self.assert_blocked()
+
     def test_terminal_rejection_never_permits_same_attempt_retry(self):
         row = self.unknown()
         result = self.observe(row, [fixture_match(row, "Rejected")])
@@ -282,6 +290,7 @@ with patch("staging_confirmation.os.path.ismount", return_value=True):
             self.assertEqual(client.post("/api/workbench/reconciliation-rehearsal").status_code, 401)
             self.assertEqual(client.get("/api/workbench/reconciliation-rehearsal/"+self.intent).status_code, 401)
             self.assertEqual(client.post("/api/workbench/reconciliation-rehearsal/"+self.intent+"/attempt").status_code, 401)
+            self.assertEqual(client.get("/api/workbench/reconciliation-status").status_code, 401)
 
 
 class CertificationReaderTests(unittest.TestCase):
@@ -315,6 +324,18 @@ class CertificationReaderTests(unittest.TestCase):
     def test_repeated_page_is_incomplete(self):
         self.session.get.side_effect = [self.page([self.item], 0, 3), self.page([self.item], 1, 3), self.page([]), self.page([])]
         self.assertFalse(self.reader.read(self.row).complete)
+
+    def test_history_window_crosses_midnight_and_preserves_terminal_orders(self):
+        from datetime import datetime, timezone
+        self.row["attempt_at"] = datetime(2026, 10, 25, 23, 59, tzinfo=timezone.utc).timestamp()
+        self.reader.clock = lambda: datetime(2026, 10, 26, 0, 2, tzinfo=timezone.utc).timestamp()
+        self.item["status"] = "Cancelled"
+        self.session.get.side_effect = [self.page([self.item]), self.collection([])]
+        result = self.reader.read(self.row)
+        self.assertTrue(result.complete)
+        params = self.session.get.call_args_list[0].kwargs["params"]
+        self.assertTrue(params["start-at"].startswith("2026-10-25"))
+        self.assertTrue(params["end-at"].startswith("2026-10-26"))
 
     def collection(self, items):
         response = Mock(status_code=200)

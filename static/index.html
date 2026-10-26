@@ -171,6 +171,13 @@
         <p id="wbReconciliationStatus" role="status"></p>
         <p id="wbReconciliationRecovery" role="status"></p>
       </section>
+      <section aria-labelledby="wbCertRecoveryTitle">
+        <h3 id="wbCertRecoveryTitle">Certification order recovery</h3>
+        <p>Tracks sandbox orders using simulated money. Unresolved attempts stay blocked while broker records are checked.</p>
+        <button type="button" id="wbRefreshCertRecovery" class="bxk-mode">Refresh recovery status</button>
+        <p id="wbCertRecoveryStatus" role="status">Loading recovery status…</p>
+        <div id="wbCertRecoveryItems"></div>
+      </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
