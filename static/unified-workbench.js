@@ -110,6 +110,7 @@
       connectButton.disabled = false;
     }
   });
+  document.getElementById("wbCondorSort").addEventListener("change",()=>document.getElementById("wbLoadQuotes").click());
   document.getElementById("wbLoadQuotes").addEventListener("click", async () => {
     const spot = Number(document.getElementById("wbLiveSpot").value);
     const range = Number(document.getElementById("wbLiveRange").value);
@@ -186,6 +187,7 @@
         const tail=density*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
         return x>=0?1-tail:tail;
       };
+      const sortMode=document.getElementById("wbCondorSort").value;
       const combinations=puts.flatMap(p=>calls.map(c=>{
         const premium=p.premium+c.premium;
         const lower=p.short-premium,upper=c.short+premium;
@@ -194,7 +196,12 @@
           maxLoss:(Math.max(widthPut,widthCall)-premium)*100,
           fresh:p.fresh&&c.fresh,pop};
       })).filter(x=>x.maxLoss>=0 && (!popEnabled || x.pop>=minPop))
-        .sort((a,b)=>b.premium-a.premium).slice(0,10);
+        .sort((a,b)=>{
+          if(sortMode==="pop" && popEnabled) return b.pop-a.pop || b.premium-a.premium;
+          if(sortMode==="riskreward") return (b.maxLoss>0?b.premium*100/b.maxLoss:Infinity)-(a.maxLoss>0?a.premium*100/a.maxLoss:Infinity);
+          if(sortMode==="risk") return a.maxLoss-b.maxLoss || b.premium-a.premium;
+          return b.premium-a.premium;
+        }).slice(0,10);
       const addTable=(heading,columns,rows)=>{
         const title=document.createElement("h3");title.textContent=heading;output.appendChild(title);
         const table=document.createElement("table");table.className="bxk-workbench-table";
@@ -219,7 +226,7 @@
       comboTable.className="bxk-workbench-table";
       const header=document.createElement("thead");
       const headerRow=document.createElement("tr");
-      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Modeled POP","Quote","Analyze"].forEach(label=>{
+      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Modeled POP","Quote","Oldest short-leg timestamp","Analyze"].forEach(label=>{
         const th=document.createElement("th");th.textContent=label;headerRow.appendChild(th);
       });
       header.appendChild(headerRow);comboTable.appendChild(header);
@@ -233,7 +240,8 @@
           fmt(c.maxLoss),
           fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),
           c.pop===null?"Unavailable":fmt(c.pop)+"%",
-          c.fresh?"Fresh":"Stale/unknown"
+          c.fresh?"Fresh":"Stale/unknown",
+          [c.put.timestamp,c.call.timestamp].filter(Boolean).sort()[0] || "Unknown"
         ];
         cells.forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
         const actionCell=document.createElement("td");
