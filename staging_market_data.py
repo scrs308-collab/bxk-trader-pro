@@ -102,20 +102,28 @@ def get_quotes(expiration, min_strike, max_strike):
     items = data.get("items", [])
     by_symbol = {str(q.get("symbol") or q.get("instrument-symbol") or ""): q for q in items}
     quotes = []
+    matched_symbols = 0
+    missing_bid_ask = 0
+    invalid_spreads = 0
     for symbol, kind, strike in contracts:
         q = by_symbol.get(symbol)
         if not q:
             continue
+        matched_symbols += 1
         try:
             bid_raw = q.get("bid") if q.get("bid") is not None else q.get("bid-price")
             ask_raw = q.get("ask") if q.get("ask") is not None else q.get("ask-price")
             bid, ask = float(bid_raw), float(ask_raw)
         except (TypeError, ValueError):
+            missing_bid_ask += 1
             continue
         if not (0 <= bid <= ask):
+            invalid_spreads += 1
             continue
         quotes.append({"type": kind, "strike": strike, "bid": bid, "ask": ask,
                        "symbol": symbol, "timestamp": q.get("timestamp") or q.get("quote-time")})
     return {"root": "SPXW", "expiration": expiration, "source": "tastytrade",
             "quotes": quotes, "received_quotes": len(quotes),
-            "requested_contracts": len(contracts), "order_execution_enabled": False}
+            "requested_contracts": len(contracts), "order_execution_enabled": False,
+            "diagnostics": {"raw_quote_items": len(items), "matched_symbols": matched_symbols,
+                            "missing_bid_ask": missing_bid_ask, "invalid_spreads": invalid_spreads}}
