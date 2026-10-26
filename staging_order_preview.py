@@ -40,10 +40,26 @@ def preview(payload):
             f"{BASE}/accounts/{account}/orders/dry-run",
             json=request_payload, headers=_headers(), timeout=20,
         )
-        response.raise_for_status()
+        if not response.ok:
+            # Return a bounded broker HTTP status and safe error codes, never account data.
+            try:
+                body = response.json()
+                errors = body.get("error", {}) if isinstance(body, dict) else {}
+                if isinstance(errors, dict):
+                    code = errors.get("code") or errors.get("error-code")
+                else:
+                    code = None
+            except ValueError:
+                code = None
+            safe_code = str(code)[:64] if code and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", str(code)) else "unspecified"
+            raise HTTPException(502, {
+                "reason": "Broker rejected dry-run request",
+                "broker_http_status": response.status_code,
+                "broker_error_code": safe_code,
+            })
         data = response.json().get("data", {})
     except (requests.RequestException, ValueError):
-        raise HTTPException(503, "Tastytrade broker dry-run unavailable") from None
+        raise HTTPException(503, "Tastytrade connection or response unavailable") from None
     effect = data.get("buying-power-effect") or {}
     order = data.get("order") or {}
     fees = data.get("fee-calculation") or {}
