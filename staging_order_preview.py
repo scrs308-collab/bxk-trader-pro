@@ -44,11 +44,28 @@ def preview(payload):
         data = response.json().get("data", {})
     except (requests.RequestException, ValueError):
         raise HTTPException(503, "Tastytrade broker dry-run unavailable") from None
-    # Return only the broker's validation and buying-power summary, never account identifiers.
     effect = data.get("buying-power-effect") or {}
-    return {"dry_run_only": True, "submitted": False,
-            "broker_status": data.get("status"),
-            "warnings": data.get("warnings", []),
-            "errors": data.get("errors", []),
-            "buying_power_effect": effect,
-            "limit_credit_points": payload.limit_price}
+    order = data.get("order") or {}
+    status = order.get("status") or data.get("status") or "Unknown"
+    def numeric(value):
+        try:
+            return round(float(value), 2)
+        except (ValueError, TypeError):
+            return None
+    broker_impact = numeric(effect.get("change-in-buying-power"))
+    estimated_risk = round((width - payload.limit_price) * 100, 2)
+    delta = round(abs(broker_impact) - estimated_risk, 2) if broker_impact is not None else None
+    return {
+        "dry_run_only": True,
+        "submitted": False,
+        "broker_status": status,
+        "status_verified": str(status).lower() == "received",
+        "warnings": data.get("warnings", []),
+        "errors": data.get("errors", []),
+        "buying_power_effect": effect,
+        "estimated_defined_risk": estimated_risk,
+        "broker_buying_power_change": broker_impact,
+        "difference_from_defined_risk": delta,
+        "reconciled": delta is not None and abs(delta) <= 0.01,
+        "execution_authorized": False,
+    }
