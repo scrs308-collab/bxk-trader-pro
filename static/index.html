@@ -129,6 +129,16 @@
         <label><span>Expected move source</span><select id="wbExpectedMoveSource"><option value="auto" selected>Auto: tastytrade ATM straddle</option><option value="manual">Manual override</option></select></label>
       </div>
       <p class="bxk-workbench-warning">Auto expected move is estimated from the nearest at-the-money SPXW call and put midpoint premiums (straddle × 1.2533). Modeled POP assumes a normal distribution at expiration; it is not tastytrade POP or a validated forecast. Stale or missing quotes disable auto POP.</p>
+      <div class="bxk-workbench-fields">
+        <label>Sort condors by
+          <select id="wbCondorSort">
+            <option value="premium">Highest premium</option>
+            <option value="pop">Highest modeled POP</option>
+            <option value="riskreward">Best premium / maximum loss</option>
+            <option value="risk">Lowest maximum loss</option>
+          </select>
+        </label>
+      </div>
       <button type="button" class="bxk-mode" id="wbConnectMarket">Check tastytrade market data</button>
       <button type="button" class="bxk-mode" id="wbLoadQuotes" disabled>Load SPXW quotes</button>
       <div id="wbQuoteResults" aria-live="polite"></div>
@@ -796,7 +806,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=13" defer></script>
+<script src="/static/unified-workbench.js?v=14" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
