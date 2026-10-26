@@ -7,7 +7,7 @@ import secrets
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -84,7 +84,7 @@ app.mount("/static", StaticFiles(directory=str(ROOT)), name="static")
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "mode": "isolated-staging", "auth_configured": _configured()}
+    return {"status": "ok", "mode": "isolated-staging", "auth_configured": _configured(), "market_data_configured": bool(os.getenv("TASTYTRADE_CLIENT_SECRET") and os.getenv("TASTYTRADE_REFRESH_TOKEN"))}
 
 
 @app.get("/login")
@@ -126,6 +126,24 @@ def logout():
 @app.get("/")
 def index():
     return FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/workbench/expirations")
+def workbench_expirations():
+    """Owner-authenticated, read-only SPXW expiration discovery."""
+    from staging_market_data import get_expirations
+    return get_expirations()
+
+
+@app.get("/api/workbench/quotes")
+def workbench_quotes(
+    expiration: str = Query(..., pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
+    min_strike: float = Query(..., gt=0),
+    max_strike: float = Query(..., gt=0),
+):
+    """Read-only, bounded bid/ask retrieval. No order/account methods."""
+    from staging_market_data import get_quotes
+    return get_quotes(expiration, min_strike, max_strike)
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
