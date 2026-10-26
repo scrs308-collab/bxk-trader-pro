@@ -142,12 +142,13 @@
           if (!(premium>0 && premium<width)) return null;
           return {type,short:short.strike,long:long.strike,premium,
             fresh:fresh(short)&&fresh(long),timestamp:short.timestamp||"Missing"};
-        }).filter(Boolean).slice(0,5);
+        }).filter(Boolean).slice(0,25);
       const puts=makeSpreads("put",widthPut), calls=makeSpreads("call",widthCall);
       const expectedMoveField=document.getElementById("wbExpectedMove");
       const expectedMove=Number(expectedMoveField.value);
       const minPop=Number(document.getElementById("wbMinPop").value);
       const popEnabled=expectedMoveField.value.trim()!=="" && Number.isFinite(expectedMove) && expectedMove>0;
+      if(expectedMoveField.value.trim()!=="" && !popEnabled){output.textContent="Expected move must be positive.";return;}
       if (!Number.isFinite(minPop)||minPop<1||minPop>99) {
         output.textContent="Minimum modeled POP must be between 1 and 99%.";return;
       }
@@ -180,9 +181,9 @@
       };
       const fmt=n=>Number(n).toFixed(2);
       addTable("Five put spreads",["Sell put","Buy put","Premium (pts)","Max loss ($)","Quote"],
-        puts.map(p=>[p.short,p.long,fmt(p.premium),fmt((widthPut-p.premium)*100),p.fresh?"Fresh":"Stale/unknown"]));
+        puts.slice(0,5).map(p=>[p.short,p.long,fmt(p.premium),fmt((widthPut-p.premium)*100),p.fresh?"Fresh":"Stale/unknown"]));
       addTable("Five call spreads",["Sell call","Buy call","Premium (pts)","Max loss ($)","Quote"],
-        calls.map(c=>[c.short,c.long,fmt(c.premium),fmt((widthCall-c.premium)*100),c.fresh?"Fresh":"Stale/unknown"]));
+        calls.slice(0,5).map(c=>[c.short,c.long,fmt(c.premium),fmt((widthCall-c.premium)*100),c.fresh?"Fresh":"Stale/unknown"]));
       const comboTitle=document.createElement("h3");
       comboTitle.textContent="Combined iron condors (1 contract)";
       output.appendChild(comboTitle);
