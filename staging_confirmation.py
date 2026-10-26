@@ -47,8 +47,6 @@ def consume(order, token):
             raise HTTPException(409, "Confirmation expired or invalid")
         # Mark consumed even on mismatch to prevent replay.
         _used.add(token)
-        if len(_used) > 10000:
-            _used.clear()  # staging only; never suitable for production execution
         if not hmac.compare_digest(record["fingerprint"], _fingerprint(order)):
             raise HTTPException(409, "Order details changed; request a new confirmation")
     return {"acknowledged": True, "simulation_only": True, "submitted": False,
