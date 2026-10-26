@@ -60,14 +60,15 @@ def _spxw():
 
 
 def get_spx_reference():
-    """Read the actual SPX index quote, never infer spot from option strikes."""
+    """Return a sourced SPX index reference; report whether it is fresh."""
     from datetime import datetime, timezone
     data = _get("/market-data/by-type", {"index": "SPX"})
     items = data.get("items", [])
     match = next((q for q in items if str(q.get("symbol") or q.get("instrument-symbol") or "").replace("$", "").upper() == "SPX"), None)
     if not match:
-        raise HTTPException(503, "SPX index quote unavailable; manual entry required")
+        raise HTTPException(503, "No SPX index quote returned by tastytrade")
     price = None
+    source_field = None
     for field in ("last", "last-price", "mark", "mark-price", "close", "close-price"):
         raw = match.get(field)
         if raw is not None:
@@ -75,22 +76,24 @@ def get_spx_reference():
                 candidate = float(raw)
                 if 1000 < candidate < 100000:
                     price = candidate
+                    source_field = field
                     break
             except (ValueError, TypeError):
                 pass
+    if price is None:
+        raise HTTPException(503, "SPX index quote has no usable last, mark, or close")
     timestamp = match.get("updated-at") or match.get("updatedAt") or match.get("timestamp")
-    if price is None or not timestamp:
-        raise HTTPException(503, "SPX price or timestamp unavailable; manual entry required")
-    try:
-        quote_time = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
-        age = (datetime.now(timezone.utc) - quote_time).total_seconds()
-    except (ValueError, TypeError):
-        raise HTTPException(503, "SPX quote timestamp invalid; manual entry required") from None
-    if age < -60 or age > 120:
-        raise HTTPException(503, "SPX index quote stale; manual entry required")
+    age = None
+    if timestamp:
+        try:
+            quote_time = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+            age = (datetime.now(timezone.utc) - quote_time).total_seconds()
+        except (ValueError, TypeError):
+            pass
     return {"symbol": "SPX", "price": price, "timestamp": timestamp,
-            "source": "tastytrade", "fresh": True}
-
+            "source": "tastytrade", "price_field": source_field,
+            "fresh": age is not None and -60 <= age <= 120,
+            "age_seconds": round(age) if age is not None else None}
 
 def get_expirations():
     item = _spxw()
