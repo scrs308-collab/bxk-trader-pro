@@ -135,6 +135,13 @@ def workbench_expirations():
     return get_expirations()
 
 
+@app.get("/api/workbench/spx-reference")
+def workbench_spx_reference():
+    """Fetch a timestamp-verified SPX index reference quote from tastytrade."""
+    from staging_market_data import get_spx_reference
+    return get_spx_reference()
+
+
 @app.get("/api/workbench/quotes")
 def workbench_quotes(
     expiration: str = Query(..., pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
