@@ -163,6 +163,14 @@
         <button type="button" id="wbForgetSimulation" class="bxk-mode">Forget saved simulation</button>
         <p id="wbReplayStatus" role="status"></p>
       </section>
+      <section>
+        <h3>Reconciliation safety rehearsal</h3>
+        <p>Uses synthetic broker outcomes only. Tests timeout recovery, partial fills and duplicate protection. No broker orders are sent.</p>
+        <button type="button" id="wbRunReconciliation" class="bxk-mode">Run recovery scenarios</button>
+        <button type="button" id="wbVerifyReconciliation" class="bxk-mode" disabled>Verify recovery after restart</button>
+        <p id="wbReconciliationStatus" role="status"></p>
+        <p id="wbReconciliationRecovery" role="status"></p>
+      </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
@@ -828,7 +836,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=29" defer></script>
+<script src="/static/unified-workbench.js?v=30" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      

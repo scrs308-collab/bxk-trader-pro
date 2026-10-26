@@ -1,5 +1,6 @@
 """Isolated staging UI with its own login; never imports trading, DB or broker modules."""
 import base64
+from contextlib import asynccontextmanager
 import hashlib
 import hmac
 import os
@@ -13,7 +14,21 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent / "static"
-app = FastAPI(title="BXK Trade Workbench Staging")
+
+
+@asynccontextmanager
+async def reconciliation_lifespan(application):
+    # This ledger contains synthetic attempts only; startup never contacts a broker.
+    from staging_reconciliation import Ledger
+    try:
+        Ledger().recover_inflight()
+        application.state.reconciliation_ready = True
+    except HTTPException:
+        application.state.reconciliation_ready = False
+    yield
+
+
+app = FastAPI(title="BXK Trade Workbench Staging", lifespan=reconciliation_lifespan)
 COOKIE = "bxk_staging_session"
 TTL = 43200
 
@@ -196,6 +211,32 @@ def confirmation_receipt(payload: ConfirmationRequest):
     """Owner-authenticated persisted simulation evidence, without broker access."""
     from staging_confirmation import receipt
     return receipt(payload, payload.confirmation_token)
+
+
+@app.post("/api/workbench/reconciliation-rehearsal")
+def reconciliation_rehearsal():
+    """Owner-authenticated synthetic fault scenarios; no external network calls."""
+    from staging_reconciliation_rehearsal import run
+    return run()
+
+
+@app.get("/api/workbench/reconciliation-rehearsal/{intent}")
+def reconciliation_rehearsal_receipt(intent: str):
+    from uuid import UUID
+    from staging_reconciliation_rehearsal import receipt
+    try:
+        UUID(intent)
+    except ValueError:
+        raise HTTPException(400, "Invalid rehearsal receipt") from None
+    return receipt(intent)
+
+
+@app.post("/api/workbench/reconciliation-rehearsal/{intent}/attempt")
+def reconciliation_rehearsal_attempt(intent: str):
+    """Synthetic duplicate-attempt test. Always has no broker transport."""
+    from staging_reconciliation import Ledger
+    Ledger().begin_attempt(intent)
+    return {"synthetic_data": True, "submitted": False, "attempt_reserved": True}
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

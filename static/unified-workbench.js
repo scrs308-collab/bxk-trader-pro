@@ -2,6 +2,46 @@
   "use strict";
   const root = document.getElementById("unifiedWorkbench");
   if (!root) return;
+  const runRecovery=document.getElementById("wbRunReconciliation");
+  const verifyRecovery=document.getElementById("wbVerifyReconciliation");
+  const recoveryStatus=document.getElementById("wbReconciliationStatus");
+  const recoveryReceipt=document.getElementById("wbReconciliationRecovery");
+  const recoveryKey="bxk-reconciliation-rehearsal-v1";
+  let savedRecovery=null;
+  try{savedRecovery=JSON.parse(sessionStorage.getItem(recoveryKey));}catch{}
+  verifyRecovery.disabled=!savedRecovery;
+  runRecovery.addEventListener("click",async()=>{
+    runRecovery.disabled=true;
+    recoveryStatus.textContent="Running synthetic recovery scenarios...";
+    try{
+      const response=await fetch("/api/workbench/reconciliation-rehearsal",{method:"POST",credentials:"same-origin"});
+      const data=await response.json();
+      if(!response.ok||data.synthetic_data!==true||data.submitted!==false||data.all_passed!==true)throw new Error("Rehearsal did not pass.");
+      recoveryStatus.textContent="PASS: "+data.checks.map(x=>x.scenario+" → "+x.state+" (retry blocked)").join("; ")+". Synthetic data only; no broker order submitted.";
+      savedRecovery=data.restart_receipt;
+      try{sessionStorage.setItem(recoveryKey,JSON.stringify(savedRecovery));}catch{}
+      verifyRecovery.disabled=false;
+      recoveryReceipt.textContent="Restart test prepared: "+savedRecovery.id+". Attempt recorded as SUBMITTING; verify after restarting staging.";
+    }catch(error){recoveryStatus.textContent="Verification incomplete: "+error.message;}
+    finally{runRecovery.disabled=false;}
+  });
+  verifyRecovery.addEventListener("click",async()=>{
+    if(!savedRecovery)return;
+    verifyRecovery.disabled=true;
+    try{
+      const response=await fetch("/api/workbench/reconciliation-rehearsal/"+encodeURIComponent(savedRecovery.id),{credentials:"same-origin"});
+      const data=await response.json();
+      const rejected=await fetch("/api/workbench/reconciliation-rehearsal/"+encodeURIComponent(savedRecovery.id)+"/attempt",{method:"POST",credentials:"same-origin"});
+      const stable=response.ok&&data.synthetic_data===true&&data.submitted===false&&data.state==="UNKNOWN"
+        &&rejected.status===409
+        &&data.retry_blocked===true&&data.attempt_count===1
+        &&["id","correlation","fingerprint","attempt"].every(k=>data[k]===savedRecovery[k]);
+      recoveryReceipt.textContent=stable
+        ?"PASS: interrupted attempt recovered as UNKNOWN; original intent and attempt unchanged; one attempt only; duplicate attempt rejected (409). Receipt "+data.id+". No broker order submitted."
+        :"Restart recovery not verified. Current state: "+(data.state||"unavailable")+". No broker order submitted.";
+    }catch{recoveryReceipt.textContent="Recovery receipt unavailable. Retry remains blocked.";}
+    finally{verifyRecovery.disabled=false;}
+  });
   const buttons = [...root.querySelectorAll("[data-workbench-mode]")];
   const manual = document.getElementById("workbenchManual");
   const description = document.getElementById("workbenchModeDescription");

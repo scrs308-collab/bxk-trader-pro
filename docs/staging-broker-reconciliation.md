@@ -189,4 +189,3 @@ out-of-order stream events, 429/5xx/auth failures, storage outage and failed
 reconciliation writes. Assert no second POST while UNKNOWN and durable recovery
 across host restart. Validate identifiers and final broker outcomes in the broker
 certification environment. None of these are authorization to enable live trading.
-
