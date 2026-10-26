@@ -259,6 +259,31 @@
     reviewPanel.hidden=false;
     reviewPanel.scrollIntoView({behavior:"smooth",block:"start"});
   };
+  const spotInput=document.getElementById("wbLiveSpot");
+  const spotSource=document.getElementById("wbSpotSource");
+  const spotStatus=document.getElementById("wbSpotStatus");
+  async function loadSpot(){
+    if(spotSource.value==="manual")return Number(spotInput.value);
+    spotInput.value="";
+    spotStatus.textContent="Retrieving SPX index quote...";
+    try{
+      const response=await fetch("/api/workbench/spx-reference",{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok)throw new Error("Unavailable");
+      const data=await response.json();
+      if(data.symbol!=="SPX"||data.fresh!==true||!(Number(data.price)>0))throw new Error("Invalid");
+      spotInput.value=Number(data.price).toFixed(2);
+      spotStatus.textContent="tastytrade SPX • "+data.timestamp;
+      return Number(data.price);
+    }catch{
+      spotStatus.textContent="Fresh SPX quote unavailable. Select Manual override.";
+      return NaN;
+    }
+  }
+  spotSource.addEventListener("change",()=>{
+    spotInput.readOnly=spotSource.value!=="manual";
+    spotInput.value="";
+    spotStatus.textContent=spotSource.value==="manual"?"Enter SPX price manually (not broker-verified).":"Auto quote will load with SPXW quotes.";
+  });
   const connectButton = document.getElementById("wbConnectMarket");
   const connectionStatus = document.getElementById("wbSearchStatus");
   connectButton.addEventListener("click", async () => {
@@ -282,6 +307,7 @@
         expirySelect.appendChild(opt);
       }
       document.getElementById("wbLoadQuotes").disabled = !data.expirations?.length;
+      if(data.expirations?.length) await loadSpot();
       connectionStatus.textContent = data.expirations?.length
         ? "SPXW chain connected: " + data.expirations.length + " listed expirations. Live option quotes and POP not yet connected."
         : "SPXW connected, but no expirations were returned.";
@@ -293,13 +319,13 @@
   });
   document.getElementById("wbCondorSort").addEventListener("change",()=>document.getElementById("wbLoadQuotes").click());
   document.getElementById("wbLoadQuotes").addEventListener("click", async () => {
-    const spot = Number(document.getElementById("wbLiveSpot").value);
+    const spot = spotSource.value==="auto" ? await loadSpot() : Number(spotInput.value);
     const range = Number(document.getElementById("wbLiveRange").value);
     const expiry = document.getElementById("wbLiveExpiry").value;
     const output = document.getElementById("wbQuoteResults");
     output.replaceChildren();
     if (!Number.isFinite(spot) || spot <= 0 || !expiry) {
-      output.textContent = "Enter a current SPX reference price and select an expiration.";
+      output.textContent = "A verified SPX quote is unavailable. Select Manual override or retry, and choose an expiration.";
       return;
     }
     const params = new URLSearchParams({expiration:expiry,
