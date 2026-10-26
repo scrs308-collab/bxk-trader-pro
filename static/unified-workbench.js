@@ -119,8 +119,8 @@
         body:JSON.stringify({...validatedReview.order,confirmation_token:validatedReview.token})
       });
       const data=await response.json();
-      confirmStatus.textContent=response.ok&&data.simulation_only===true
-        ?"Server durably consumed one-time confirmation. No order created or submitted."
+      confirmStatus.textContent=response.ok&&data.simulation_only===true&&data.order_intent_status==="SIMULATED_NO_SUBMISSION"
+        ?"Server durably recorded the simulated order intent and consumed the confirmation. No broker order submitted."
         :"Confirmation rejected: "+(data.detail||response.status);
     }catch{
       confirmStatus.textContent="Confirmation request failed. No order submitted.";
