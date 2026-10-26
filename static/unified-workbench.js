@@ -118,9 +118,20 @@
         brokerStatus.textContent="Broker dry-run unavailable ("+response.status+"): "+(data.detail||"No broker validation returned.");
         return;
       }
-      brokerStatus.textContent="Broker dry-run status: "+(data.broker_status||"Unknown")+
-        ". Buying-power effect: "+JSON.stringify(data.buying_power_effect||{})+
-        ". No order submitted. Broker warnings: "+JSON.stringify(data.warnings||[]);
+      const fmtMoney=n=>typeof n==="number"&&Number.isFinite(n)?"$"+Math.abs(n).toFixed(2):"Unavailable";
+      const delta=data.difference_from_defined_risk;
+      const reconciled=data.reconciled===true;
+      const warnings=(data.warnings||[]).map(w=>w.message||String(w)).join("; ");
+      const errors=(data.errors||[]).map(w=>w.message||String(w)).join("; ");
+      brokerStatus.textContent=[
+        "Broker status: "+(data.broker_status||"Unknown")+(data.status_verified?" (verified)":" (not verified)"),
+        "BXK defined risk: "+fmtMoney(data.estimated_defined_risk),
+        "Broker buying-power change: "+fmtMoney(data.broker_buying_power_change),
+        "Difference: "+fmtMoney(delta)+(reconciled?" (reconciled)":" (unexplained; review required)"),
+        "Broker warnings: "+(warnings||"None reported"),
+        "Broker errors: "+(errors||"None reported"),
+        "No order submitted. Live execution remains disabled."
+      ].join(" | ");
     }catch{
       brokerStatus.textContent="Could not contact broker dry-run endpoint. No order submitted.";
     }finally{
