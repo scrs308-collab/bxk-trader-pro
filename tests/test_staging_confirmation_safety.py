@@ -76,6 +76,28 @@ class ConfirmationSafetyTests(unittest.TestCase):
                 self.module.issue(self.order, self.result)
         self.assertEqual(caught.exception.status_code, 503)
 
+    def test_order_intent_idempotency_survives_reload(self):
+        import staging_order_ledger
+        ledger = importlib.reload(staging_order_ledger)
+        key = "rehearsal-idempotency-key-0001"
+        first = ledger.reserve_intent(self.order, key)
+        self.assertEqual(first["status"], "SIMULATED_NO_SUBMISSION")
+        self.assertFalse(first["submitted"])
+        ledger = importlib.reload(ledger)
+        with self.assertRaises(HTTPException) as caught:
+            ledger.reserve_intent(self.order, key)
+        self.assertEqual(caught.exception.status_code, 409)
+
+    def test_order_intent_key_cannot_change_order(self):
+        import staging_order_ledger
+        ledger = importlib.reload(staging_order_ledger)
+        key = "rehearsal-idempotency-key-0002"
+        ledger.reserve_intent(self.order, key)
+        changed = SimpleNamespace(legs=self.order.legs, quantity=1, limit_price=2.80)
+        with self.assertRaises(HTTPException) as caught:
+            ledger.reserve_intent(changed, key)
+        self.assertEqual(caught.exception.status_code, 409)
+
     def test_failed_checks_never_issue_token(self):
         with self.assertRaises(HTTPException):
             self.module.issue(self.order, {"all_checks_pass": False, "server_quote_verified": True})
