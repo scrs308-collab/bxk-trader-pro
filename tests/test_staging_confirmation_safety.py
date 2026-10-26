@@ -6,6 +6,7 @@ import importlib
 import os
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -16,9 +17,12 @@ class ConfirmationSafetyTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        with patch.dict(os.environ, {"BXK_STAGING_CONFIRMATION_DB": str(Path(self.tmp.name) / "test.sqlite3")}):
-            import staging_confirmation
-            self.module = importlib.reload(staging_confirmation)
+        self.db_path = Path(self.tmp.name) / "test.sqlite3"
+        self.env_patch = patch.dict(os.environ, {"BXK_STAGING_CONFIRMATION_DB": str(self.db_path)})
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
+        import staging_confirmation
+        self.module = importlib.reload(staging_confirmation)
         self.mount = patch.object(self.module.os.path, "ismount", return_value=True)
         self.mount.start()
         self.addCleanup(self.mount.stop)
@@ -53,6 +57,24 @@ class ConfirmationSafetyTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 409)
         with self.assertRaises(HTTPException):
             self.module.consume(self.order, token)
+
+    def test_concurrent_consumers_only_one_succeeds(self):
+        token = self.module.issue(self.order, self.result)["confirmation_token"]
+        def consume_once(_):
+            try:
+                return self.module.consume(self.order, token)["acknowledged"]
+            except HTTPException as exc:
+                return exc.status_code
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(consume_once, range(8)))
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(409), 7)
+
+    def test_missing_volume_fails_closed(self):
+        with patch.object(self.module.os.path, "ismount", return_value=False):
+            with self.assertRaises(HTTPException) as caught:
+                self.module.issue(self.order, self.result)
+        self.assertEqual(caught.exception.status_code, 503)
 
     def test_failed_checks_never_issue_token(self):
         with self.assertRaises(HTTPException):
