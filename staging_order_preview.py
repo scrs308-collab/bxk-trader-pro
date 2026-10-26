@@ -2,8 +2,9 @@
 import os
 import re
 import requests
+from datetime import datetime, timezone
 from fastapi import HTTPException
-from staging_market_data import _headers, BASE
+from staging_market_data import _headers, BASE, get_quotes
 
 OCC = re.compile(r"^SPXW  [0-9]{6}[PC][0-9]{8}$")
 
@@ -29,6 +30,33 @@ def preview(payload):
     width = max(parsed[0][2]-parsed[1][2],parsed[3][2]-parsed[2][2])
     if not 0 < payload.limit_price < width:
         raise HTTPException(400, "Credit must be positive and below maximum wing width")
+    # Independently re-fetch all four legs immediately before the broker dry-run.
+    # Never trust the browser's freshness label or quoted premium.
+    expiry = "20" + parsed[0][0][:2] + "-" + parsed[0][0][2:4] + "-" + parsed[0][0][4:6]
+    low = min(x[2] for x in parsed)
+    high = max(x[2] for x in parsed)
+    snapshot = get_quotes(expiry, max(0.01, low - 1), high + 1)
+    quote_index = {q["symbol"]: q for q in snapshot.get("quotes", [])}
+    now = datetime.now(timezone.utc)
+    fresh_quotes = []
+    for leg in legs:
+        quote = quote_index.get(leg.symbol)
+        if not quote or not quote.get("timestamp"):
+            raise HTTPException(409, "Missing fresh broker quote for one or more legs")
+        try:
+            timestamp = datetime.fromisoformat(quote["timestamp"].replace("Z", "+00:00"))
+            age = (now - timestamp).total_seconds()
+        except (ValueError, TypeError):
+            raise HTTPException(409, "Invalid broker quote timestamp") from None
+        if not -60 <= age <= 120:
+            raise HTTPException(409, "Broker quote is stale; refresh and review again")
+        fresh_quotes.append(quote)
+    def mid(q):
+        return (float(q["bid"]) + float(q["ask"])) / 2
+    current_credit = round(mid(fresh_quotes[0]) - mid(fresh_quotes[1])
+                           + mid(fresh_quotes[2]) - mid(fresh_quotes[3]), 2)
+    if current_credit <= 0 or abs(current_credit - payload.limit_price) > 0.10:
+        raise HTTPException(409, "Quoted premium changed; refresh and select a new position")
     request_payload = {
         "time-in-force": "Day", "order-type": "Limit",
         "price": f"{payload.limit_price:.2f}", "price-effect": "Credit",
@@ -120,4 +148,7 @@ def preview(payload):
         "difference_from_defined_risk": variance,
         "unexplained_difference_after_fees": unexplained,
         "execution_authorized": False,
+        "server_quote_verified": True,
+        "server_quote_credit_points": current_credit,
+        "server_quote_checked_at": now.isoformat(),
     }
