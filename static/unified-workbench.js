@@ -167,13 +167,55 @@
         puts.map(p=>[p.short,p.long,fmt(p.premium),fmt((widthPut-p.premium)*100),p.fresh?"Fresh":"Stale/unknown"]));
       addTable("Five call spreads",["Sell call","Buy call","Premium (pts)","Max loss ($)","Quote"],
         calls.map(c=>[c.short,c.long,fmt(c.premium),fmt((widthCall-c.premium)*100),c.fresh?"Fresh":"Stale/unknown"]));
-      addTable("Combined iron condors (1 contract)",["Short put","Short call","Premium ($)","Max loss ($)","Breakevens","Quote"],
-        combinations.map(c=>[c.put.short,c.call.short,fmt(c.premium*100),fmt(c.maxLoss),
-          fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),c.fresh?"Fresh":"Stale/unknown"]));
+      const comboTitle=document.createElement("h3");
+      comboTitle.textContent="Combined iron condors (1 contract)";
+      output.appendChild(comboTitle);
+      const comboTable=document.createElement("table");
+      comboTable.className="bxk-workbench-table";
+      const header=document.createElement("thead");
+      const headerRow=document.createElement("tr");
+      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Quote","Analyze"].forEach(label=>{
+        const th=document.createElement("th");th.textContent=label;headerRow.appendChild(th);
+      });
+      header.appendChild(headerRow);comboTable.appendChild(header);
+      const comboBody=document.createElement("tbody");
+      combinations.forEach(c=>{
+        const row=document.createElement("tr");
+        const cells=[
+          c.put.short+" / "+c.put.long,
+          c.call.short+" / "+c.call.long,
+          fmt(c.premium*100),
+          fmt(c.maxLoss),
+          fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),
+          c.fresh?"Fresh":"Stale/unknown"
+        ];
+        cells.forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
+        const actionCell=document.createElement("td");
+        const button=document.createElement("button");button.type="button";
+        button.className="bxk-mode";button.textContent="Analyze";
+        button.disabled=!c.fresh;
+        button.title=c.fresh?"Transfer quote snapshot to Custom Builder":"Stale or missing quote timestamps";
+        button.addEventListener("click",()=>{
+          document.getElementById("wbShortPut").value=c.put.short;
+          document.getElementById("wbShortCall").value=c.call.short;
+          document.getElementById("wbPutWing").value=widthPut;
+          document.getElementById("wbCallWing").value=widthCall;
+          document.getElementById("wbCredit").value=fmt(c.premium);
+          document.getElementById("wbContracts").value="1";
+          setMode("custom");
+        });
+        actionCell.appendChild(button);row.appendChild(actionCell);comboBody.appendChild(row);
+      });
+      comboTable.appendChild(comboBody);output.appendChild(comboTable);
+      if(!combinations.length){
+        const empty=document.createElement("p");
+        empty.textContent="No complete four-leg condors matched the selected wing widths and strike range.";
+        output.appendChild(empty);
+      }
       const info=document.createElement("p");
       info.textContent="Indicative midpoint premiums from tastytrade, before fees. Quote freshness threshold: 2 minutes. POP unavailable. Analysis only; no order submission.";
       output.appendChild(info);
-      connectionStatus.textContent=data.received_quotes+" SPXW quotes received. "+puts.length+" put spreads, "+calls.length+" call spreads, "+combinations.length+" condors. Refresh before any trade review.";
+      connectionStatus.textContent=data.received_quotes+" SPXW quotes received. "+puts.length+" put spreads, "+calls.length+" call spreads, "+combinations.length+" condors. POP filtering requires a validated probability model; no 70% POP claim is made. Refresh before analysis.";
     } catch {
       output.textContent = "Could not retrieve SPXW option quotes.";
     }
