@@ -36,6 +36,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log configuration state without exposing any credential values.
+    from bxk_app.services.auth_service import auth_configuration_status
+    auth_state = auth_configuration_status()
+    logger.warning(
+        "BXK staging startup configuration: auth_enabled=%s, auth_configured=%s, "
+        "username_configured=%s, password_configured=%s, session_secret_configured=%s, "
+        "preview_mode=%s, live_trading_enabled=%s",
+        auth_state["enabled"], auth_state["configured"],
+        auth_state["username_configured"], auth_state["password_configured"],
+        auth_state["session_secret_configured"], config.BXK_PREVIEW_MODE,
+        config.BXK_LIVE_TRADING_ENABLED,
+    )
     if config.BXK_PREVIEW_MODE:
         logger.info(
             "BXK preview mode enabled. Background "
