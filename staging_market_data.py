@@ -39,7 +39,7 @@ def _headers():
                 _token_expiry = time.time() + 12 * 60
             except (requests.RequestException, ValueError, KeyError):
                 raise HTTPException(503, "Tastytrade authentication unavailable") from None
-        return {"Authorization": "Bearer " + _token, "Accept": "application/json"}
+        return {"Authorization": "Bearer " + _token, "Accept": "application/json", "User-Agent": "bxk-trader-pro-staging/1.0"}
 
 
 def _get(path, params=None):
@@ -81,16 +81,19 @@ def get_quotes(expiration, min_strike, max_strike):
     if selected is None:
         raise HTTPException(404, "SPXW expiration not listed")
     contracts = []
+    def occ_symbol(kind, strike):
+        # REST requires OCC symbols; DXLink streamer symbols are not REST identifiers.
+        yymmdd = expiration[2:4] + expiration[5:7] + expiration[8:10]
+        strike_units = round(strike * 1000)
+        return f"SPXW  {yymmdd}{'P' if kind == 'put' else 'C'}{strike_units:08d}"
     for row in selected.get("strikes", []):
         try:
             strike = float(row["strike-price"])
         except (KeyError, ValueError, TypeError):
             continue
         if min_strike <= strike <= max_strike:
-            for kind, field in (("put", "put-streamer-symbol"), ("call", "call-streamer-symbol")):
-                symbol = row.get(field)
-                if symbol:
-                    contracts.append((str(symbol), kind, strike))
+            for kind in ("put", "call"):
+                contracts.append((occ_symbol(kind, strike), kind, strike))
     if len(contracts) > 160:
         raise HTTPException(400, "Too many contracts; narrow strike range")
     if not contracts:
@@ -98,8 +101,11 @@ def get_quotes(expiration, min_strike, max_strike):
                 "received_quotes": 0, "requested_contracts": 0, "order_execution_enabled": False}
     # Existing BXK quote route uses equity-option. This may require a different
     # instrument type for SPXW; do not fabricate prices when quotes are absent.
-    data = _get("/market-data/by-type", {"equity-option": ",".join(x[0] for x in contracts)})
-    items = data.get("items", [])
+    items = []
+    for start in range(0, len(contracts), 80):
+        batch = contracts[start:start + 80]
+        data = _get("/market-data/by-type", {"equity-option": ",".join(x[0] for x in batch)})
+        items.extend(data.get("items", []))
     by_symbol = {str(q.get("symbol") or q.get("instrument-symbol") or ""): q for q in items}
     quotes = []
     matched_symbols = 0
@@ -121,7 +127,7 @@ def get_quotes(expiration, min_strike, max_strike):
             invalid_spreads += 1
             continue
         quotes.append({"type": kind, "strike": strike, "bid": bid, "ask": ask,
-                       "symbol": symbol, "timestamp": q.get("timestamp") or q.get("quote-time")})
+                       "symbol": symbol, "timestamp": q.get("updated-at") or q.get("updatedAt") or q.get("timestamp")})
     return {"root": "SPXW", "expiration": expiration, "source": "tastytrade",
             "quotes": quotes, "received_quotes": len(quotes),
             "requested_contracts": len(contracts), "order_execution_enabled": False,
