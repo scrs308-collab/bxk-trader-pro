@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parent / "static"
 @asynccontextmanager
 async def reconciliation_lifespan(application):
     # This ledger contains synthetic attempts only; startup never contacts a broker.
+    preview_ok = os.getenv("BXK_PREVIEW_MODE", "").strip().lower() == "true"
+    live_off = os.getenv("BXK_LIVE_TRADING_ENABLED", "").strip().lower() == "false"
+    print(f"STAGING_SAFETY preview_enabled={preview_ok} live_trading_disabled={live_off} submission_route_available=False", flush=True)
     from staging_reconciliation import Ledger
     try:
         Ledger().recover_inflight()
