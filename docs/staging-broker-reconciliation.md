@@ -24,7 +24,7 @@ Those logs do not contain response bodies, so they do not independently prove
 every check passed. Railway OAuth exposes variable names only; the presence of
 `BXK_LIVE_TRADING_ENABLED` does not prove its value.
 
-Offline verification: 22 staging tests passed, including server quote re-fetch,
+Offline verification: 23 staging tests passed, including server quote re-fetch,
 stale-quote rejection before broker access, matching broker order and fees,
 unexplained fee and unknown warning rejection, explicit live-flag rejection,
 eight concurrent consumers with one success, and separate-process persistence.
@@ -33,7 +33,35 @@ insertion roll back together. FULL synchronous mode is explicitly required.
 Temporary-directory mount shims are test-only; offline results do not establish
 Railway host/volume behavior or current broker connectivity.
 
-## Actual Railway restart acceptance procedure — pending authenticated access
+## Actual Railway restart acceptance results
+
+On October 26, 2026, staging commit
+`3f7e68168c038a767c91af8f37e1406a054c9487` deployed successfully as
+`b0423b8b-dc57-47c0-b04d-fa574b08c294`. The isolated runtime and persistent
+volume were retained. Fresh tastytrade dry-run checks all passed at
+13:22:24.130774 UTC (09:22 EDT): server quote premium 3.15 points, reviewed limit
+3.20, defined risk $680.00, broker impact $686.88, fees $6.88, unexplained
+difference $0.00. The exact four-leg order and buying-power arithmetic matched;
+all eight broker checks passed. An earlier changed-premium request was rejected
+409 rather than bypassing quote verification.
+
+The simulation for expiration 2026-10-26, puts 7545/7535 and calls 7665/7675,
+one contract, was consumed at 13:22:37 UTC. Its durable receipt ID is
+`50d3cc9852f28d7376c41ccdea5c99a723fc5d8d2cdb6a2c030b1aea065a5c26`.
+Replay returned 409 before restart. Railway confirmed an in-place restart of
+that staging deployment; logs show shutdown at 13:23:21 UTC, volume remount at
+13:23:22 and completed application startup at 13:23:23. After recovery, replay
+again returned 409 and the persisted receipt was exactly unchanged. Repeating
+after a browser reload also passed. The receipt verifies a consumed token,
+matching fingerprint and SIMULATED_NO_SUBMISSION intent in the persistent DB;
+it is independent evidence beyond expiry rejection. The key primary constraint
+prevents a second intent under that token hash. No broker order was submitted.
+
+The standalone reserve_intent helper is not exposed by the staging HTTP app;
+its separate-process rejection is verified offline, not represented as an
+additional Railway HTTP test. Reconciliation below remains a design proposal.
+
+## Repeatable Railway restart acceptance procedure
 
 Do not call a replay rejection proof of persistence by itself: the 30-second token
 may have expired, or the server could have lost the token entirely. Both also
@@ -67,8 +95,8 @@ return 409. Establish the durable row before and after restart.
 8. Verify every live submission route remains unavailable. Keep the evidence
    marked incomplete if fresh quotes, sign-in or volume inspection is unavailable.
 
-No actual Railway restart/replay or fresh broker result has yet been established
-in this continuation. Do not convert this checklist into a passing test report.
+The actual integrated confirmation/intent path passed as recorded above. Steps
+requiring a direct operator harness remain separate from that HTTP verification.
 
 ## Reconciliation design — proposal only, no live implementation
 
@@ -161,3 +189,4 @@ out-of-order stream events, 429/5xx/auth failures, storage outage and failed
 reconciliation writes. Assert no second POST while UNKNOWN and durable recovery
 across host restart. Validate identifiers and final broker outcomes in the broker
 certification environment. None of these are authorization to enable live trading.
+
