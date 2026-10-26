@@ -19,3 +19,7 @@
 
 /* Keep legacy BXK Auto cards intact, but show only the user-directed workbench in manual modes. */
 #tradeSetup.bxk-manual-mode > :not(#unifiedWorkbench) { display:none!important; }
+
+#wbOrderPreview {border:1px solid #64748b;border-radius:12px;padding:18px;margin:18px 0;max-width:900px}
+#wbOrderPreview[hidden] {display:none!important}
+#wbOrderPreview h3 {margin-top:0}
