@@ -21,6 +21,26 @@ from staging_reconciliation_reader import CertificationOrderReader
 
 
 class ReconciliationTests(unittest.TestCase):
+    def test_complete_empty_certification_collections_never_release_unknown(self):
+        session = Mock()
+        reader = CertificationOrderReader("CERT0001", "test-user", lambda: {}, session=session)
+        history = Mock(status_code=200)
+        history.json.return_value = {"data": {"items": []}, "pagination": {"page-offset": 0, "total-pages": 0}}
+        today = Mock(status_code=200)
+        today.json.return_value = {"context": "/accounts/CERT0001/orders/live", "data": {"items": []}}
+        session.get.side_effect = [history, today]
+        intent = self.ledger.create(reader.scope, "certification-empty-history-key", fixture_order())
+        attempt = self.ledger.begin_attempt(intent)
+        self.ledger.mark_unknown(intent, attempt)
+        self.assertEqual(self.ledger.reconcile(intent, reader)["state"], "UNKNOWN")
+        with self.assertRaises(HTTPException) as duplicate:
+            self.ledger.begin_attempt(intent)
+        self.assertEqual(duplicate.exception.status_code, 409)
+        with self.assertRaises(HTTPException) as replacement:
+            self.ledger.create(reader.scope, "different-certification-intent-key", fixture_order())
+        self.assertEqual(replacement.exception.status_code, 409)
+        session.post.assert_not_called()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -281,11 +301,11 @@ class CertificationReaderTests(unittest.TestCase):
         return response
 
     def test_pagination_history_and_today_use_only_certification_gets(self):
-        self.session.get.side_effect = [self.page([], 0, 2), self.page([self.item], 1, 2), self.page([])]
+        self.session.get.side_effect = [self.page([], 0, 2), self.page([self.item], 1, 2), self.page([]), self.page([])]
         result = self.reader.read(self.row)
         self.assertTrue(result.complete)
         self.assertEqual(result.items[0]["filled-quantity"], "0")
-        self.assertEqual(self.session.get.call_count, 3)
+        self.assertEqual(self.session.get.call_count, 4)
         for call in self.session.get.call_args_list:
             self.assertTrue(call.args[0].startswith("https://api.cert.tastyworks.com/accounts/CERT0001/orders"))
             self.assertFalse(call.kwargs["allow_redirects"])
@@ -293,8 +313,54 @@ class CertificationReaderTests(unittest.TestCase):
         self.assertIn("start-at", self.session.get.call_args_list[0].kwargs["params"])
 
     def test_repeated_page_is_incomplete(self):
-        self.session.get.side_effect = [self.page([self.item], 0, 3), self.page([self.item], 1, 3), self.page([])]
+        self.session.get.side_effect = [self.page([self.item], 0, 3), self.page([self.item], 1, 3), self.page([]), self.page([])]
         self.assertFalse(self.reader.read(self.row).complete)
+
+    def collection(self, items):
+        response = Mock(status_code=200)
+        response.json.return_value = {"context": "/accounts/CERT0001/orders/live", "data": {"items": items}}
+        return response
+
+    def test_unpaginated_today_empty_and_nonempty_collections(self):
+        for items in ([], [self.item]):
+            self.session.get.side_effect = [self.page([]), self.collection(items)]
+            result = self.reader.read(self.row)
+            self.assertTrue(result.complete)
+            self.assertEqual(len(result.items), len(items))
+            self.assertEqual(self.session.get.call_args.kwargs["params"], {})
+
+    def test_unpaginated_history_is_still_incomplete(self):
+        history = self.collection([])
+        history.json.return_value["context"] = "/accounts/CERT0001/orders"
+        self.session.get.side_effect = [history, self.collection([])]
+        self.assertFalse(self.reader.read(self.row).complete)
+
+    def test_unpaginated_today_rejects_ambiguous_or_malformed_envelopes(self):
+        original = self.collection([]).json.return_value
+        invalid = [None, {}, {**original, "context": "/accounts/OTHER/orders/live"},
+                   {**original, "next": "more"}, {**original, "data": {"items": [], "has-more": True}},
+                   {**original, "data": {"items": None}},
+                   {**original, "data": {"items": [None]}},
+                   {**original, "data": {"items": [{"id": "1", "account-number": "OTHER"}]}}]
+        for body in invalid:
+            with self.subTest(body=body):
+                response = Mock(status_code=200)
+                response.json.return_value = body
+                self.session.get.side_effect = [response]
+                self.assertFalse(self.reader.today()[1])
+
+    def test_explicit_broken_pagination_does_not_use_collection_fallback(self):
+        broken = self.collection([])
+        broken.json.return_value["pagination"] = {}
+        self.session.get.side_effect = [broken, broken]
+        self.assertFalse(self.reader.today()[1])
+
+    def test_unpaginated_today_with_paginated_history_finds_terminal_match(self):
+        self.item["status"] = "Cancelled"
+        self.session.get.side_effect = [self.page([]), self.collection([self.item])]
+        result = self.reader.read(self.row)
+        self.assertTrue(result.complete)
+        self.assertEqual(result.items[0]["status"], "Cancelled")
 
     def test_imbalanced_fill_or_wrong_account_is_not_a_valid_match(self):
         item = deepcopy(self.item)

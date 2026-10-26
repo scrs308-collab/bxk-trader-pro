@@ -50,6 +50,29 @@ class CertificationOrderReader:
                 return items, True
         return items, False
 
+    def today(self):
+        """Today's all-status endpoint may return an unpaginated collection.
+
+        Request it without filters or paging parameters. Only the exact documented
+        collection envelope can establish completeness without paging metadata.
+        History still requires pagination, and empty results never release an intent.
+        """
+        body = self._get("/live", {})
+        if not isinstance(body, dict):
+            return [], False
+        if "pagination" in body:
+            # Restart with explicit page sizing; the default page size may differ.
+            return self._pages("/live", {})
+        data = body.get("data")
+        batch = data.get("items") if isinstance(data, dict) else None
+        valid = (set(body) == {"context", "data"}
+                 and body.get("context") == "/accounts/"+self.account+"/orders/live"
+                 and isinstance(data, dict) and set(data) == {"items"}
+                 and isinstance(batch, list)
+                 and all(isinstance(item, dict) and item.get("id") is not None
+                         and item.get("account-number") == self.account for item in batch))
+        return (batch, True) if valid else ([], False)
+
     def _normalise(self, item):
         basic = {"id": str(item.get("id") or ""), "scope": self.scope if item.get("account-number") == self.account else "INVALID_ACCOUNT",
                  "external-identifier": item.get("external-identifier"), "status": item.get("status"),
@@ -84,7 +107,7 @@ class CertificationOrderReader:
         # Overlap the attempt and retain an absolute UTC window across midnight.
         history, complete = self._pages("", {"start-at": stamp(row["attempt_at"]-300),
                                              "end-at": stamp(self.clock()), "sort": "Asc"})
-        today, today_complete = self._pages("/live", {})
+        today, today_complete = self.today()
         items = history+today
         if row["broker_id"]:
             data = self._get("/"+row["broker_id"], {})["data"]
