@@ -59,6 +59,39 @@ def _spxw():
     raise HTTPException(503, "SPXW chain unavailable; standard SPX not substituted")
 
 
+def get_spx_reference():
+    """Read the actual SPX index quote, never infer spot from option strikes."""
+    from datetime import datetime, timezone
+    data = _get("/market-data/by-type", {"index": "SPX"})
+    items = data.get("items", [])
+    match = next((q for q in items if str(q.get("symbol") or q.get("instrument-symbol") or "").replace("$", "").upper() == "SPX"), None)
+    if not match:
+        raise HTTPException(503, "SPX index quote unavailable; manual entry required")
+    price = None
+    for field in ("last", "last-price", "mark", "mark-price", "close", "close-price"):
+        raw = match.get(field)
+        if raw is not None:
+            try:
+                candidate = float(raw)
+                if 1000 < candidate < 100000:
+                    price = candidate
+                    break
+            except (ValueError, TypeError):
+                pass
+    timestamp = match.get("updated-at") or match.get("updatedAt") or match.get("timestamp")
+    if price is None or not timestamp:
+        raise HTTPException(503, "SPX price or timestamp unavailable; manual entry required")
+    try:
+        quote_time = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+        age = (datetime.now(timezone.utc) - quote_time).total_seconds()
+    except (ValueError, TypeError):
+        raise HTTPException(503, "SPX quote timestamp invalid; manual entry required") from None
+    if age < -60 or age > 120:
+        raise HTTPException(503, "SPX index quote stale; manual entry required")
+    return {"symbol": "SPX", "price": price, "timestamp": timestamp,
+            "source": "tastytrade", "fresh": True}
+
+
 def get_expirations():
     item = _spxw()
     return {
