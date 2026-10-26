@@ -144,11 +144,27 @@
             fresh:fresh(short)&&fresh(long),timestamp:short.timestamp||"Missing"};
         }).filter(Boolean).slice(0,5);
       const puts=makeSpreads("put",widthPut), calls=makeSpreads("call",widthCall);
-      const combinations=puts.flatMap(p=>calls.map(c=>({
-        put:p,call:c,premium:p.premium+c.premium,
-        maxLoss:(Math.max(widthPut,widthCall)-p.premium-c.premium)*100,
-        fresh:p.fresh&&c.fresh
-      }))).filter(x=>x.maxLoss>=0)
+      const expectedMoveField=document.getElementById("wbExpectedMove");
+      const expectedMove=Number(expectedMoveField.value);
+      const minPop=Number(document.getElementById("wbMinPop").value);
+      const popEnabled=expectedMoveField.value.trim()!=="" && Number.isFinite(expectedMove) && expectedMove>0;
+      if (!Number.isFinite(minPop)||minPop<1||minPop>99) {
+        output.textContent="Minimum modeled POP must be between 1 and 99%.";return;
+      }
+      const cdf=x=>{
+        const z=Math.abs(x),t=1/(1+0.2316419*z);
+        const density=Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+        const tail=density*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
+        return x>=0?1-tail:tail;
+      };
+      const combinations=puts.flatMap(p=>calls.map(c=>{
+        const premium=p.premium+c.premium;
+        const lower=p.short-premium,upper=c.short+premium;
+        const pop=popEnabled?100*Math.max(0,Math.min(1,cdf((upper-spot)/expectedMove)-cdf((lower-spot)/expectedMove))):null;
+        return {put:p,call:c,premium,
+          maxLoss:(Math.max(widthPut,widthCall)-premium)*100,
+          fresh:p.fresh&&c.fresh,pop};
+      })).filter(x=>x.maxLoss>=0 && (!popEnabled || x.pop>=minPop))
         .sort((a,b)=>b.premium-a.premium).slice(0,10);
       const addTable=(heading,columns,rows)=>{
         const title=document.createElement("h3");title.textContent=heading;output.appendChild(title);
@@ -174,7 +190,7 @@
       comboTable.className="bxk-workbench-table";
       const header=document.createElement("thead");
       const headerRow=document.createElement("tr");
-      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Quote","Analyze"].forEach(label=>{
+      ["Put legs (sell / buy)","Call legs (sell / buy)","Premium ($)","Max loss ($)","Breakevens","Modeled POP","Quote","Analyze"].forEach(label=>{
         const th=document.createElement("th");th.textContent=label;headerRow.appendChild(th);
       });
       header.appendChild(headerRow);comboTable.appendChild(header);
@@ -187,6 +203,7 @@
           fmt(c.premium*100),
           fmt(c.maxLoss),
           fmt(c.put.short-c.premium)+" / "+fmt(c.call.short+c.premium),
+          c.pop===null?"Unavailable":fmt(c.pop)+"%",
           c.fresh?"Fresh":"Stale/unknown"
         ];
         cells.forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
@@ -213,7 +230,7 @@
         output.appendChild(empty);
       }
       const info=document.createElement("p");
-      info.textContent="Indicative midpoint premiums from tastytrade, before fees. Quote freshness threshold: 2 minutes. POP unavailable. Analysis only; no order submission.";
+      info.textContent="Indicative midpoint premiums from tastytrade, before fees. Quote freshness threshold: 2 minutes. Modeled POP uses the user-entered expected move and a normal-distribution approximation, not broker POP. Analysis only; no order submission.";
       output.appendChild(info);
       connectionStatus.textContent=data.received_quotes+" SPXW quotes received. "+puts.length+" put spreads, "+calls.length+" call spreads, "+combinations.length+" condors. POP filtering requires a validated probability model; no 70% POP claim is made. Refresh before analysis.";
     } catch {
