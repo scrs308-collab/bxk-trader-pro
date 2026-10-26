@@ -191,6 +191,13 @@ def consume_confirmation(payload: ConfirmationRequest):
     return consume(payload, payload.confirmation_token)
 
 
+@app.post("/api/workbench/confirmation-receipt")
+def confirmation_receipt(payload: ConfirmationRequest):
+    """Owner-authenticated persisted simulation evidence, without broker access."""
+    from staging_confirmation import receipt
+    return receipt(payload, payload.confirmation_token)
+
+
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 def disabled_api(path: str):
     return JSONResponse(

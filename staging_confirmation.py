@@ -17,10 +17,13 @@ def _connect():
     # Fail closed if persistent Railway volume is absent.
     if not DB.parent.is_dir() or not os.path.ismount(str(DB.parent)):
         raise HTTPException(503, "Persistent confirmation volume is not mounted")
+    conn = None
     try:
         conn = sqlite3.connect(str(DB), timeout=10, isolation_level=None)
         conn.execute("PRAGMA busy_timeout=10000")
         conn.execute("PRAGMA journal_mode=WAL")
+        # A successful receipt must follow a durable commit, including WAL sync.
+        conn.execute("PRAGMA synchronous=FULL")
         conn.execute("""CREATE TABLE IF NOT EXISTS confirmations (
             token_hash TEXT PRIMARY KEY,
             fingerprint TEXT NOT NULL,
@@ -31,6 +34,8 @@ def _connect():
         conn.execute("CREATE INDEX IF NOT EXISTS confirmation_expiry ON confirmations(expires_at)")
         return conn
     except sqlite3.Error:
+        if conn is not None:
+            conn.close()
         raise HTTPException(503, "Durable confirmation ledger unavailable") from None
 
 
@@ -91,14 +96,14 @@ def consume(order, token):
         if not hmac.compare_digest(row[0], _fingerprint(order)):
             conn.commit()
             raise HTTPException(409, "Order details changed; confirmation consumed")
-        try:
-            conn.execute(
-                "INSERT INTO staging_order_intents (key_hash,fingerprint,status,created_at) VALUES (?,?,?,?)",
-                (_hash(token), row[0], "SIMULATED_NO_SUBMISSION", now)
-            )
-        except sqlite3.IntegrityError:
+        inserted = conn.execute(
+            "INSERT INTO staging_order_intents (key_hash,fingerprint,status,created_at) VALUES (?,?,?,?) "
+            "ON CONFLICT(key_hash) DO NOTHING",
+            (_hash(token), row[0], "SIMULATED_NO_SUBMISSION", now)
+        )
+        if inserted.rowcount != 1:
             conn.commit()
-            raise HTTPException(409, "Duplicate simulated order intent; no order submitted") from None
+            raise HTTPException(409, "Duplicate simulated order intent; no order submitted")
         conn.commit()
     except sqlite3.Error:
         conn.rollback()
@@ -108,3 +113,25 @@ def consume(order, token):
     return {"acknowledged": True, "simulation_only": True, "submitted": False,
             "order_intent_status": "SIMULATED_NO_SUBMISSION",
             "message": "Confirmation and simulated order intent committed atomically; no broker order sent."}
+
+
+def receipt(order, token):
+    """Read persisted evidence; expiry alone is not proof of replay protection."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT c.fingerprint,c.consumed_at,i.fingerprint,i.status,i.created_at "
+            "FROM confirmations c LEFT JOIN staging_order_intents i ON i.key_hash=c.token_hash "
+            "WHERE c.token_hash=?", (_hash(token),)
+        ).fetchone()
+        if row is None or not hmac.compare_digest(row[0], _fingerprint(order)):
+            raise HTTPException(404, "Simulation receipt not found")
+        return {"simulation_only": True, "submitted": False, "receipt_id": _hash(token),
+                "consumed_at": row[1], "intent_created_at": row[4],
+                "order_intent_status": row[3],
+                "durable_intent_verified": row[1] is not None and row[2] == row[0]
+                and row[3] == "SIMULATED_NO_SUBMISSION"}
+    except sqlite3.Error:
+        raise HTTPException(503, "Durable simulation receipt unavailable") from None
+    finally:
+        conn.close()

@@ -3,21 +3,17 @@
 The unique idempotency key is a rehearsal safeguard. Live trading additionally
 requires broker-side reconciliation of unknown outcomes and a real order lifecycle.
 """
-import hashlib
-import json
 import sqlite3
 import time
 from fastapi import HTTPException
-from staging_confirmation import _connect
+from staging_confirmation import _connect, _fingerprint, _hash
 
 
 def reserve_intent(order, idempotency_key):
     if not isinstance(idempotency_key, str) or not 16 <= len(idempotency_key) <= 128:
         raise HTTPException(400, "Invalid idempotency key")
-    canonical = {"legs": [{"symbol": x.symbol, "action": x.action} for x in order.legs],
-                 "quantity": order.quantity, "limit_price": round(order.limit_price, 2)}
-    fingerprint = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+    fingerprint = _fingerprint(order)
+    key_hash = _hash(idempotency_key)
     conn = _connect()
     try:
         conn.execute("BEGIN IMMEDIATE")

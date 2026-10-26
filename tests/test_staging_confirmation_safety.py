@@ -2,6 +2,7 @@
 
 Uses a temporary SQLite path with a mount-check shim; never calls a broker.
 """
+from contextlib import closing
 import importlib
 import os
 import sqlite3
@@ -48,7 +49,7 @@ class ConfirmationSafetyTests(unittest.TestCase):
         result = self.module.consume(self.order, token)
         self.assertEqual(result["order_intent_status"], "SIMULATED_NO_SUBMISSION")
         self.assertFalse(result["submitted"])
-        with sqlite3.connect(self.db_path) as db:
+        with closing(sqlite3.connect(self.db_path)) as db:
             row = db.execute(
                 "SELECT status FROM staging_order_intents WHERE key_hash=?",
                 (self.module._hash(token),)

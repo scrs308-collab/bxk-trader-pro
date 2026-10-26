@@ -156,6 +156,13 @@
         </div>
         <button type="button" class="bxk-mode" id="wbClosePreview">Close review</button>
       </section>
+      <section id="wbReplayPanel" hidden>
+        <h3>Staging restart rehearsal</h3>
+        <p>The last simulation is retained in this browser tab for replay testing across a staging restart. No broker order is sent.</p>
+        <button type="button" id="wbReplaySimulation" class="bxk-mode">Verify saved simulation and reject replay</button>
+        <button type="button" id="wbForgetSimulation" class="bxk-mode">Forget saved simulation</button>
+        <p id="wbReplayStatus" role="status"></p>
+      </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
@@ -821,7 +828,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=28" defer></script>
+<script src="/static/unified-workbench.js?v=29" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      

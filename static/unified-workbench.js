@@ -94,6 +94,41 @@
   const confirmButton=document.getElementById("wbConfirmSimulation");
   const confirmStatus=document.getElementById("wbConfirmationStatus");
   let validatedReview=null;
+  const replayPanel=document.getElementById("wbReplayPanel");
+  const replayButton=document.getElementById("wbReplaySimulation");
+  const replayStatus=document.getElementById("wbReplayStatus");
+  const savedKey="bxk-staging-last-simulation-v1";
+  let savedSimulation=null;
+  try{savedSimulation=JSON.parse(sessionStorage.getItem(savedKey));}catch{}
+  replayPanel.hidden=!savedSimulation;
+  document.getElementById("wbForgetSimulation").addEventListener("click",()=>{
+    savedSimulation=null;
+    try{sessionStorage.removeItem(savedKey);}catch{}
+    replayPanel.hidden=true;
+  });
+  replayButton.addEventListener("click",async()=>{
+    if(!savedSimulation)return;
+    replayButton.disabled=true;
+    replayStatus.textContent="Checking persisted receipt and replay rejection...";
+    const post=path=>fetch(path,{method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(savedSimulation.request)});
+    try{
+      const before=await post("/api/workbench/confirmation-receipt");
+      const receipt=await before.json();
+      if(!before.ok||receipt.durable_intent_verified!==true)throw new Error("Persisted simulation receipt unavailable.");
+      const replay=await post("/api/workbench/confirmation-consume");
+      const after=await post("/api/workbench/confirmation-receipt");
+      const checked=await after.json();
+      const stable=after.ok&&JSON.stringify(receipt)===JSON.stringify(checked)
+        &&(!savedSimulation.receipt||JSON.stringify(receipt)===JSON.stringify(savedSimulation.receipt));
+      if(replay.status!==409||!stable)throw new Error("Replay or durable receipt verification failed.");
+      savedSimulation.receipt=receipt;
+      try{sessionStorage.setItem(savedKey,JSON.stringify(savedSimulation));}catch{}
+      replayStatus.textContent="PASS: replay rejected (409); durable simulated intent unchanged. Receipt "
+        +receipt.receipt_id+"; consumed "+new Date(receipt.consumed_at*1000).toISOString()+". No order submitted.";
+    }catch(error){replayStatus.textContent="Verification incomplete: "+error.message;}
+    finally{replayButton.disabled=false;}
+  });
   const clearConfirmation=()=>{
     validatedReview=null;
     confirmation.hidden=true;
@@ -119,6 +154,12 @@
         body:JSON.stringify({...validatedReview.order,confirmation_token:validatedReview.token})
       });
       const data=await response.json();
+      if(response.ok&&data.simulation_only===true&&data.submitted===false&&data.order_intent_status==="SIMULATED_NO_SUBMISSION"){
+        savedSimulation={request:{...validatedReview.order,confirmation_token:validatedReview.token}};
+        try{sessionStorage.setItem(savedKey,JSON.stringify(savedSimulation));}catch{}
+        replayPanel.hidden=false;
+        replayStatus.textContent="Simulation saved in this tab. Verify once before and once after the staging restart.";
+      }
       confirmStatus.textContent=response.ok&&data.simulation_only===true&&data.order_intent_status==="SIMULATED_NO_SUBMISSION"
         ?"Server durably recorded the simulated order intent and consumed the confirmation. No broker order submitted."
         :"Confirmation rejected: "+(data.detail||response.status);
