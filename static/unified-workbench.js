@@ -61,9 +61,9 @@
     note.hidden = mode !== "search";
     searchPanel.hidden = mode !== "search";
     description.textContent = mode === "auto"
-      ? "Existing BXK trading engine and market analysis."
+      ? "BXK Auto is unavailable in isolated staging. Use Condor Search for tastytrade market data."
       : mode === "search"
-      ? "Condor Search: tastytrade market-data connection pending. No quotes or search results are available yet."
+      ? "Condor Search: tastytrade SPXW market data and broker dry-run preview. No live order submission."
       : "Custom Builder: calculate a manually entered iron condor's expiration payoff.";
     if (mode !== "auto") render();
   }
@@ -360,5 +360,5 @@
       output.textContent = "Could not retrieve SPXW option quotes.";
     }
   });
-  setMode("auto");
+  setMode("search");
 })();
