@@ -115,6 +115,16 @@ def health():
     return {"status": "ok", "mode": "isolated-staging", "auth_configured": _configured(), "market_data_configured": bool(os.getenv("TASTYTRADE_CLIENT_SECRET") and os.getenv("TASTYTRADE_REFRESH_TOKEN"))}
 
 
+@app.get("/api/workbench/runtime-safety")
+def runtime_safety():
+    """Authenticated read-only safety flags. Never returns credentials or identifiers."""
+    preview = os.getenv("BXK_PREVIEW_MODE", "").strip().lower() == "true"
+    disabled = os.getenv("BXK_LIVE_TRADING_ENABLED", "").strip().lower() == "false"
+    return {"environment": "isolated-staging", "preview_enabled": preview,
+            "live_trading_disabled": disabled, "safety_ready": preview and disabled,
+            "order_submission_available": False}
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(ROOT / "login.html", headers={"Cache-Control": "no-store"})
