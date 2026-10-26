@@ -90,5 +90,28 @@ BXK_SKIP_ASGI_SOCKET_TESTS flag; Linux CI runs the full suite without that flag.
 The existing staging-only GitHub workflow now runs all staging tests and checks
 JavaScript syntax, with read-only repository permissions and no broker secrets.
 
-Actual CI results and Railway restart evidence are recorded in the continuation
-report after deployment. Offline fixtures are not claimed as certification proof.
+## Verified deployment and restart checkpoint
+
+Code commit `8a66f6dee984114daec704893ec0e33fec5e7786` deployed successfully to
+the existing isolated staging service as
+`d453226f-4cd2-4666-bc77-a656269f057f`. Production was not modified. The source
+branch remains `feature/unified-trade-workbench` and live trading stays disabled.
+
+[CI run 40334909076](https://github.com/scrs308-collab/bxk-trader-pro/actions/runs/40334909076)
+ran all 49 tests in Linux with no skips and passed JavaScript validation. Its
+log reports `Ran 49 tests in 4.301s` and `OK` at 13:55:54 UTC (09:55 EDT).
+
+At 13:59:01 UTC the authenticated Railway rehearsal endpoint returned 200; all
+six synthetic scenarios passed, each with retries blocked. The restart receipt
+was `ca44c12e-120f-43d7-bce6-7d1a097ccf95`, initially SUBMITTING with one attempt.
+Railway confirmed an in-place restart of that deployment. Runtime logs show the
+volume remounted at 14:01:26 UTC and application startup completed at 14:01:31.
+At 14:02:01 UTC the persisted receipt returned 200 with state UNKNOWN and its
+original identity/correlation/fingerprint/attempt intact, and a second attempt
+returned 409. Repeating after browser reload at 14:02:07 UTC also passed.
+
+The original confirmation receipt
+`50d3cc9852f28d7376c41ccdea5c99a723fc5d8d2cdb6a2c030b1aea065a5c26`
+remained unchanged and its replay still returned 409 after this deployment and
+restart. No broker orders were submitted. These are deployed synthetic recovery
+tests; actual certification-broker validation remains the next integration step.
