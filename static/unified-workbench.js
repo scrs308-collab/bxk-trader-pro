@@ -118,7 +118,8 @@
       if (!response.ok) {output.textContent = "Quotes unavailable ("+response.status+").";return;}
       const data = await response.json();
       if (!data.quotes?.length) {
-        output.textContent = "No usable bid/ask quotes returned. Verify SPXW quote permissions and market session.";
+        const d = data.diagnostics || {};
+        output.textContent = `No usable bid/ask quotes. Raw items: ${d.raw_quote_items ?? "?"}; matched symbols: ${d.matched_symbols ?? "?"}; missing bid/ask: ${d.missing_bid_ask ?? "?"}; invalid spreads: ${d.invalid_spreads ?? "?"}.`;
         return;
       }
       const table = document.createElement("table");
