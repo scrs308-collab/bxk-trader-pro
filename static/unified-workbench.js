@@ -150,6 +150,9 @@
       const money=n=>typeof n==="number"&&Number.isFinite(n)?"$"+n.toFixed(2):"Unavailable";
       const lines=[
         "Broker dry-run status: "+(data.broker_status||"Unknown"),
+        "Server-verified four-leg quotes: "+(data.server_quote_verified===true?"PASS":"NOT VERIFIED"),
+        "Server quote checked: "+(data.server_quote_checked_at||"Unavailable"),
+        "Server quote premium: "+(typeof data.server_quote_credit_points==="number"?data.server_quote_credit_points.toFixed(2)+" points":"Unavailable"),
         "BXK defined risk: "+money(data.estimated_defined_risk),
         "Broker buying-power impact: "+money(data.broker_buying_power_change),
         "Broker-reported total fees: "+money(data.broker_total_fees),
@@ -186,7 +189,7 @@
         const li=document.createElement("li");li.textContent=line;list.appendChild(li);
       }
       brokerStatus.appendChild(list);
-      if(data.all_checks_pass===true && data.execution_authorized===false){
+      if(data.all_checks_pass===true && data.server_quote_verified===true && data.execution_authorized===false){
         validatedReview={at:Date.now()};
         confirmation.hidden=false;
         confirmStatus.textContent="All broker checks passed. Explicitly acknowledge this review within 30 seconds; no order will be placed.";
