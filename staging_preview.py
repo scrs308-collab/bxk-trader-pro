@@ -164,6 +164,26 @@ def workbench_order_dry_run(payload: WorkbenchDryRun):
     return preview(payload)
 
 
+class ConfirmationRequest(WorkbenchDryRun):
+    confirmation_token: str = Field(..., min_length=20, max_length=128)
+
+
+@app.post("/api/workbench/confirmation-issue")
+def issue_confirmation(payload: WorkbenchDryRun):
+    """Re-run broker validation and issue a short-lived simulation-only token."""
+    from staging_order_preview import preview
+    from staging_confirmation import issue
+    result = preview(payload)
+    return issue(payload, result)
+
+
+@app.post("/api/workbench/confirmation-consume")
+def consume_confirmation(payload: ConfirmationRequest):
+    """Consume one-time token; intentionally has no broker order submission."""
+    from staging_confirmation import consume
+    return consume(payload, payload.confirmation_token)
+
+
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 def disabled_api(path: str):
     return JSONResponse(
