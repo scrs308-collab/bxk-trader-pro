@@ -15,6 +15,7 @@
   const ownerResult=document.getElementById("wbOwnerReviewResult");
   let ownerSelectedReceipt=null,brokerReview=null,ownerBusy=false;
   const decisionLabels={KEEP_BLOCKED:"Keep blocked",BIND_BROKER_ORDER:"Bind verified broker order",CLOSE_WITHOUT_SUBMISSION:"Close proven no-submission attempt"};
+  const ownerStateLabel=state=>({READY:"Prepared",SUBMITTING:"Awaiting recovery",UNKNOWN:"Checking broker",MANUAL_REVIEW:"Needs owner review",ACKNOWLEDGED:"Working at broker",TERMINAL:"Broker order completed",RESOLVED_NO_SUBMISSION:"Resolved without submission"}[state]||"Unavailable");
   async function ownerRequest(path,body){
     const response=await fetch("/api/workbench/owner-review/"+encodeURIComponent(ownerSelectedReceipt)+path,
       {credentials:"same-origin",cache:"no-store",...(body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})});
@@ -31,16 +32,16 @@
     ownerResult.textContent="";ownerEvidence.textContent="Refresh broker evidence before recording a resolution.";syncOwnerSave();
     try{
       const data=await ownerRequest("");
-      document.getElementById("wbOwnerReviewSummary").textContent="Receipt "+data.receipt.id+" · "+data.receipt.state+" · filled quantity "+data.receipt.filled;
+      document.getElementById("wbOwnerReviewSummary").textContent="Receipt "+data.receipt.id+" · "+ownerStateLabel(data.receipt.state)+" · filled quantity "+data.receipt.filled;
       ownerRefresh.disabled=data.receipt.state!=="MANUAL_REVIEW";
       const order=document.getElementById("wbOwnerReviewOrder");order.replaceChildren();
       const terms=document.createElement("p");terms.textContent="Original order: "+data.order["time-in-force"]+" limit "+data.order.price+" points "+data.order["price-effect"]+".";order.appendChild(terms);
       const legs=document.createElement("ul");data.order.legs.forEach(leg=>{const li=document.createElement("li");li.textContent=leg.action+" · "+leg.quantity+" · "+leg.symbol;legs.appendChild(li);});order.appendChild(legs);
       const history=document.getElementById("wbOwnerReviewHistory");history.replaceChildren();
       const heading=document.createElement("h5");heading.textContent="Recovery and owner history";history.appendChild(heading);
-      const list=document.createElement("ol");[...data.events].reverse().forEach(event=>{const li=document.createElement("li");li.textContent=new Date(event.occurred_at*1000).toLocaleString()+" · "+event.state+" · "+event.reason.replaceAll("_"," ").toLowerCase();list.appendChild(li);});history.appendChild(list);
+      const list=document.createElement("ol");[...data.events].reverse().forEach(event=>{const li=document.createElement("li");li.textContent=new Date(event.occurred_at*1000).toLocaleString()+" · "+ownerStateLabel(event.state)+" · "+event.reason.replaceAll("_"," ").toLowerCase();list.appendChild(li);});history.appendChild(list);
       data.resolutions.forEach(resolution=>{const p=document.createElement("p");p.textContent="Owner "+resolution.actor+" · "+(decisionLabels[resolution.decision]||resolution.decision)+" · "+resolution.note;history.appendChild(p);});
-      data.evidence.forEach(evidence=>{const p=document.createElement("p");p.textContent="Broker evidence "+new Date(evidence.created_at*1000).toLocaleString()+" · "+(evidence.complete?"complete records":"incomplete records")+" · "+evidence.candidates.length+" candidate observations";history.appendChild(p);});
+      data.evidence.forEach(evidence=>{const p=document.createElement("p");p.textContent="Broker evidence "+new Date(evidence.created_at*1000).toLocaleString()+" · "+(evidence.complete?"complete records":"incomplete records")+" · "+evidence.candidates.length+" matching order records";history.appendChild(p);});
       document.getElementById("wbOwnerReviewProof").textContent=data.no_submission_proof
         ?"Independent proof: guarded certification no-submission test. Reference "+data.no_submission_proof.reference+"; attested by "+data.no_submission_proof.actor+"."
         :"No independent no-submission proof is registered. An empty broker search cannot release this receipt.";
@@ -52,7 +53,7 @@
     try{
       brokerReview=await ownerRequest("/refresh",{});ownerDecision.replaceChildren();
       brokerReview.allowed_decisions.forEach(value=>{const option=document.createElement("option");option.value=value;option.textContent=decisionLabels[value];ownerDecision.appendChild(option);});ownerDecision.disabled=false;
-      ownerEvidence.textContent=(brokerReview.complete?"Complete broker records":"Incomplete broker records")+" · "+brokerReview.candidate_count+" candidate observations. Evidence expires at "+new Date(brokerReview.expires_at*1000).toLocaleTimeString()+". Only supported resolutions are offered.";
+      ownerEvidence.textContent=(brokerReview.complete?"Complete broker records":"Incomplete broker records")+" · "+brokerReview.candidate_count+" matching order records. Evidence expires at "+new Date(brokerReview.expires_at*1000).toLocaleTimeString()+". Only supported resolutions are offered.";
     }catch(error){ownerEvidence.textContent=error.message;}
     finally{ownerBusy=false;ownerRefresh.disabled=false;syncOwnerSave();}
   });
@@ -63,7 +64,7 @@
       const data=await ownerRequest("/resolve",{review_id:brokerReview.review_id,decision:ownerDecision.value,note:ownerNote.value.trim(),acknowledged:ownerAck.checked});
       if(data.submitted!==false||data.original_attempt_retry_allowed!==false||data.fresh_confirmation_required!==true)throw new Error("Resolution could not be verified.");
       brokerReview=null;ownerDecision.disabled=true;ownerRefresh.disabled=true;
-      ownerResult.textContent="Resolution saved: "+data.state+". Original attempt remains blocked. Use a fresh dry-run and confirmation for any new order.";
+      ownerResult.textContent="Resolution saved: "+ownerStateLabel(data.state)+". Original attempt remains blocked. Use a fresh dry-run and confirmation for any new order.";
       await loadCertificationRecovery();
     }catch(error){brokerReview=null;ownerResult.textContent=error.message;ownerRefresh.disabled=false;}
     finally{ownerBusy=false;syncOwnerSave();}
