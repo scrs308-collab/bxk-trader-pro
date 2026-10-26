@@ -78,6 +78,43 @@
       ?"Load SPXW quotes to calculate ATM straddle expected move."
       :"Enter your own 1σ expected move, then load quotes.";
   });
+  const reviewPanel=document.getElementById("wbOrderPreview");
+  const reviewDetails=document.getElementById("wbPreviewDetails");
+  const reviewStatus=document.getElementById("wbPreviewStatus");
+  document.getElementById("wbClosePreview").addEventListener("click",()=>{
+    reviewPanel.hidden=true;
+    reviewDetails.replaceChildren();
+  });
+  const showReview=(c,widthPut,widthCall,expiry)=>{
+    reviewDetails.replaceChildren();
+    const rows=[
+      ["Expiration",expiry],
+      ["Sell 1 put",c.put.short],["Buy 1 put",c.put.long],
+      ["Sell 1 call",c.call.short],["Buy 1 call",c.call.long],
+      ["Estimated midpoint premium", "$"+(c.premium*100).toFixed(2)],
+      ["Maximum loss (before fees)","$"+c.maxLoss.toFixed(2)],
+      ["Estimated breakevens",(c.put.short-c.premium).toFixed(2)+" / "+(c.call.short+c.premium).toFixed(2)],
+      ["Modeled POP",c.pop===null?"Unavailable":c.pop.toFixed(2)+"% (approximation)"],
+      ["Put / call wing widths",widthPut+" / "+widthCall+" points"],
+      ["Oldest quote timestamp",c.oldestQuote||"Unavailable"],
+      ["Quote freshness",c.fresh?"Fresh at selection":"Stale or unknown"],
+      ["Buying power requirement","Not verified — broker order preview required"],
+      ["Trading","Disabled in staging"]
+    ];
+    const table=document.createElement("table");table.className="bxk-workbench-table";
+    const body=document.createElement("tbody");
+    rows.forEach(([name,value])=>{
+      const tr=document.createElement("tr");
+      for(const cellValue of [name,value]){
+        const td=document.createElement("td");td.textContent=String(cellValue);tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    });
+    table.appendChild(body);reviewDetails.appendChild(table);
+    reviewStatus.textContent="Indicative quote snapshot for analysis only. No order has been created or sent to tastytrade.";
+    reviewPanel.hidden=false;
+    reviewPanel.scrollIntoView({behavior:"smooth",block:"start"});
+  };
   const connectButton = document.getElementById("wbConnectMarket");
   const connectionStatus = document.getElementById("wbSearchStatus");
   connectButton.addEventListener("click", async () => {
@@ -260,7 +297,7 @@
           document.getElementById("wbCallWing").value=widthCall;
           document.getElementById("wbCredit").value=fmt(c.premium);
           document.getElementById("wbContracts").value="1";
-          setMode("custom");
+          showReview(c,widthPut,widthCall,expiry);
         });
         actionCell.appendChild(button);row.appendChild(actionCell);comboBody.appendChild(row);
       });
@@ -273,7 +310,7 @@
       const info=document.createElement("p");
       info.textContent="Indicative midpoint premiums from tastytrade, before fees. Quote freshness threshold: 2 minutes. Modeled POP uses the user-entered expected move and a normal-distribution approximation, not broker POP. Analysis only; no order submission.";
       output.appendChild(info);
-      connectionStatus.textContent=data.received_quotes+" SPXW quotes received. "+puts.length+" put spreads, "+calls.length+" call spreads, "+combinations.length+" condors. POP filtering requires a validated probability model; no 70% POP claim is made. Refresh before analysis.";
+      connectionStatus.textContent=data.received_quotes+" SPXW quotes received; "+combinations.length+" condors shown. "+(popEnabled?"Modeled POP filter active at "+minPop+"% (approximate, not broker-validated).":"Modeled POP unavailable; filter inactive.")+" Quotes must be refreshed before any future broker order preview.";
     } catch {
       output.textContent = "Could not retrieve SPXW option quotes.";
     }
