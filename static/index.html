@@ -120,7 +120,7 @@
       <p class="bxk-workbench-warning">Quotes are indicative and may be delayed or stale. Results are for analysis only; trading is disabled in staging.</p>
       <div class="bxk-workbench-fields">
         <label>Expiration <select id="wbLiveExpiry" aria-label="SPXW expiration"><option value="">Connect to load expirations</option></select></label>
-        <label>SPX reference price <input id="wbLiveSpot" type="number" min="1" step=".01" placeholder="Enter current SPX"></label>
+        <label>SPX reference price <input id="wbLiveSpot" type="number" min="1" step=".01" placeholder="Auto from tastytrade" readonly><small id="wbSpotStatus">Waiting for verified SPX quote</small><select id="wbSpotSource"><option value="auto">Auto: tastytrade SPX</option><option value="manual">Manual override</option></select></label>
         <label>Strike range (+/- points) <select id="wbLiveRange"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select></label>
       </div>
       <div class="bxk-workbench-fields">
@@ -821,7 +821,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=25" defer></script>
+<script src="/static/unified-workbench.js?v=26" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
