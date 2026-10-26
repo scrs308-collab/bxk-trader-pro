@@ -141,6 +141,12 @@
       </div>
       <button type="button" class="bxk-mode" id="wbConnectMarket">Check tastytrade market data</button>
       <button type="button" class="bxk-mode" id="wbLoadQuotes" disabled>Load SPXW quotes</button>
+      <section id="wbOrderPreview" hidden aria-label="Review-only position preview">
+        <h3>Position review — no order submission</h3>
+        <p id="wbPreviewStatus" role="status">Select a quoted condor to review its four legs.</p>
+        <div id="wbPreviewDetails"></div>
+        <button type="button" class="bxk-mode" id="wbClosePreview">Close review</button>
+      </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
     </div>
@@ -806,7 +812,7 @@
   </section>
 </div>
 </div>
-<script src="/static/unified-workbench.js?v=15" defer></script>
+<script src="/static/unified-workbench.js?v=16" defer></script>
 <script type="module" src="/static/dashboard.js?v=39"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
