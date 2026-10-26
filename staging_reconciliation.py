@@ -99,6 +99,18 @@ class Ledger:
             db.execute("""CREATE TABLE IF NOT EXISTS certification_worker_state (
                 scope TEXT PRIMARY KEY, blocked_until INTEGER NOT NULL,
                 last_error TEXT)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS certification_review_evidence (
+                id TEXT PRIMARY KEY,intent_id TEXT NOT NULL,scope TEXT NOT NULL,
+                version INTEGER NOT NULL,snapshot TEXT NOT NULL,created_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS certification_no_submission_proofs (
+                intent_id TEXT PRIMARY KEY,identity_hash TEXT NOT NULL,source TEXT NOT NULL,
+                reference TEXT NOT NULL,actor TEXT NOT NULL,created_at INTEGER NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS certification_owner_resolutions (
+                id TEXT PRIMARY KEY,review_id TEXT NOT NULL UNIQUE,intent_id TEXT NOT NULL,
+                actor TEXT NOT NULL,decision TEXT NOT NULL,note TEXT NOT NULL,
+                previous_state TEXT NOT NULL,new_state TEXT NOT NULL,
+                proof_reference TEXT,created_at INTEGER NOT NULL)""")
             if write:
                 db.execute("BEGIN IMMEDIATE")
             yield db

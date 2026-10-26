@@ -5,6 +5,70 @@
   const certStatus=document.getElementById("wbCertRecoveryStatus");
   const certItems=document.getElementById("wbCertRecoveryItems");
   const certRefresh=document.getElementById("wbRefreshCertRecovery");
+  const ownerPanel=document.getElementById("wbOwnerReview");
+  const ownerEvidence=document.getElementById("wbOwnerEvidenceStatus");
+  const ownerDecision=document.getElementById("wbOwnerDecision");
+  const ownerNote=document.getElementById("wbOwnerNote");
+  const ownerAck=document.getElementById("wbOwnerAcknowledged");
+  const ownerSave=document.getElementById("wbOwnerSaveResolution");
+  const ownerRefresh=document.getElementById("wbOwnerRefreshEvidence");
+  const ownerResult=document.getElementById("wbOwnerReviewResult");
+  let ownerSelectedReceipt=null,brokerReview=null,ownerBusy=false;
+  const decisionLabels={KEEP_BLOCKED:"Keep blocked",BIND_BROKER_ORDER:"Bind verified broker order",CLOSE_WITHOUT_SUBMISSION:"Close proven no-submission attempt"};
+  async function ownerRequest(path,body){
+    const response=await fetch("/api/workbench/owner-review/"+encodeURIComponent(ownerSelectedReceipt)+path,
+      {credentials:"same-origin",cache:"no-store",...(body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})});
+    const data=await response.json();
+    if(!response.ok)throw new Error(typeof data.detail==="string"?data.detail:"Owner review is unavailable.");
+    return data;
+  }
+  function syncOwnerSave(){ownerSave.disabled=ownerBusy||!brokerReview||!ownerAck.checked||ownerNote.value.trim().length<20;}
+  async function showOwnerReview(id){
+    if(ownerBusy)return;
+    ownerBusy=true;ownerRefresh.disabled=true;
+    ownerSelectedReceipt=id;brokerReview=null;ownerPanel.hidden=false;
+    ownerDecision.replaceChildren();ownerDecision.disabled=true;ownerNote.value="";ownerAck.checked=false;
+    ownerResult.textContent="";ownerEvidence.textContent="Refresh broker evidence before recording a resolution.";syncOwnerSave();
+    try{
+      const data=await ownerRequest("");
+      document.getElementById("wbOwnerReviewSummary").textContent="Receipt "+data.receipt.id+" · "+data.receipt.state+" · filled quantity "+data.receipt.filled;
+      ownerRefresh.disabled=data.receipt.state!=="MANUAL_REVIEW";
+      const order=document.getElementById("wbOwnerReviewOrder");order.replaceChildren();
+      const terms=document.createElement("p");terms.textContent="Original order: "+data.order["time-in-force"]+" limit "+data.order.price+" points "+data.order["price-effect"]+".";order.appendChild(terms);
+      const legs=document.createElement("ul");data.order.legs.forEach(leg=>{const li=document.createElement("li");li.textContent=leg.action+" · "+leg.quantity+" · "+leg.symbol;legs.appendChild(li);});order.appendChild(legs);
+      const history=document.getElementById("wbOwnerReviewHistory");history.replaceChildren();
+      const heading=document.createElement("h5");heading.textContent="Recovery and owner history";history.appendChild(heading);
+      const list=document.createElement("ol");[...data.events].reverse().forEach(event=>{const li=document.createElement("li");li.textContent=new Date(event.occurred_at*1000).toLocaleString()+" · "+event.state+" · "+event.reason.replaceAll("_"," ").toLowerCase();list.appendChild(li);});history.appendChild(list);
+      data.resolutions.forEach(resolution=>{const p=document.createElement("p");p.textContent="Owner "+resolution.actor+" · "+(decisionLabels[resolution.decision]||resolution.decision)+" · "+resolution.note;history.appendChild(p);});
+      data.evidence.forEach(evidence=>{const p=document.createElement("p");p.textContent="Broker evidence "+new Date(evidence.created_at*1000).toLocaleString()+" · "+(evidence.complete?"complete records":"incomplete records")+" · "+evidence.candidates.length+" candidate observations";history.appendChild(p);});
+      document.getElementById("wbOwnerReviewProof").textContent=data.no_submission_proof
+        ?"Independent proof: guarded certification no-submission test. Reference "+data.no_submission_proof.reference+"; attested by "+data.no_submission_proof.actor+"."
+        :"No independent no-submission proof is registered. An empty broker search cannot release this receipt.";
+    }catch(error){ownerResult.textContent=error.message;ownerRefresh.disabled=true;}
+    finally{ownerBusy=false;syncOwnerSave();}
+  }
+  ownerRefresh.addEventListener("click",async()=>{
+    if(ownerBusy||!ownerSelectedReceipt)return;ownerBusy=true;ownerRefresh.disabled=true;ownerDecision.disabled=true;ownerAck.checked=false;brokerReview=null;syncOwnerSave();
+    try{
+      brokerReview=await ownerRequest("/refresh",{});ownerDecision.replaceChildren();
+      brokerReview.allowed_decisions.forEach(value=>{const option=document.createElement("option");option.value=value;option.textContent=decisionLabels[value];ownerDecision.appendChild(option);});ownerDecision.disabled=false;
+      ownerEvidence.textContent=(brokerReview.complete?"Complete broker records":"Incomplete broker records")+" · "+brokerReview.candidate_count+" candidate observations. Evidence expires at "+new Date(brokerReview.expires_at*1000).toLocaleTimeString()+". Only supported resolutions are offered.";
+    }catch(error){ownerEvidence.textContent=error.message;}
+    finally{ownerBusy=false;ownerRefresh.disabled=false;syncOwnerSave();}
+  });
+  ownerNote.addEventListener("input",syncOwnerSave);ownerAck.addEventListener("change",syncOwnerSave);
+  ownerSave.addEventListener("click",async()=>{
+    if(ownerSave.disabled||ownerBusy)return;ownerBusy=true;syncOwnerSave();
+    try{
+      const data=await ownerRequest("/resolve",{review_id:brokerReview.review_id,decision:ownerDecision.value,note:ownerNote.value.trim(),acknowledged:ownerAck.checked});
+      if(data.submitted!==false||data.original_attempt_retry_allowed!==false||data.fresh_confirmation_required!==true)throw new Error("Resolution could not be verified.");
+      brokerReview=null;ownerDecision.disabled=true;ownerRefresh.disabled=true;
+      ownerResult.textContent="Resolution saved: "+data.state+". Original attempt remains blocked. Use a fresh dry-run and confirmation for any new order.";
+      await loadCertificationRecovery();
+    }catch(error){brokerReview=null;ownerResult.textContent=error.message;ownerRefresh.disabled=false;}
+    finally{ownerBusy=false;syncOwnerSave();}
+  });
+  document.getElementById("wbOwnerClose").addEventListener("click",()=>{if(!ownerBusy){ownerPanel.hidden=true;ownerSelectedReceipt=null;brokerReview=null;}});
   let certLoading=false;
   async function loadCertificationRecovery(){
     if(certLoading)return;
@@ -27,10 +91,10 @@
       if(!data.items.length){const p=document.createElement("p");p.textContent="No certification attempts recorded.";certItems.appendChild(p);return;}
       const table=document.createElement("table");table.className="bxk-workbench-table";
       const head=document.createElement("thead"),header=document.createElement("tr");
-      ["Receipt","Status","Filled quantity","Next check","Detail"].forEach(label=>{const th=document.createElement("th");th.textContent=label;header.appendChild(th);});
+      ["Receipt","Status","Filled quantity","Next check","Detail","Review"].forEach(label=>{const th=document.createElement("th");th.textContent=label;header.appendChild(th);});
       head.appendChild(header);table.appendChild(head);
       const body=document.createElement("tbody");
-      const labels={SUBMITTING:"Awaiting recovery",UNKNOWN:"Checking broker",ACKNOWLEDGED:"Working at broker",MANUAL_REVIEW:"Needs owner review",READY:"Prepared"};
+      const labels={SUBMITTING:"Awaiting recovery",UNKNOWN:"Checking broker",ACKNOWLEDGED:"Working at broker",MANUAL_REVIEW:"Needs owner review",READY:"Prepared",RESOLVED_NO_SUBMISSION:"Resolved: no submission"};
       data.items.forEach(item=>{
         const row=document.createElement("tr");
         const active=["UNKNOWN","ACKNOWLEDGED"].includes(item.state);
@@ -41,6 +105,7 @@
           :item.reason==="INCOMPLETE_HISTORY"?"Waiting for complete broker records.":"Original attempt retained.";
         const due=Math.max(Number(item.next_read)||0,Number(data.backoff_until)||0);
         [String(item.id).slice(0,8),state,String(item.filled),active&&due?new Date(due*1000).toLocaleTimeString():"—",detail].forEach(value=>{const td=document.createElement("td");td.textContent=value;row.appendChild(td);});
+        const action=document.createElement("td"),reviewButton=document.createElement("button");reviewButton.type="button";reviewButton.className="bxk-mode";reviewButton.textContent="Review";reviewButton.addEventListener("click",()=>showOwnerReview(item.id));action.appendChild(reviewButton);row.appendChild(action);
         body.appendChild(row);
       });
       table.appendChild(body);certItems.appendChild(table);

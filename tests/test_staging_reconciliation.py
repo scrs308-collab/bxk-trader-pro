@@ -291,6 +291,9 @@ with patch("staging_confirmation.os.path.ismount", return_value=True):
             self.assertEqual(client.get("/api/workbench/reconciliation-rehearsal/"+self.intent).status_code, 401)
             self.assertEqual(client.post("/api/workbench/reconciliation-rehearsal/"+self.intent+"/attempt").status_code, 401)
             self.assertEqual(client.get("/api/workbench/reconciliation-status").status_code, 401)
+            self.assertEqual(client.get("/api/workbench/owner-review/"+self.intent).status_code, 401)
+            self.assertEqual(client.post("/api/workbench/owner-review/"+self.intent+"/refresh").status_code, 401)
+            self.assertEqual(client.post("/api/workbench/owner-review/"+self.intent+"/resolve", json={}).status_code, 401)
 
 
 class CertificationReaderTests(unittest.TestCase):

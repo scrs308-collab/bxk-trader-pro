@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from pydantic import StrictBool
 
 ROOT = Path(__file__).resolve().parent / "static"
 
@@ -257,6 +258,46 @@ def certification_reconciliation_status():
     from staging_certification_worker import CertificationWorker
     worker = getattr(app.state, "certification_worker", None)
     return (worker if worker is not None else CertificationWorker()).status()
+
+
+def owner_review_service():
+    from staging_certification_worker import CertificationWorker
+    from staging_owner_review import OwnerReview
+    worker = getattr(app.state, "certification_worker", None)
+    return OwnerReview(worker if worker is not None else CertificationWorker())
+
+
+def require_review_origin(request):
+    from urllib.parse import urlsplit
+    expected = urlsplit(os.getenv("BXK_PUBLIC_APP_URL", str(request.base_url)))
+    origin = urlsplit(request.headers.get("origin", ""))
+    if origin.scheme != expected.scheme or origin.netloc != expected.netloc or origin.path not in ("", "/") or origin.query or origin.fragment:
+        raise HTTPException(403, "Owner review requires a same-origin request")
+
+
+@app.get("/api/workbench/owner-review/{intent}")
+def owner_review_detail(intent: str):
+    return owner_review_service().detail(intent)
+
+
+@app.post("/api/workbench/owner-review/{intent}/refresh")
+def owner_review_refresh(intent: str, request: Request):
+    require_review_origin(request)
+    return owner_review_service().refresh(intent)
+
+
+class OwnerResolution(BaseModel):
+    review_id: str = Field(..., min_length=36, max_length=36)
+    decision: str
+    note: str = Field(..., min_length=20, max_length=500)
+    acknowledged: StrictBool
+
+
+@app.post("/api/workbench/owner-review/{intent}/resolve")
+def owner_review_resolve(intent: str, payload: OwnerResolution, request: Request):
+    require_review_origin(request)
+    return owner_review_service().resolve(intent, payload.review_id, payload.decision, payload.note,
+                                          payload.acknowledged, os.environ["BXK_APP_USERNAME"])
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

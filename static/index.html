@@ -177,6 +177,21 @@
         <button type="button" id="wbRefreshCertRecovery" class="bxk-mode">Refresh recovery status</button>
         <p id="wbCertRecoveryStatus" role="status">Loading recovery status…</p>
         <div id="wbCertRecoveryItems"></div>
+        <section id="wbOwnerReview" hidden aria-labelledby="wbOwnerReviewTitle">
+          <h4 id="wbOwnerReviewTitle">Owner review</h4>
+          <p id="wbOwnerReviewSummary"></p>
+          <div id="wbOwnerReviewOrder"></div>
+          <div id="wbOwnerReviewHistory"></div>
+          <p id="wbOwnerReviewProof"></p>
+          <button type="button" id="wbOwnerRefreshEvidence" class="bxk-mode">Refresh broker evidence</button>
+          <p id="wbOwnerEvidenceStatus" role="status"></p>
+          <label>Resolution <select id="wbOwnerDecision" disabled></select></label>
+          <label>Review note (no credentials) <textarea id="wbOwnerNote" minlength="20" maxlength="500" rows="3"></textarea></label>
+          <label><input type="checkbox" id="wbOwnerAcknowledged"> I reviewed the evidence. This cannot retry the original attempt; a new order needs fresh validation and confirmation.</label>
+          <button type="button" id="wbOwnerSaveResolution" class="bxk-mode" disabled>Save owner resolution</button>
+          <button type="button" id="wbOwnerClose" class="bxk-mode">Close owner review</button>
+          <p id="wbOwnerReviewResult" role="status"></p>
+        </section>
       </section>
       <div id="wbQuoteResults" aria-live="polite"></div>
       <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
