@@ -118,20 +118,45 @@
         brokerStatus.textContent="Broker dry-run unavailable ("+response.status+"): "+(data.detail||"No broker validation returned.");
         return;
       }
-      const fmtMoney=n=>typeof n==="number"&&Number.isFinite(n)?"$"+Math.abs(n).toFixed(2):"Unavailable";
-      const delta=data.difference_from_defined_risk;
-      const reconciled=data.reconciled===true;
-      const warnings=(data.warnings||[]).map(w=>w.message||String(w)).join("; ");
-      const errors=(data.errors||[]).map(w=>w.message||String(w)).join("; ");
-      brokerStatus.textContent=[
-        "Broker status: "+(data.broker_status||"Unknown")+(data.status_verified?" (verified)":" (not verified)"),
-        "BXK defined risk: "+fmtMoney(data.estimated_defined_risk),
-        "Broker buying-power change: "+fmtMoney(data.broker_buying_power_change),
-        "Difference: "+fmtMoney(delta)+(reconciled?" (reconciled)":" (unexplained; review required)"),
-        "Broker warnings: "+(warnings||"None reported"),
-        "Broker errors: "+(errors||"None reported"),
-        "No order submitted. Live execution remains disabled."
-      ].join(" | ");
+      const money=n=>typeof n==="number"&&Number.isFinite(n)?"$"+n.toFixed(2):"Unavailable";
+      const lines=[
+        "Broker dry-run status: "+(data.broker_status||"Unknown"),
+        "BXK defined risk: "+money(data.estimated_defined_risk),
+        "Broker buying-power impact: "+money(data.broker_buying_power_change),
+        "Broker-reported total fees: "+money(data.broker_total_fees),
+        "Difference before fees: "+money(data.difference_from_defined_risk),
+        "Unexplained difference after fees: "+money(data.unexplained_difference_after_fees),
+        "Buying power remaining: "+money(data.remaining_buying_power),
+        "Minimum reserve: "+money(data.minimum_buying_power_reserve),
+      ];
+      const labels={
+        broker_status_received:"Broker status Received",
+        order_matches_request:"Four legs, limit price, and order terms match",
+        broker_buying_power_internal:"Broker buying-power arithmetic reconciles",
+        fees_reported:"Broker returned fee calculation",
+        risk_plus_fees_matches_impact:"Defined risk plus fees matches buying-power impact",
+        remaining_buying_power_reserve:"Remaining buying power meets reserve",
+        broker_warnings_approved:"No unapproved broker warnings",
+        broker_errors_absent:"No broker errors"
+      };
+      for(const [key,label] of Object.entries(labels)){
+        lines.push((data.checks?.[key]===true?"PASS: ":"REVIEW: ")+label);
+      }
+      for(const warning of data.warnings||[]){
+        lines.push("Broker warning: "+(warning.message||warning.code||"Unspecified"));
+      }
+      for(const error of data.errors||[]){
+        lines.push("Broker error: "+(error.message||error.code||"Unspecified"));
+      }
+      lines.push(data.all_checks_pass
+        ?"Dry-run checks passed. Staging is review-only; no execution permitted."
+        :"Dry-run requires review. Live execution is blocked.");
+      brokerStatus.replaceChildren();
+      const list=document.createElement("ul");
+      for(const line of lines){
+        const li=document.createElement("li");li.textContent=line;list.appendChild(li);
+      }
+      brokerStatus.appendChild(list);
     }catch{
       brokerStatus.textContent="Could not contact broker dry-run endpoint. No order submitted.";
     }finally{
