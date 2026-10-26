@@ -84,10 +84,37 @@
   document.getElementById("wbClosePreview").addEventListener("click",()=>{
     reviewPanel.hidden=true;
     reviewDetails.replaceChildren();
+    clearConfirmation();
   });
   let selectedReview=null;
   const brokerButton=document.getElementById("wbBrokerPreview");
   const brokerStatus=document.getElementById("wbBrokerPreviewStatus");
+  const confirmation=document.getElementById("wbConfirmationRehearsal");
+  const confirmCheck=document.getElementById("wbConfirmReview");
+  const confirmButton=document.getElementById("wbConfirmSimulation");
+  const confirmStatus=document.getElementById("wbConfirmationStatus");
+  let validatedReview=null;
+  const clearConfirmation=()=>{
+    validatedReview=null;
+    confirmation.hidden=true;
+    confirmCheck.checked=false;
+    confirmButton.disabled=true;
+    confirmStatus.textContent="";
+  };
+  confirmCheck.addEventListener("change",()=>{
+    confirmButton.disabled=!confirmCheck.checked||!validatedReview;
+  });
+  confirmButton.addEventListener("click",()=>{
+    if(!validatedReview||!confirmCheck.checked)return;
+    const elapsed=Date.now()-validatedReview.at;
+    if(elapsed>30000){
+      clearConfirmation();
+      brokerStatus.textContent="Broker dry-run validation expired. Reload quotes and request a new dry-run.";
+      return;
+    }
+    confirmButton.disabled=true;
+    confirmStatus.textContent="Review acknowledged for this quote snapshot. Simulation only: no order created or submitted.";
+  });
   const occ=(expiry,type,strike)=>{
     const compact=expiry.slice(2,4)+expiry.slice(5,7)+expiry.slice(8,10);
     return "SPXW  "+compact+type+String(Math.round(strike*1000)).padStart(8,"0");
@@ -101,6 +128,7 @@
       brokerButton.disabled=true;return;
     }
     brokerButton.disabled=true;
+    clearConfirmation();
     brokerStatus.textContent="Requesting tastytrade dry-run (no order submission)...";
     const legs=[
       {symbol:occ(expiry,"P",c.put.short),action:"Sell to Open"},
@@ -158,6 +186,11 @@
         const li=document.createElement("li");li.textContent=line;list.appendChild(li);
       }
       brokerStatus.appendChild(list);
+      if(data.all_checks_pass===true && data.execution_authorized===false){
+        validatedReview={at:Date.now()};
+        confirmation.hidden=false;
+        confirmStatus.textContent="All broker checks passed. Explicitly acknowledge this review within 30 seconds; no order will be placed.";
+      }
     }catch{
       brokerStatus.textContent="Could not contact broker dry-run endpoint. No order submitted.";
     }finally{
@@ -165,6 +198,7 @@
     }
   });
   const showReview=(c,widthPut,widthCall,expiry)=>{
+    clearConfirmation();
     selectedReview={c,expiry,selectedAt:Date.now()};
     brokerStatus.textContent="Broker buying power not yet checked. Dry-run never places an order.";
     brokerButton.disabled=!c.fresh;
