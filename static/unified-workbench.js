@@ -69,6 +69,15 @@
   }
   buttons.forEach(b => b.addEventListener("click", () => setMode(b.dataset.workbenchMode)));
   fields.forEach(k => document.getElementById("wb" + k).addEventListener("input", render));
+  const moveSource=document.getElementById("wbExpectedMoveSource");
+  moveSource.addEventListener("change",()=>{
+    const field=document.getElementById("wbExpectedMove");
+    field.readOnly=moveSource.value==="auto";
+    field.value="";
+    connectionStatus.textContent=moveSource.value==="auto"
+      ?"Load SPXW quotes to calculate ATM straddle expected move."
+      :"Enter your own 1σ expected move, then load quotes.";
+  });
   const connectButton = document.getElementById("wbConnectMarket");
   const connectionStatus = document.getElementById("wbSearchStatus");
   connectButton.addEventListener("click", async () => {
@@ -145,6 +154,25 @@
         }).filter(Boolean).slice(0,25);
       const puts=makeSpreads("put",widthPut), calls=makeSpreads("call",widthCall);
       const expectedMoveField=document.getElementById("wbExpectedMove");
+      const source=document.getElementById("wbExpectedMoveSource").value;
+      let moveExplanation="";
+      if(source==="auto"){
+        // ATM straddle is approximately sqrt(2/pi) * 1-sigma move
+        // under a zero-drift normal terminal-price approximation.
+        const strikes=[...new Set(data.quotes.map(q=>Number(q.strike)))].sort((a,b)=>Math.abs(a-spot)-Math.abs(b-spot));
+        let chosen=null;
+        for(const strike of strikes){
+          const put=quoteMap.get("put:"+strike),call=quoteMap.get("call:"+strike);
+          if(!put||!call||!fresh(put)||!fresh(call))continue;
+          const putMid=(Number(put.bid)+Number(put.ask))/2;
+          const callMid=(Number(call.bid)+Number(call.ask))/2;
+          if(putMid>0&&callMid>0){chosen={strike,move:(putMid+callMid)*Math.sqrt(Math.PI/2)};break;}
+        }
+        expectedMoveField.value=chosen?chosen.move.toFixed(2):"";
+        moveExplanation=chosen?"ATM "+chosen.strike+" straddle-derived 1σ: "+chosen.move.toFixed(2)+" SPX points.":"Auto expected move unavailable: fresh paired ATM quotes required.";
+      }else{
+        moveExplanation="Manual expected-move assumption.";
+      }
       const expectedMove=Number(expectedMoveField.value);
       const minPop=Number(document.getElementById("wbMinPop").value);
       const popEnabled=expectedMoveField.value.trim()!=="" && Number.isFinite(expectedMove) && expectedMove>0;
