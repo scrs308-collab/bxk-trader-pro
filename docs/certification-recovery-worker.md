@@ -22,6 +22,13 @@ SQLite, so a process restart cannot bypass it. Individual intent backoff and
 the six-read limit remain durable too. An empty complete collection never
 permits resubmission. Exhausted UNKNOWN recovery moves to MANUAL_REVIEW.
 
+Consecutive provider failure counts are also durable and account-scoped. Failures
+after a restart retain the 30, 60, 120, 240, 300-second progression; longer broker
+Retry-After values still win. A complete successful read resets the count and
+cooldown for either automatic checks or owner evidence refreshes. Incomplete
+collections do not reset failure history. The added failure-count table preserves
+existing cooldown rows without rewriting or deleting them during deployment.
+
 The authenticated `/api/workbench/reconciliation-status` route reads durable
 status only. It exposes at most 50 recent certification receipts, filled quantity,
 broker lifecycle status, safe reason codes and next check time. It excludes

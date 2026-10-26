@@ -149,7 +149,7 @@ class CertificationWorkerTests(unittest.TestCase):
         intent = self.unknown()
         with self.ledger.db(True) as db:
             db.execute("UPDATE rehearsal_reconciliation SET state='MANUAL_REVIEW' WHERE id=?", (intent,))
-        for failure in (requests.Timeout("private provider detail"), KeyError("private response field")):
+        for index, failure in enumerate((requests.Timeout("private provider detail"), KeyError("private response field"))):
             self.cached_token()
             self.session.get.side_effect = failure
             review = OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now)
@@ -158,18 +158,48 @@ class CertificationWorkerTests(unittest.TestCase):
             self.assertEqual(caught.exception.status_code, 503)
             self.assertNotIn("private", str(caught.exception.detail))
             calls = self.session.get.call_count
-            self.assertEqual(self.worker.failures, 1)
+            self.assertEqual(self.worker.failures, index+1)
             restarted = CertificationWorker(session=self.session, clock=lambda: self.now)
             with self.assertRaises(HTTPException) as blocked:
                 OwnerReview(restarted, ledger=self.ledger, clock=lambda: self.now).refresh(intent)
             self.assertEqual(blocked.exception.status_code, 409)
             self.assertEqual(self.session.get.call_count, calls)
-            self.assertEqual(restarted.status()["backoff_until"], self.now+30)
+            delay = 30 * 2**index
+            self.assertEqual(restarted.status()["backoff_until"], self.now+delay)
             self.assertEqual(self.ledger.get(intent)["state"], "MANUAL_REVIEW")
             with self.ledger.db() as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_review_evidence").fetchone()[0], 0)
-            self.now += 31
+            self.now += delay+1
             self.worker = restarted
+        self.session.post.assert_not_called()
+
+    def test_failure_escalation_survives_restarts_and_complete_read_resets(self):
+        intent = self.unknown()
+        with self.ledger.db(True) as db:
+            db.execute("UPDATE rehearsal_reconciliation SET state='MANUAL_REVIEW' WHERE id=?", (intent,))
+        for delay in (30, 60, 120, 240, 300, 300):
+            self.worker = CertificationWorker(session=self.session, clock=lambda: self.now)
+            self.cached_token()
+            self.session.get.side_effect = requests.Timeout()
+            with self.assertRaises(HTTPException):
+                OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now).refresh(intent)
+            self.assertEqual(self.worker.status()["backoff_until"], self.now+delay)
+            self.now += delay+1
+        # Incomplete broker collections cannot reset consecutive failure history.
+        self.session.get.side_effect = [self.reply({"data": {"items": []}}), self.empty()[1]]
+        review = OwnerReview(self.worker, ledger=self.ledger, clock=lambda: self.now)
+        self.assertFalse(review.refresh(intent)["complete"])
+        with self.ledger.db() as db:
+            self.assertEqual(db.execute("SELECT failures FROM certification_provider_failures").fetchone()[0], 5)
+        self.session.get.side_effect = self.empty()
+        self.assertTrue(review.refresh(intent)["complete"])
+        with self.ledger.db() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_provider_failures").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM certification_worker_state").fetchone()[0], 0)
+        self.session.get.side_effect = requests.Timeout()
+        with self.assertRaises(HTTPException):
+            review.refresh(intent)
+        self.assertEqual(self.worker.status()["backoff_until"], self.now+30)
         self.session.post.assert_not_called()
 
     def test_terminal_and_manual_review_attempts_are_not_polled(self):

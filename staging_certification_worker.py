@@ -18,7 +18,7 @@ class ObservedReader(CertificationOrderReader):
 
     def read(self, row):
         try:
-            return super().read(row)
+            snapshot = super().read(row)
         except BrokerReadError as error:
             self.worker.provider_failure(error)
             raise
@@ -28,6 +28,9 @@ class ObservedReader(CertificationOrderReader):
             error = BrokerReadError()
             self.worker.provider_failure(error)
             raise error from None
+        if snapshot.complete is True:
+            self.worker.provider_success()
+        return snapshot
 
 
 class CertificationWorker:
@@ -37,6 +40,7 @@ class CertificationWorker:
         self.lock = threading.Lock()
         self.token, self.token_until = None, 0
         self.blocked_until, self.failures = 0, 0
+        self.failure_events = 0
         self.last_check, self.last_error = None, None
         self.reader = None
         self.enabled = os.getenv("BXK_CERT_RECONCILIATION_ENABLED", "").lower() == "true"
@@ -53,18 +57,28 @@ class CertificationWorker:
             self.last_error = "CERTIFICATION_CONFIGURATION_UNAVAILABLE"
 
     def provider_failure(self, error):
-        self.failures += 1
         if error.status_code == 401:
             self.token, self.token_until = None, 0
         # Cool down the whole account, not only the current intent. No tight
         # retry loop for bare 429s or repeated authentication failures.
-        delay = max(error.retry_after, min(300, 30 * 2**min(self.failures-1, 4)))
-        self.blocked_until = int(self.clock())+delay
         self.last_error = ("BROKER_RATE_LIMITED" if error.status_code == 429 else
                            "BROKER_AUTH_UNAVAILABLE" if error.status_code in (401, 403) else "BROKER_READ_UNAVAILABLE")
         with Ledger(clock=self.clock).db(True) as db:
+            previous = db.execute("SELECT failures FROM certification_provider_failures WHERE scope=?", (self.reader.scope,)).fetchone()
+            failures = min(5, (previous["failures"] if previous else 0)+1)
+            delay = max(error.retry_after, min(300, 30 * 2**(failures-1)))
+            blocked_until = int(self.clock())+delay
+            db.execute("INSERT INTO certification_provider_failures VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET failures=excluded.failures", (self.reader.scope, failures))
             db.execute("INSERT INTO certification_worker_state(scope,blocked_until,last_error) VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET blocked_until=MAX(blocked_until,excluded.blocked_until),last_error=excluded.last_error",
-                       (self.reader.scope, self.blocked_until, self.last_error))
+                       (self.reader.scope, blocked_until, self.last_error))
+        self.failures, self.blocked_until = failures, blocked_until
+        self.failure_events += 1
+
+    def provider_success(self):
+        with Ledger(clock=self.clock).db(True) as db:
+            db.execute("DELETE FROM certification_worker_state WHERE scope=?", (self.reader.scope,))
+            db.execute("DELETE FROM certification_provider_failures WHERE scope=?", (self.reader.scope,))
+        self.failures, self.blocked_until, self.last_error = 0, 0, None
 
     def headers(self):
         headers = {"User-Agent": "bxk-certification-worker/1.0", "Accept": "application/json"}
@@ -108,16 +122,12 @@ class CertificationWorker:
                                  (self.reader.scope, int(self.clock()), int(self.clock()))).fetchone()
             if row is None:
                 return
-            previous_failures = self.failures
+            previous_failures = self.failure_events
             result = ledger.reconcile(row["id"], self.reader)
             self.last_check = int(self.clock())
-            if self.failures == previous_failures:
+            if self.failure_events == previous_failures:
                 if result["reason"] == "READ_UNAVAILABLE":
                     self.provider_failure(BrokerReadError())
-                else:
-                    self.failures, self.last_error = 0, None
-                    with ledger.db(True) as db:
-                        db.execute("DELETE FROM certification_worker_state WHERE scope=?", (self.reader.scope,))
         except HTTPException as error:
             if error.status_code != 409:
                 self.last_error = "DURABLE_STORAGE_UNAVAILABLE"

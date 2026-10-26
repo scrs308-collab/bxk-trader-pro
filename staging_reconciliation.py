@@ -99,6 +99,8 @@ class Ledger:
             db.execute("""CREATE TABLE IF NOT EXISTS certification_worker_state (
                 scope TEXT PRIMARY KEY, blocked_until INTEGER NOT NULL,
                 last_error TEXT)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS certification_provider_failures (
+                scope TEXT PRIMARY KEY, failures INTEGER NOT NULL CHECK(failures>0))""")
             db.execute("""CREATE TABLE IF NOT EXISTS certification_review_evidence (
                 id TEXT PRIMARY KEY,intent_id TEXT NOT NULL,scope TEXT NOT NULL,
                 version INTEGER NOT NULL,snapshot TEXT NOT NULL,created_at INTEGER NOT NULL,
