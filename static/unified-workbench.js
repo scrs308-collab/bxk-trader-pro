@@ -85,7 +85,52 @@
     reviewPanel.hidden=true;
     reviewDetails.replaceChildren();
   });
+  let selectedReview=null;
+  const brokerButton=document.getElementById("wbBrokerPreview");
+  const brokerStatus=document.getElementById("wbBrokerPreviewStatus");
+  const occ=(expiry,type,strike)=>{
+    const compact=expiry.slice(2,4)+expiry.slice(5,7)+expiry.slice(8,10);
+    return "SPXW  "+compact+type+String(Math.round(strike*1000)).padStart(8,"0");
+  };
+  brokerButton.addEventListener("click",async()=>{
+    if(!selectedReview)return;
+    const {c,expiry,selectedAt}=selectedReview;
+    if(!c.fresh || Date.now()-selectedAt>30000){
+      brokerStatus.textContent="Quote snapshot expired. Reload SPXW quotes before broker dry-run.";
+      brokerButton.disabled=true;return;
+    }
+    brokerButton.disabled=true;
+    brokerStatus.textContent="Requesting tastytrade dry-run (no order submission)...";
+    const legs=[
+      {symbol:occ(expiry,"P",c.put.short),action:"Sell to Open"},
+      {symbol:occ(expiry,"P",c.put.long),action:"Buy to Open"},
+      {symbol:occ(expiry,"C",c.call.short),action:"Sell to Open"},
+      {symbol:occ(expiry,"C",c.call.long),action:"Buy to Open"}
+    ];
+    try{
+      const response=await fetch("/api/workbench/order-dry-run",{
+        method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({legs,quantity:1,limit_price:Number(c.premium.toFixed(2))})
+      });
+      const data=await response.json();
+      if(!response.ok){
+        brokerStatus.textContent="Broker dry-run unavailable ("+response.status+"): "+(data.detail||"No broker validation returned.");
+        return;
+      }
+      brokerStatus.textContent="Broker dry-run status: "+(data.broker_status||"Unknown")+
+        ". Buying-power effect: "+JSON.stringify(data.buying_power_effect||{})+
+        ". No order submitted. Broker warnings: "+JSON.stringify(data.warnings||[]);
+    }catch{
+      brokerStatus.textContent="Could not contact broker dry-run endpoint. No order submitted.";
+    }finally{
+      brokerButton.disabled=false;
+    }
+  });
   const showReview=(c,widthPut,widthCall,expiry)=>{
+    selectedReview={c,expiry,selectedAt:Date.now()};
+    brokerStatus.textContent="Broker buying power not yet checked. Dry-run never places an order.";
+    brokerButton.disabled=!c.fresh;
     reviewDetails.replaceChildren();
     const rows=[
       ["Expiration",expiry],
