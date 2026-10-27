@@ -72,6 +72,28 @@
       for(const c of data.condors)rows.push([c.put_short+" / "+c.put_long,c.call_short+" / "+c.call_long,c.premium_dollars,c.max_loss_before_fees,c.lower_breakeven+" / "+c.upper_breakeven,c.modeled_pop]);
       for(const cells of rows){const row=document.createElement("tr");for(const value of cells){const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);}table.appendChild(row);}
       output.appendChild(table);
+      const reviewOutput=document.createElement("div");output.appendChild(reviewOutput);
+      [...table.rows].slice(1).forEach((row,index)=>{
+        const cell=document.createElement("td"),button=document.createElement("button");
+        button.type="button";button.textContent="Review position";cell.appendChild(button);row.appendChild(cell);
+        button.addEventListener("click",async()=>{
+          button.disabled=true;reviewOutput.textContent="Refreshing the selected four-leg position...";
+          const candidate=data.condors[index],payload=Object.fromEntries(params);
+          for(const key of Object.keys(payload))if(key!=="expiration")payload[key]=Number(payload[key]);
+          for(const key of ["put_short","put_long","call_short","call_long","credit_points"])payload[key]=candidate[key];
+          try{
+            const response=await fetch("/api/workbench-preview/position-review",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+            if(!response.ok)throw new Error(response.status===409?"Position or premium changed. Reload condors and select again.":"Position review unavailable ("+response.status+").");
+            const reviewed=await response.json();
+            if(reviewed.review_lock_issued!==false||reviewed.order_submission_available!==false||reviewed.user_scoped!==true)throw new Error("Unexpected review response");
+            const p=reviewed.position;
+            reviewOutput.textContent="Verified snapshot: sell put "+p.put_short+", buy put "+p.put_long+", sell call "+p.call_short+", buy call "+p.call_long+
+              ". Credit $"+p.premium_dollars+"; maximum loss before fees $"+p.max_loss_before_fees+
+              "; breakevens "+p.lower_breakeven+" / "+p.upper_breakeven+". Buying power unverified. No execution lock or order created.";
+          }catch(error){reviewOutput.textContent=error.message;}
+          finally{button.disabled=false;}
+        });
+      });
       status.textContent=data.condors.length+" of "+data.matching_count+" matching condors shown by highest credit. Fresh at calculation only; no broker review or order submission.";
     }catch(error){status.textContent=error.message;}
     finally{analyze.disabled=false;}
