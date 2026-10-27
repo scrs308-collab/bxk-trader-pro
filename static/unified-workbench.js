@@ -631,6 +631,9 @@
           tbody.appendChild(row);});
         table.appendChild(tbody);output.appendChild(table);
       };
+      const spreadNote=document.createElement("p");
+      spreadNote.textContent="The five spreads on each side are examples. Combined condors below search all retrieved strikes and apply your modeled POP filter.";
+      output.appendChild(spreadNote);
       const fmt=n=>Number(n).toFixed(2);
       addTable("Five put spreads",["Sell put","Buy put","Premium (pts)","Max loss ($)","Quote"],
         puts.slice(0,5).map(p=>[p.short,p.long,fmt(p.premium),fmt((widthPut-p.premium)*100),p.fresh?"Fresh":"Stale/unknown"]));
