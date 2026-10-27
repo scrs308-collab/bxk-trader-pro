@@ -90,6 +90,31 @@
             reviewOutput.textContent="Verified snapshot: sell put "+p.put_short+", buy put "+p.put_long+", sell call "+p.call_short+", buy call "+p.call_long+
               ". Credit $"+p.premium_dollars+"; maximum loss before fees $"+p.max_loss_before_fees+
               "; breakevens "+p.lower_breakeven+" / "+p.upper_breakeven+". Buying power unverified. No execution lock or order created.";
+            const dryButton=document.createElement("button"),dryStatus=document.createElement("div");
+            dryButton.type="button";dryButton.textContent="Check broker risk and buying power (dry-run only)";
+            reviewOutput.appendChild(document.createElement("br"));reviewOutput.appendChild(dryButton);reviewOutput.appendChild(dryStatus);
+            dryButton.addEventListener("click",async()=>{
+              dryButton.disabled=true;dryStatus.textContent="Refreshing quotes and checking broker risk...";
+              try{
+                const response=await fetch("/api/workbench-preview/dry-run",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+                if(!response.ok)throw new Error(response.status===409?"Quotes or position changed. Reload and review again.":"Dry-run unavailable ("+response.status+"). No order submitted.");
+                const result=await response.json();
+                if(result.order_submission_available!==false||result.review_lock_issued!==false)throw new Error("Unexpected dry-run response");
+                dryStatus.replaceChildren();
+                const summary=document.createElement("p");
+                summary.textContent=result.passed?"Dry-run passed. No order submitted; execution unavailable.":"Dry-run blocked. No order submitted.";
+                dryStatus.appendChild(summary);
+                const list=document.createElement("ul");
+                for(const check of result.checks||[]){const item=document.createElement("li");item.textContent=(check.passed?"PASS: ":"BLOCKED: ")+check.message;list.appendChild(item);}
+                dryStatus.appendChild(list);
+                if(result.buying_power){
+                  const bp=document.createElement("p");
+                  bp.textContent="Broker impact $"+result.buying_power.impact+"; fees $"+result.fees+"; remaining $"+result.buying_power.remaining+"; minimum reserve $"+result.minimum_reserve+". Snapshot only.";
+                  dryStatus.appendChild(bp);
+                }
+              }catch(error){dryStatus.textContent=error.message;}
+              finally{dryButton.disabled=false;}
+            });
           }catch(error){reviewOutput.textContent=error.message;}
           finally{button.disabled=false;}
         });
