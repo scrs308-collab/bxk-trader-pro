@@ -49,4 +49,31 @@
     }catch(error){status.textContent=error.message;}
     finally{load.disabled=false;}
   });
+  const analyze=document.getElementById("analyzeCondors");
+  analyze.addEventListener("click",async()=>{
+    const status=document.getElementById("analysisStatus"),output=document.getElementById("analysisResults");
+    output.replaceChildren();
+    const fields={spot:"analysisSpot",expected_move:"analysisMove",width:"analysisWidth",minimum_pop:"analysisPop",min_strike:"quoteMin",max_strike:"quoteMax"};
+    const params=new URLSearchParams({expiration:expiry.value});
+    for(const [key,id] of Object.entries(fields)){
+      const value=Number(document.getElementById(id).value);
+      if(!Number.isFinite(value)||value<=0){status.textContent="Enter valid positive analysis inputs.";return;}
+      params.set(key,String(value));
+    }
+    if(!expiry.value){status.textContent="Check your broker connection and select an expiration first.";return;}
+    analyze.disabled=true;status.textContent="Refreshing user quotes and calculating condors...";
+    try{
+      const response=await fetch("/api/workbench-preview/condors?"+params,{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok)throw new Error("Analysis unavailable ("+response.status+"). Check your connection and inputs.");
+      const data=await response.json();
+      if(data.user_scoped!==true||data.order_submission_available!==false||!Array.isArray(data.condors))throw new Error("Unexpected response");
+      const table=document.createElement("table");
+      const rows=[["Put sell/buy","Call sell/buy","Credit ($)","Max loss before fees ($)","Breakevens","Modeled POP (%)"]];
+      for(const c of data.condors)rows.push([c.put_short+" / "+c.put_long,c.call_short+" / "+c.call_long,c.premium_dollars,c.max_loss_before_fees,c.lower_breakeven+" / "+c.upper_breakeven,c.modeled_pop]);
+      for(const cells of rows){const row=document.createElement("tr");for(const value of cells){const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);}table.appendChild(row);}
+      output.appendChild(table);
+      status.textContent=data.condors.length+" of "+data.matching_count+" matching condors shown by highest credit. Fresh at calculation only; no broker review or order submission.";
+    }catch(error){status.textContent=error.message;}
+    finally{analyze.disabled=false;}
+  });
 })();
