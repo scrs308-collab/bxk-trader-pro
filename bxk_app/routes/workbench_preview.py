@@ -138,3 +138,42 @@ def condors(
     except ValueError:
         raise HTTPException(400,"Invalid analysis inputs") from None
     return dict(result,expiration=expiration,user_scoped=True,checked_at=snapshot["checked_at"])
+
+
+from pydantic import BaseModel, Field, ConfigDict
+
+class PositionReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    expiration: str = Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    min_strike: float = Field(gt=0)
+    max_strike: float = Field(gt=0)
+    spot: float = Field(gt=0)
+    expected_move: float = Field(gt=0)
+    width: float = Field(gt=0,le=100)
+    minimum_pop: float = Field(ge=1,le=99)
+    put_short: float = Field(gt=0)
+    put_long: float = Field(gt=0)
+    call_short: float = Field(gt=0)
+    call_long: float = Field(gt=0)
+    credit_points: float = Field(gt=0)
+
+def reviewed_position(result, payload):
+    keys=("put_short","put_long","call_short","call_long")
+    selected=next((c for c in result["condors"]
+                   if all(c[k]==getattr(payload,k) for k in keys)),None)
+    if selected is None:
+        raise HTTPException(409,"Position no longer matches fresh analysis; reload results")
+    if abs(selected["credit_points"]-payload.credit_points)>0.10+1e-9:
+        raise HTTPException(409,"Premium changed; reload and select again")
+    return {"position":selected,"expiration":payload.expiration,"contracts":1,
+            "quote_checked_at":result["checked_at"],"user_scoped":True,
+            "buying_power_verified":False,"broker_dry_run_available":False,
+            "review_lock_issued":False,"order_submission_available":False,
+            "message":"Fresh snapshot verified. Broker risk and buying power review still required."}
+
+@router.post("/position-review")
+def position_review(payload:PositionReviewRequest,user=Depends(preview_access),session:Session=Depends(get_db)):
+    result=condors(expiration=payload.expiration,min_strike=payload.min_strike,
+        max_strike=payload.max_strike,spot=payload.spot,expected_move=payload.expected_move,
+        width=payload.width,minimum_pop=payload.minimum_pop,user=user,session=session)
+    return reviewed_position(result,payload)
