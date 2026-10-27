@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     APIRouter,
@@ -1097,7 +1098,7 @@ def _validate_order(
             ).date()
 
             expiration_valid = (
-                expiration_date >= date.today()
+                expiration_date >= datetime.now(ZoneInfo("America/New_York")).date()
             )
         except ValueError:
             expiration_valid = False
