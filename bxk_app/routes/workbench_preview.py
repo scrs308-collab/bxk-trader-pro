@@ -177,3 +177,17 @@ def position_review(payload:PositionReviewRequest,user=Depends(preview_access),s
         max_strike=payload.max_strike,spot=payload.spot,expected_move=payload.expected_move,
         width=payload.width,minimum_pop=payload.minimum_pop,user=user,session=session)
     return reviewed_position(result,payload)
+
+@router.post("/dry-run")
+def preview_dry_run(payload:PositionReviewRequest,user=Depends(preview_access),session:Session=Depends(get_db)):
+    from bxk_app.services.workbench_analysis import analyze_condors
+    from bxk_app.services.workbench_dry_run import run_dry_run
+    broker=scoped_broker(session,user)
+    snapshot=quote_snapshot(broker,payload.expiration,payload.min_strike,payload.max_strike)
+    try:
+        result=analyze_condors(snapshot,payload.spot,payload.expected_move,payload.width,payload.minimum_pop)
+    except ValueError:
+        raise HTTPException(400,"Invalid analysis inputs") from None
+    result["checked_at"]=snapshot["checked_at"]
+    review=reviewed_position(result,payload)
+    return run_dry_run(review,payload,broker,session,user)
