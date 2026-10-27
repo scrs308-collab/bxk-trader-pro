@@ -327,5 +327,11 @@ def home(
         )
 
     return FileResponse(
-        "static/index.html"
+        "static/production-dashboard.html"
     )
+
+
+@app.get("/workbench", include_in_schema=False)
+def workbench_preview_page(request: Request):
+    from bxk_app.workbench_preview import workbench_page
+    return workbench_page(request)
