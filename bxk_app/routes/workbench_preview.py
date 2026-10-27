@@ -2,16 +2,17 @@
 import os
 import math
 from datetime import date, datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from bxk_app.authorization import require_owner
 from bxk_app.database import get_db
 
 router = APIRouter(prefix="/api/workbench-preview", tags=["Workbench preview"])
 
-def preview_access(user=Depends(require_owner)):
+def preview_access(response: Response, user=Depends(require_owner)):
     if os.getenv("BXK_WORKBENCH_PREVIEW_ENABLED", "").strip().lower() != "true":
         raise HTTPException(404, "Not found")
+    response.headers["Cache-Control"]="no-store"
     return user
 
 def scoped_broker(session, user):
