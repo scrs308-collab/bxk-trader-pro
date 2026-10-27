@@ -3,7 +3,7 @@ name: BXK Test Suite
 on:
   pull_request:
     branches:
-      - feature/unified-trade-workbench
+      - main
   workflow_dispatch:
 
 jobs:
