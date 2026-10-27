@@ -358,6 +358,7 @@
         body:JSON.stringify(orderPayload)
       });
       const data=await response.json();
+      if(selectedReview!==reviewRequest)return;
       if(!response.ok){
         brokerStatus.textContent="Broker dry-run unavailable ("+response.status+"): "+(typeof data.detail==="object" ? ("Broker HTTP "+data.detail.broker_http_status+", code "+data.detail.broker_error_code+(data.detail.broker_detail_codes?.length ? "; details: "+data.detail.broker_detail_codes.join(", ") : "")+". No order submitted.") : (data.detail||"No broker validation returned."));
         return;
