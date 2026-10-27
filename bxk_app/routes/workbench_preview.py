@@ -122,3 +122,19 @@ def quotes(
     user=Depends(preview_access), session: Session=Depends(get_db),
 ):
     return quote_snapshot(scoped_broker(session,user), expiration,min_strike,max_strike)
+
+@router.get("/condors")
+def condors(
+    expiration: str=Query(..., pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"),
+    min_strike: float=Query(..., gt=0), max_strike: float=Query(..., gt=0),
+    spot: float=Query(..., gt=0), expected_move: float=Query(..., gt=0),
+    width: float=Query(10, gt=0, le=100), minimum_pop: float=Query(70, ge=1, le=99),
+    user=Depends(preview_access), session: Session=Depends(get_db),
+):
+    from bxk_app.services.workbench_analysis import analyze_condors
+    snapshot=quote_snapshot(scoped_broker(session,user),expiration,min_strike,max_strike)
+    try:
+        result=analyze_condors(snapshot,spot,expected_move,width,minimum_pop)
+    except ValueError:
+        raise HTTPException(400,"Invalid analysis inputs") from None
+    return dict(result,expiration=expiration,user_scoped=True,checked_at=snapshot["checked_at"])
