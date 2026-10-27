@@ -84,3 +84,16 @@ class DryRunTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class RejectionDiagnosticsTests(DryRunTests):
+    def test_nested_codes_exposed_without_broker_messages(self):
+        from fastapi import HTTPException
+        response = Mock(ok=False, status_code=422)
+        response.json.return_value = {"error": {"code": "preflight_check_failure", "errors": [
+            {"code": "order.invalid_price_increment", "message": "private account data"},
+            {"code": "unsafe code with spaces"}]}}
+        with patch.object(adapter, "get_quotes", return_value={"quotes": self.quotes}), patch.object(adapter, "_headers", return_value={}), patch.object(adapter.requests, "post", return_value=response):
+            with self.assertRaises(HTTPException) as caught:
+                adapter.preview(self.order)
+        self.assertEqual(caught.exception.detail["broker_detail_codes"], ["order.invalid_price_increment"])
+        self.assertNotIn("private account data", str(caught.exception.detail))
