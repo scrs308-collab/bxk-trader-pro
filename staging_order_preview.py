@@ -70,10 +70,18 @@ def preview(payload):
         )
         if not response.ok:
             # Return a bounded broker HTTP status and safe error codes, never account data.
+            detail_codes = []
             try:
                 body = response.json()
                 errors = body.get("error", {}) if isinstance(body, dict) else {}
                 if isinstance(errors, dict):
+                    # Only bounded code fields leave the adapter, never broker messages.
+                    nested = errors.get("errors", [])
+                    if isinstance(nested, list):
+                        for item in nested[:10]:
+                            candidate = item.get("code") if isinstance(item, dict) else None
+                            if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", candidate):
+                                detail_codes.append(candidate)
                     code = errors.get("code") or errors.get("error-code")
                 else:
                     code = None
@@ -84,6 +92,7 @@ def preview(payload):
                 "reason": "Broker rejected dry-run request",
                 "broker_http_status": response.status_code,
                 "broker_error_code": safe_code,
+                "broker_detail_codes": detail_codes,
             })
         data = response.json().get("data", {})
     except (requests.RequestException, ValueError):
