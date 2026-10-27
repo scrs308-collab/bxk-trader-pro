@@ -73,6 +73,27 @@ class DryRunTests(unittest.TestCase):
             self.assertEqual(caught.exception.status_code, 409)
             post.assert_not_called()
 
+    def test_changed_premium_never_reaches_broker(self):
+        self.quotes[0]["bid"] += 0.50
+        self.quotes[0]["ask"] += 0.50
+        self.assert_quote_rejected_without_broker()
+
+    def test_missing_leg_never_reaches_broker(self):
+        self.quotes.pop()
+        self.assert_quote_rejected_without_broker()
+
+    def test_future_quote_never_reaches_broker(self):
+        self.quotes[0]["timestamp"] = (datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat()
+        self.assert_quote_rejected_without_broker()
+
+    def assert_quote_rejected_without_broker(self):
+        with patch.object(adapter, "get_quotes", return_value={"quotes": self.quotes}), \
+             patch.object(adapter.requests, "post") as post:
+            with self.assertRaises(HTTPException) as caught:
+                adapter.preview(self.order)
+            self.assertEqual(caught.exception.status_code, 409)
+            post.assert_not_called()
+
     def test_live_flag_never_reaches_broker(self):
         with patch.dict(os.environ, {"BXK_LIVE_TRADING_ENABLED": "true"}), \
              patch.object(adapter.requests, "post") as post:
