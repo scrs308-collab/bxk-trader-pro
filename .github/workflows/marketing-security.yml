@@ -1,0 +1,16 @@
+name: Marketing certificate security
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image-trust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fresh image and certificate packages
+        run: docker build --pull --no-cache -t bxk-marketing-security marketing-site
+      - name: Verify image rejects compromised certificates
+        run: docker run --rm --entrypoint python bxk-marketing-security check_tls_trust.py --probe
