@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101b32" />
+  <link rel="manifest" href="/static/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/static/bxk-icon-192.png" />
+
+  <title>BXK Trader Pro</title>
+
+  <link rel="stylesheet" href="/static/style.css?v=30" />
+  <link rel="stylesheet" href="/static/position-v10.css?v=1" />
+  <link rel="icon" href="/static/favicon.ico" />
+</head>
+
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <div>
+        <h1>BXK Trader Pro</h1>
+        <p>Live Market Intelligence</p>
+      </div>
+
+      <div class="status-pill" id="apiStatus">
+        ● Connecting
+      </div>
+    </header>
+
+    <nav
+  class="dashboard-tabs"
+  aria-label="Dashboard sections"
+>
+  <button
+    type="button"
+    class="dashboard-tab active"
+    data-tab="tradeSetup"
+  >
+    Trade Setup
+  </button>
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="positionMonitorTab"
+    data-authenticated-only="true"
+  >
+    Position Monitor
+  </button>
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="marketSummaryTab"
+  >
+    Market Summary
+  </button>
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="strategiesTab"
+  >
+    Strategies
+  </button>
+
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="performanceTab"
+    data-trading-only="true"
+  >
+    Performance
+  </button>
+
+  <a
+    class="dashboard-tab dashboard-tab-link"
+    href="/sms-opt-in"
+    data-authenticated-only="true"
+  >
+    SMS Alerts
+  </a>
+
+  <a
+    class="dashboard-tab dashboard-tab-link"
+    href="/subscription"
+    data-authenticated-only="true"
+  >
+    Billing
+  </a>
+
+  <button
+    type="button"
+    class="dashboard-tab"
+    data-tab="systemTab"
+    data-trading-only="true"
+  >
+    System
+  </button>
+</nav>
+
+<div
+  id="tradeSetup"
+  class="dashboard-tab-panel active"
+>
+ <div class="trade-parameters">
+  <div class="trade-parameter">
+    <label for="underlyingSelector">
+      Underlying
+    </label>
+
+    <div class="underlying-input-row">
+      <input
+        id="underlyingSelector"
+        type="text"
+        value="SPX"
+        maxlength="16"
+        autocomplete="off"
+        spellcheck="false"
+        list="underlyingSuggestions"
+        aria-label="Option underlying symbol"
+      />
+
+      <button
+        id="underlyingLoadButton"
+        class="underlying-load-button"
+        type="button"
+      >
+        LOAD
+      </button>
+    </div>
+
+    <datalist id="underlyingSuggestions">
+      <option value="SPX"></option>
+      <option value="QQQ"></option>
+      <option value="SPY"></option>
+      <option value="IWM"></option>
+      <option value="DIA"></option>
+      <option value="XSP"></option>
+    </datalist>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="strategySelector">
+      Strategy
+    </label>
+
+    <select id="strategySelector">
+      <option value="auto">
+        BXK Auto
+      </option>
+  
+
+      <option value="iron_condor">
+        Iron Condor
+      </option>
+
+      <option value="reverse_iron_condor">Reverse Iron Condor</option>
+      <option value="butterfly">Butterfly</option>
+      <option value="bull_put_credit_spread">
+        Bull Put Credit Spread
+      </option>
+
+      <option value="bear_call_credit_spread">
+        Bear Call Credit Spread
+      </option>
+      <option value="debit_call_spread">Debit Call Spread</option>
+      <option value="debit_put_spread">Debit Put Spread</option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="dteSelector">
+      Expiration
+    </label>
+
+    <select id="dteSelector">
+      <option value="0">0 DTE</option>
+      <option value="1" selected>1 DTE</option>
+      <option value="2">2 DTE</option>
+      <option value="3">3 DTE</option>
+      <option value="7">7 DTE</option>
+      <option value="10">10 DTE</option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="wingWidthSelector">
+      Wing Width
+    </label>
+
+    <select id="wingWidthSelector">
+      <option value="5">5 Points</option>
+      <option value="10">10 Points</option>
+      <option value="20">20 Points</option>
+      <option value="25" selected>
+        25 Points
+      </option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="contractsSelector">
+      Contracts
+    </label>
+
+    <select id="contractsSelector">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="10">10</option>
+    </select>
+  </div>
+
+  <div class="trade-parameter">
+    <label for="popTargetSelector">Condor POP target</label>
+    <select id="popTargetSelector" aria-describedby="popTargetHelp">
+      <option value="" selected>Auto (current selection)</option>
+      <option value="80">80% · Conservative</option>
+      <option value="75">75% · Balanced</option>
+      <option value="70">70% · Higher premium</option>
+    </select>
+    <small id="popTargetHelp">Delta based estimate that both shorts expire OTM. Each short's OTM% differs. Quality scores use the selected profile.</small>
+  </div>
+
+  <div class="trade-parameter trade-parameter-action">
+    <button
+      id="buildTradeButton"
+      class="build-trade-button"
+      type="button"
+    >
+      BUILD TRADE
+    </button>
+  </div>
+</div>
+
+<div
+  id="underlyingModeNotice"
+  class="underlying-mode-notice spx-mode"
+>
+  SPX | STANDARD MODE
+</div>
+
+<div
+  id="closingFlowRiskBanner"
+  class="closing-flow-risk-banner"
+  hidden
+></div>
+
+    <section
+  id="bestTradeCard"
+  class="trade-hero"
+>
+  <div class="hero-loading">
+    Loading BXK Trade Engine...
+  </div>
+</section>
+
+  <section class="card thermo-card">
+
+    <div class="card-label">
+        BXK Market Readiness
+    </div>
+
+    <div class="thermo-status" id="thermoStatus">
+        WAIT
+    </div>
+
+    <div class="thermo-bar">
+
+        <div class="thermo-fill" id="thermoFill"></div>
+
+        <div class="thermo-pointer" id="thermoPointer">
+            ▲
+        </div>
+
+    </div>
+
+    <div class="thermo-scale">
+        <span>0</span>
+        <span>25</span>
+        <span>50</span>
+        <span>75</span>
+        <span>100</span>
+    </div>
+
+    <div class="thermo-score">
+        <span id="thermoValue">0</span>
+    </div>
+
+    <div class="thermo-message" id="thermoMessage">
+        Waiting for market...
+    </div>
+
+    <div class="thermo-blockers">
+  <div class="thermo-blockers-title">
+    Market Conditions
+  </div>
+
+  <div id="thermoBlockers">
+    Waiting for market data...
+  </div>
+</div>
+</section>
+      <section class="card checklist-card">
+
+  <div class="card-label">
+    Why This Trade Scores
+  </div>
+
+  <div id="tradeChecklist">
+    Waiting for trade-quality data...
+  </div>
+
+</section>
+
+<section class="card bxk-coach-card full-width">
+
+  <div class="card-label">
+    MISSION BRIEF
+  </div>
+
+  <div class="bxk-coach-grid">
+
+    <div class="coach-command-block">
+
+      <div class="coach-eyebrow">
+        MISSION STATUS
+      </div>
+
+      <div
+        class="coach-command"
+        id="coachCommand"
+      >
+        Waiting for market data...
+      </div>
+
+      <div
+        class="coach-explanation"
+        id="coachExplanation"
+      >
+        The coach will evaluate market score, trade state,
+        probability, credit quality, and risk.
+      </div>
+
+    </div>
+
+    <div class="coach-metrics">
+
+      <div class="coach-metric">
+        <span>Position Size</span>
+        <strong id="coachSize">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Minimum Credit</span>
+        <strong id="coachCredit">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Take Profit</span>
+        <strong id="coachTakeProfit">--</strong>
+      </div>
+
+      <div class="coach-metric">
+        <span>Stop Rule</span>
+        <strong id="coachStop">--</strong>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div
+    class="coach-reasons"
+    id="coachReasons"
+  >
+    <div class="coach-reason neutral">
+      Waiting for the trade engine...
+    </div>
+  </div>
+
+</section>
+
+<main class="dashboard">
+      
+      <section class="card decision-card">
+
+    <div class="card-label">
+        Decision
+    </div>
+
+    <div
+        class="decision-score"
+        id="score">
+        --
+    </div>
+
+    <div
+        class="decision-grade"
+        id="scoreGrade">
+        Grade --
+    </div>
+
+    <div
+        class="decision-action"
+        id="tradeState">
+        --
+    </div>
+
+</section>
+
+          
+      <section class="card">
+        <div class="card-label">Trend</div>
+        <div class="metric" id="trend">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">VIX State</div>
+        <div class="metric" id="vixState">--</div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Expected Move</div>
+        <div class="metric" id="expectedMove">--</div>
+      </section>
+         
+
+    </main>
+
+  </div>
+
+<div
+  id="positionMonitorTab"
+  class="dashboard-tab-panel"
+  data-authenticated-only="true"
+>
+  <section
+    class="card position-monitor-card"
+    style="width: 100%;"
+  >
+    <div class="card-label">
+      Live Position Monitor
+    </div>
+
+    <div id="positionMonitor">
+      Loading open position...
+    </div>
+  </section>
+</div>
+
+<div
+  id="marketSummaryTab"
+  class="dashboard-tab-panel"
+>
+  <section class="card">
+    <div class="card-label">
+      Market Summary
+    </div>
+
+    <div id="marketSummary">
+      Loading market summary...
+    </div>
+  </section>
+</div>
+<div
+  id="strategiesTab"
+  class="dashboard-tab-panel"
+>
+  <section class="card">
+    <div class="card-label">
+      BXK Strategy Playbook
+    </div>
+
+    <div id="strategyPlaybook">
+      Loading strategy recommendations...
+    </div>
+  </section>
+</div>
+
+
+<div
+  id="performanceTab"
+  class="dashboard-tab-panel"
+  data-trading-only="true"
+>
+  <section class="card">
+    <div class="journal-header-row">
+      <div>
+        <div class="card-label">
+          Trade Performance
+        </div>
+
+        <div
+          id="journalPerformanceStatus"
+          class="journal-subtitle"
+        >
+          Performance data loads when this tab is opened.
+        </div>
+      </div>
+
+      <button
+        id="journalRefreshButton"
+        class="journal-refresh-button"
+        type="button"
+      >
+        REFRESH
+      </button>
+    </div>
+
+    <div
+      id="journalPerformanceSummary"
+      class="journal-performance-grid"
+    >
+      <div class="journal-loading">
+        Open Performance to load journal statistics.
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-label">
+      Recent Trades
+    </div>
+
+    <div id="journalRecentTrades">
+      Performance history has not been loaded yet.
+    </div>
+  </section>
+
+  <section class="card stop-audit" id="stopAuditSection" aria-labelledby="stopAuditHeading">
+    <div class="journal-header-row">
+      <div>
+        <h2 class="card-label" id="stopAuditHeading">Stop Audit</h2>
+        <p class="stop-audit-subtitle">Observe the hypothetical hold after a confirmed stop-out.</p>
+        <p id="stopAuditStatus" class="stop-audit-status" role="status" aria-live="polite">
+          Stop Audit loads when this tab is opened.
+        </p>
+      </div>
+      <button id="stopAuditRefreshButton" class="journal-refresh-button" type="button">REFRESH</button>
+    </div>
+
+    <div class="stop-audit-notice">
+      <strong>Observation only. No positions reopened or orders placed.</strong>
+      <p>First release: account-verified Tastytrade SPXW PM-settled iron condors. A closed trade is not automatically a stop-out. Sampling starts only when you explicitly enroll it; the earlier gap is unobserved.</p>
+      <p>Regular-session quotes are sampled about once a minute. Midpoint marks are estimates, not executable fills. Breakeven, profit, best and worst values refer only to valid observed samples, not every moment of the hold. Expiration P/L requires verified settlement data; an unavailable value is never treated as $0.</p>
+    </div>
+
+    <h3 class="stop-audit-section-heading">Tracked stop-outs</h3>
+    <div id="stopAuditList" class="stop-audit-list">
+      <p class="stop-audit-empty">Open Performance to load your audits.</p>
+    </div>
+
+    <div class="stop-audit-enrollment">
+      <h3 class="stop-audit-section-heading">Enroll a closed condor</h3>
+      <p id="stopAuditCandidateStatus" class="stop-audit-subtitle">Eligible closed trades will appear here for your confirmation.</p>
+      <form id="stopAuditForm" hidden>
+        <fieldset id="stopAuditFields">
+          <legend class="stop-audit-sr-only">Confirm a stop-out and enter total estimated costs</legend>
+          <label class="stop-audit-field" for="stopAuditCandidate">
+            <span>Closed trade</span>
+            <select id="stopAuditCandidate" name="journal_id" required aria-describedby="stopAuditCandidateSummary"></select>
+          </label>
+          <p id="stopAuditCandidateSummary" class="stop-audit-subtitle"></p>
+
+          <p id="stopAuditCostHelp" class="stop-audit-cost-help">Enter your estimated fees and commissions in USD, total for the entire position. All three amounts are required. Enter 0 only if you estimate no cost.</p>
+          <div class="stop-audit-cost-grid">
+            <label class="stop-audit-field" for="stopAuditEntryCosts">
+              <span>Entry costs ($ total)</span>
+              <input id="stopAuditEntryCosts" name="entry_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+            <label class="stop-audit-field" for="stopAuditActualExitCosts">
+              <span>Actual stop-close costs ($ total)</span>
+              <input id="stopAuditActualExitCosts" name="actual_exit_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+            <label class="stop-audit-field" for="stopAuditHypotheticalExitCosts">
+              <span>Hypothetical exit costs ($ total)</span>
+              <input id="stopAuditHypotheticalExitCosts" name="hypothetical_exit_costs" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required autocomplete="off" aria-describedby="stopAuditCostHelp" />
+            </label>
+          </div>
+          <p class="stop-audit-subtitle">These are user estimates, not broker-verified costs. Hypothetical net P/L subtracts entry and hypothetical exit costs, and excludes the actual stop-close fee.</p>
+          <label class="stop-audit-confirm" for="stopAuditConfirm">
+            <input id="stopAuditConfirm" name="confirm_stop_out" type="checkbox" required />
+            <span>I confirm this selected position was closed because my stop was hit.</span>
+          </label>
+          <button id="stopAuditEnrollButton" class="stop-audit-primary" type="submit">Confirm stop-out and track</button>
+        </fieldset>
+      </form>
+      <p id="stopAuditFormMessage" class="stop-audit-form-message" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+</div>
+
+<div
+  id="systemTab"
+  class="dashboard-tab-panel"
+  data-trading-only="true"
+>
+  <section class="card" id="accountStatusBanner">
+    <div class="card-label">Account &amp; Trading Status</div>
+    Loading broker connections...
+  </section>
+
+  <section class="card" id="brokerConnectionSetup" hidden></section>
+
+  <section class="card" data-beta-only="true">
+    <div class="card-label">Trading Settings</div>
+    <form id="buyingPowerReserveForm" class="bxk-settings-form">
+      <label class="bxk-settings-field" for="myBuyingPowerReserve">
+        <span>Minimum Remaining Buying Power ($)</span>
+        <input id="myBuyingPowerReserve" type="number" min="0" step="0.01" required />
+      </label>
+      <button type="submit">Save Reserve</button>
+      <span id="buyingPowerReserveStatus" role="status"></span>
+    </form>
+    <p>This reserve applies to your own Tastytrade order checks.</p>
+  </section>
+
+
+  <section
+    class="card"
+    id="commercialReadinessCard"
+    data-owner-only="true"
+    hidden
+  >
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+      "
+    >
+      <div class="card-label">
+        Commercial Readiness
+      </div>
+
+      <button
+        id="refreshCommercialReadiness"
+        type="button"
+      >
+        Refresh
+      </button>
+    </div>
+
+    <div
+      id="commercialReadinessPanel"
+      style="margin-top:12px;"
+    >
+      Loading...
+    </div>
+  </section>
+
+  <section class="card" data-owner-only="true">
+    <div class="card-label">
+      BXK System Control Room
+    </div>
+
+    <div id="systemDashboard">
+      Loading system status...
+    </div>
+  </section>
+
+  <section class="card" data-owner-only="true">
+    <div class="card-label">
+      BXK System Settings
+    </div>
+
+    <div id="systemSettingsPanel">
+      Loading system settings...
+    </div>
+  </section>
+
+
+
+  <section
+    class="card"
+    id="adminRequestsCard"
+    data-owner-only="true"
+    hidden
+  >
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+      "
+    >
+      <div class="card-label">
+        Access &amp; Support Requests
+      </div>
+
+      <button
+        id="bxkRefreshAdminRequests"
+        type="button"
+      >
+        Refresh
+      </button>
+    </div>
+
+    <div
+      style="
+        display:grid;
+        grid-template-columns:
+          repeat(auto-fit,minmax(280px,1fr));
+        gap:14px;
+        margin-top:12px;
+      "
+    >
+      <div>
+        <strong>Access Requests</strong>
+        <div id="bxkAccessRequestsList">
+          Loading...
+        </div>
+      </div>
+
+      <div>
+        <strong>Support Requests</strong>
+        <div id="bxkSupportRequestsList">
+          Loading...
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="bxkAdminRequestsMessage"
+      style="
+        margin-top:10px;
+        font-size:12px;
+        opacity:.75;
+      "
+    ></div>
+  </section>
+
+  <section
+    class="card"
+    id="adminUsersCard"
+    data-owner-only="true"
+    hidden
+  >
+    <div class="card-label">
+      BXK User Administration
+    </div>
+
+    <div id="adminUsersPanel">
+      Loading users...
+    </div>
+  </section>
+</div>
+</div>
+<script type="module" src="/static/dashboard.js?v=39"></script>
+<script type="module" src="/static/buying-power-reserve.js?v=2"></script>
+     
+   
+</body>
+</html>
+
+<script src="/static/theme.js?v=2"></script>
