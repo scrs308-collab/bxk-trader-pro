@@ -335,3 +335,7 @@ def home(
 def workbench_preview_page(request: Request):
     from bxk_app.workbench_preview import workbench_page
     return workbench_page(request)
+
+
+from bxk_app.routes.workbench_preview import router as workbench_preview_router
+app.include_router(workbench_preview_router)
