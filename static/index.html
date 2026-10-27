@@ -156,6 +156,9 @@
         </div>
         <button type="button" class="bxk-mode" id="wbClosePreview">Close review</button>
       </section>
+      <details id="wbStagingDiagnostics">
+        <summary>Staging safety tests</summary>
+        <p>Run recovery scenarios once, restart staging, then verify recovery. Running new scenarios creates a new receipt.</p>
       <section id="wbReplayPanel" hidden>
         <h3>Staging restart rehearsal</h3>
         <p>The last simulation is retained in this browser tab for replay testing across a staging restart. No broker order is sent.</p>
@@ -171,6 +174,7 @@
         <p id="wbReconciliationStatus" role="status"></p>
         <p id="wbReconciliationRecovery" role="status"></p>
       </section>
+      </details>
       <section aria-labelledby="wbCertRecoveryTitle">
         <h3 id="wbCertRecoveryTitle">Certification order recovery</h3>
         <p>Tracks sandbox orders using simulated money. Unresolved attempts stay blocked while broker records are checked.</p>
