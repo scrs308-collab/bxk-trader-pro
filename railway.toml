@@ -2,6 +2,7 @@
 builder = "RAILPACK"
 
 [deploy]
+preDeployCommand = ["python scripts/check_tls_trust.py --probe"]
 startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 120

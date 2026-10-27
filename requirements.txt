@@ -1,6 +1,9 @@
+-c dependencies.constraints
 fastapi
 uvicorn
 requests
 python-dotenv
 pydantic
 tastytrade
+certifi>=2026.10.19
+cryptography==50.0.1
