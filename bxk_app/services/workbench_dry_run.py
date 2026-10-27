@@ -75,7 +75,16 @@ def run_dry_run(review,payload,broker,session,user,policy=None):
     raw=broker.preview_order(order,account_number=account)
     if not isinstance(raw,dict):
         raise HTTPException(502,"Broker rejected dry-run; no order submitted")
-    evaluation=policy["evaluate"](raw,order,min_remaining_buying_power=reserve)
+    try:
+        broker_data=raw.get("broker_response",{}).get("data",{})
+        broker_errors=broker_data.get("errors",[])
+        evaluation=policy["evaluate"](raw,order,min_remaining_buying_power=reserve)
+    except (AttributeError,TypeError,ValueError,KeyError):
+        raise HTTPException(502,"Invalid broker dry-run response; no order submitted") from None
+    errors_absent=isinstance(broker_errors,list) and not broker_errors
+    evaluation["checks"].append({"name":"broker_errors_absent","passed":errors_absent,
+        "message":"No broker errors returned." if errors_absent else "Broker returned errors; review blocked."})
+    evaluation["passed"]=bool(evaluation["passed"] and errors_absent)
     # Never expose raw broker responses, account identifiers or execution tokens.
     return {"passed":evaluation["passed"],"checks":checks+evaluation["checks"],
             "buying_power":evaluation.get("buying_power"),"fees":evaluation.get("fees"),
