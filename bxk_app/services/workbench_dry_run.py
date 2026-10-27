@@ -31,6 +31,7 @@ def build_review_order(review, payload):
 def production_policy():
     from bxk_app.routes import order
     return {"validate":order._validate_order,"overlap":order._check_existing_position_overlap,
+            "live_overlap":order._check_existing_order_overlap,
             "evaluate":order._evaluate_broker_dry_run,"reserve":order._user_buying_power_reserve,
             "session":order._execution_session_gate}
 
@@ -59,6 +60,17 @@ def run_dry_run(review,payload,broker,session,user,policy=None):
                    "message":overlap["message"]})
     if not overlap["passed"]:
         return {"passed":False,"checks":checks,"broker_contacted":True,
+                "order_submission_available":False,"review_lock_issued":False}
+    live_orders=broker.get_live_orders(account_number=account)
+    if broker.last_error or not isinstance(live_orders,list):
+        raise HTTPException(503,"Existing orders could not be verified")
+    live_overlap=policy["live_overlap"](order,live_orders)
+    checks.append({"name":"existing_order_overlap","passed":live_overlap["passed"],
+                   "message":live_overlap["message"]})
+    rechecks,errors=policy["validate"](order,requested_dte=order["dte"],
+        requested_wing_width=int(payload.width),requested_contracts=1)
+    if not live_overlap["passed"] or errors:
+        return {"passed":False,"checks":checks+rechecks,"broker_contacted":True,
                 "order_submission_available":False,"review_lock_issued":False}
     raw=broker.preview_order(order,account_number=account)
     if not isinstance(raw,dict):
