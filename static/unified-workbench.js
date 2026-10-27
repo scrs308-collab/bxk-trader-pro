@@ -327,9 +327,15 @@
     const compact=expiry.slice(2,4)+expiry.slice(5,7)+expiry.slice(8,10);
     return "SPXW  "+compact+type+String(Math.round(strike*1000)).padStart(8,"0");
   };
+  const setBuyingPowerSummary=text=>{
+    const cell=document.getElementById("wbBuyingPowerSummary");
+    if(cell)cell.textContent=text;
+  };
   brokerButton.addEventListener("click",async()=>{
     if(!selectedReview)return;
-    const {c,expiry,selectedAt}=selectedReview;
+    const reviewRequest=selectedReview;
+    const {c,expiry,selectedAt}=reviewRequest;
+    setBuyingPowerSummary("Not verified — broker check required");
     const quoteAge=Date.now()-Date.parse(c.oldestQuote||"");
     if(!c.fresh || !Number.isFinite(quoteAge) || quoteAge>120000 || quoteAge< -60000 || Date.now()-selectedAt>30000){
       brokerStatus.textContent="Quote snapshot expired. Reload SPXW quotes before broker dry-run.";
@@ -398,6 +404,9 @@
         const li=document.createElement("li");li.textContent=line;list.appendChild(li);
       }
       brokerStatus.appendChild(list);
+      setBuyingPowerSummary(data.all_checks_pass===true && data.server_quote_verified===true
+        ? "Verified by broker dry-run: "+money(data.broker_buying_power_change)+" (including fees); snapshot only"
+        : "Not verified — broker dry-run requires review");
       if(data.all_checks_pass===true && data.server_quote_verified===true && data.execution_authorized===false){
         // Server repeats fresh quote verification and broker dry-run before issuing token.
         const issueResponse=await fetch("/api/workbench/confirmation-issue",{
@@ -445,7 +454,9 @@
     rows.forEach(([name,value])=>{
       const tr=document.createElement("tr");
       for(const cellValue of [name,value]){
-        const td=document.createElement("td");td.textContent=String(cellValue);tr.appendChild(td);
+        const td=document.createElement("td");td.textContent=String(cellValue);
+        if(name==="Buying power requirement" && tr.children.length===1)td.id="wbBuyingPowerSummary";
+        tr.appendChild(td);
       }
       body.appendChild(tr);
     });
