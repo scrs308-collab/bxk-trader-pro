@@ -103,6 +103,40 @@
     }catch(error){status.textContent=error.message;}
     finally{load.disabled=false;}
   });
+  function renderDryRun(container,result) {
+    container.replaceChildren();container.className="dry-run-result";
+    const checks=Array.isArray(result.checks)?result.checks:[];
+    const blocked=checks.filter(check=>check.passed!==true);
+    const passed=checks.filter(check=>check.passed===true);
+    const summary=document.createElement("p");
+    summary.className=result.passed?"review-outcome passed":"review-outcome blocked";
+    summary.textContent=result.passed?"Dry-run passed · No order submitted":"Dry-run blocked · No order submitted";
+    container.appendChild(summary);
+    if(blocked.length){
+      const list=document.createElement("ul");list.className="blocked-reasons";
+      for(const check of blocked){const item=document.createElement("li");item.textContent=check.message;list.appendChild(item);}
+      container.appendChild(list);
+    }
+    const money=value=>value!==null && value!==undefined && Number.isFinite(Number(value))
+      ? new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(value)):"Unavailable";
+    if(result.buying_power){
+      const totals=document.createElement("dl");totals.className="review-totals";
+      for(const [label,value] of [["Broker impact (including fees)",result.buying_power.impact],["Broker fees",result.fees],["Buying power remaining",result.buying_power.remaining],["Minimum reserve",result.minimum_reserve]]){
+        const term=document.createElement("dt"),amount=document.createElement("dd");
+        term.textContent=label;amount.textContent=money(value);totals.appendChild(term);totals.appendChild(amount);
+      }
+      container.appendChild(totals);
+    }
+    if(passed.length){
+      const details=document.createElement("details"),heading=document.createElement("summary"),list=document.createElement("ul");
+      heading.textContent=passed.length+" checks passed — view details";details.appendChild(heading);
+      for(const check of passed){const item=document.createElement("li");item.textContent="PASS: "+check.message;list.appendChild(item);}
+      details.appendChild(list);container.appendChild(details);
+    }
+    const note=document.createElement("p");note.className="help";
+    note.textContent="Snapshot only. No execution lock or order created. Live submission remains unavailable.";
+    container.appendChild(note);
+  }
   const analyze=document.getElementById("analyzeCondors");
   analyze.addEventListener("click",async()=>{
     const status=document.getElementById("analysisStatus"),output=document.getElementById("analysisResults");
@@ -164,18 +198,7 @@
                 if(!response.ok)throw new Error(response.status===409?"Quotes or position changed. Reload and review again.":"Dry-run unavailable ("+response.status+"). No order submitted.");
                 const result=await response.json();
                 if(result.order_submission_available!==false||result.review_lock_issued!==false)throw new Error("Unexpected dry-run response");
-                dryStatus.replaceChildren();
-                const summary=document.createElement("p");
-                summary.textContent=result.passed?"Dry-run passed. No order submitted; execution unavailable.":"Dry-run blocked. No order submitted.";
-                dryStatus.appendChild(summary);
-                const list=document.createElement("ul");
-                for(const check of result.checks||[]){const item=document.createElement("li");item.textContent=(check.passed?"PASS: ":"BLOCKED: ")+check.message;list.appendChild(item);}
-                dryStatus.appendChild(list);
-                if(result.buying_power){
-                  const bp=document.createElement("p");
-                  bp.textContent="Broker impact $"+result.buying_power.impact+"; fees $"+result.fees+"; remaining $"+result.buying_power.remaining+"; minimum reserve $"+result.minimum_reserve+". Snapshot only.";
-                  dryStatus.appendChild(bp);
-                }
+                renderDryRun(dryStatus,result);
               }catch(error){dryStatus.textContent=error.message;}
               finally{dryButton.disabled=false;}
             });
