@@ -38,6 +38,10 @@ def test_import_verifies_encrypts_and_is_shared_and_idempotent(setup, monkeypatc
     assert service.import_legacy_owner_connection(session, user_context=context).id == connection.id
     assert len(calls) == 1
     assert service.resolve_tastytrade_broker(session, user_context=context) is not service.owner_broker
+    connection.is_active = False
+    session.commit()
+    assert service.import_legacy_owner_connection(session, user_context=context) is None
+    assert len(calls) == 1
 
 @pytest.mark.parametrize('change', [dict(username='another-owner'), dict(role='BETA'), dict(auth_source='LEGACY'), dict(user_id=None)])
 def test_other_identities_cannot_import(setup, monkeypatch, change):
