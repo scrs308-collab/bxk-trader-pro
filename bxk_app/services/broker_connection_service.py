@@ -502,6 +502,37 @@ def connect_tastytrade_account(
     )
 
 
+def import_legacy_owner_connection(session: Session, *, user_context: dict):
+    """Verify and save the configured owner's existing grant once.
+
+    Only the database owner whose username matches the installation owner
+    may import global credentials. Never replace any existing personal grant.
+    """
+    user_id = _normalized_user_id(user_context)
+    owner_name = str(config.BXK_APP_USERNAME or "").strip()
+    if (user_id is None or _normalized_role(user_context) != UserRole.OWNER.value
+            or user_context.get("auth_source") != "DATABASE"
+            or not owner_name
+            or str(user_context.get("username") or "").strip() != owner_name):
+        return None
+    existing = get_any_user_tastytrade_connection(session, user_id=user_id)
+    if existing is not None:
+        return existing
+    secret = str(config.TASTYTRADE_CLIENT_SECRET or "").strip()
+    token = str(config.TASTYTRADE_REFRESH_TOKEN or "").strip()
+    account = str(config.TASTYTRADE_ACCOUNT_NUMBER or "").strip()
+    if not all((secret, token, account)):
+        return None
+    # The normal connect flow verifies account ownership with the broker,
+    # encrypts both secrets, and synchronizes the user's authorized accounts.
+    # It leaves live trading disabled; importing must never enable trading.
+    connect_tastytrade_account(
+        session, user_context=user_context, client_secret=secret,
+        refresh_token=token, account_number=account,
+    )
+    return get_user_tastytrade_connection(session, user_id=user_id)
+
+
 def list_or_sync_tastytrade_accounts(
     session: Session,
     *,
