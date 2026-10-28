@@ -4,7 +4,36 @@
   const list=document.getElementById("expirationList");
   const expiry=document.getElementById("quoteExpiry");
   const load=document.getElementById("loadQuotes");
+  const move=document.getElementById("analysisMove");
+  const spotInput=document.getElementById("analysisSpot");
+  move.readOnly=true;move.value="";move.placeholder="Auto from ATM quotes";
+  const moveStatus=document.createElement("p");moveStatus.setAttribute("role","status");
+  move.parentElement.after(moveStatus);
+  let latestSnapshot=null;
+  function automaticMove(snapshot,spot,expiration,now=Date.now()) {
+    if(!snapshot || snapshot.expiration!==expiration || !(spot>0) || !Number.isFinite(spot))return null;
+    const quotes=snapshot.quotes||[];
+    const strikes=[...new Set(quotes.map(q=>Number(q.strike)).filter(Number.isFinite))];
+    strikes.sort((a,b)=>Math.abs(a-spot)-Math.abs(b-spot)||a-b);
+    const strike=strikes[0];
+    // Never replace an unavailable nearest ATM pair with a farther strike.
+    if(strike===undefined || spot<Math.min(...strikes) || spot>Math.max(...strikes))return null;
+    const pair=["call","put"].map(type=>quotes.find(q=>q.type===type && Number(q.strike)===strike));
+    if(pair.some(q=>!q || !q.fresh || !Number.isFinite(q.bid) || !Number.isFinite(q.ask) || q.bid<0 || q.ask<q.bid || !Number.isFinite(Date.parse(q.timestamp)) || now-Date.parse(q.timestamp)>120000 || now-Date.parse(q.timestamp)<-60000))return null;
+    const value=pair.reduce((sum,q)=>sum+(q.bid+q.ask)/2,0)*1.2533;
+    return Number.isFinite(value)&&value>0 ? {value,strike} : null;
+  }
+  function populateMove() {
+    const result=automaticMove(latestSnapshot,Number(spotInput.value),expiry.value);
+    move.value=result?result.value.toFixed(2):"";
+    moveStatus.textContent=result ? "Auto expected move: ATM "+result.strike+" call + put midpoints × 1.2533. Normal-distribution estimate, not broker POP."
+      : "Auto expected move unavailable. Enter the SPX reference and load fresh quotes covering its nearest ATM strike.";
+    return result;
+  }
+  spotInput.addEventListener("input",populateMove);
+  expiry.addEventListener("change",()=>{latestSnapshot=null;populateMove();document.getElementById("analysisResults").replaceChildren();});
   button.addEventListener("click", async () => {
+    latestSnapshot=null;populateMove();
     expiry.replaceChildren(); load.disabled=true;
     button.disabled=true; list.replaceChildren(); status.textContent="Checking your verified broker connection...";
     try {
@@ -40,6 +69,7 @@
       if(!response.ok)throw new Error("Quote request rejected ("+response.status+"). Narrow the range or check your connection.");
       const data=await response.json();
       if(data.user_scoped!==true || data.order_submission_available!==false || !Array.isArray(data.quotes))throw new Error("Unexpected quote response");
+      latestSnapshot=data;populateMove();
       const table=document.createElement("table");
       for(const cells of [["Type","Strike","Bid","Ask","Quote time","Freshness"],...data.quotes.map(q=>[q.type,q.strike,q.bid,q.ask,q.timestamp||"Unavailable",q.fresh?"Fresh at retrieval":"Stale or unknown"])]){
         const row=document.createElement("tr");for(const value of cells){const cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell);}table.appendChild(row);
@@ -53,6 +83,15 @@
   analyze.addEventListener("click",async()=>{
     const status=document.getElementById("analysisStatus"),output=document.getElementById("analysisResults");
     output.replaceChildren();
+    // Refresh the ATM inputs before each analysis; never reuse a stale/manual move.
+    move.value="";
+    try {
+      const quoteParams=new URLSearchParams({expiration:expiry.value,min_strike:document.getElementById("quoteMin").value,max_strike:document.getElementById("quoteMax").value});
+      const response=await fetch("/api/workbench-preview/quotes?"+quoteParams,{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok)throw new Error("Fresh ATM quotes unavailable");
+      latestSnapshot=await response.json();
+      if(latestSnapshot.user_scoped!==true || latestSnapshot.order_submission_available!==false || !populateMove())throw new Error("Fresh ATM pair unavailable");
+    } catch { move.value="";status.textContent="Cannot analyze: auto expected move needs a fresh ATM call and put for the selected expiration.";return; }
     const fields={spot:"analysisSpot",expected_move:"analysisMove",width:"analysisWidth",minimum_pop:"analysisPop",min_strike:"quoteMin",max_strike:"quoteMax"};
     const params=new URLSearchParams({expiration:expiry.value});
     for(const [key,id] of Object.entries(fields)){
