@@ -517,7 +517,7 @@ def import_legacy_owner_connection(session: Session, *, user_context: dict):
         return None
     existing = get_any_user_tastytrade_connection(session, user_id=user_id)
     if existing is not None:
-        return existing
+        return existing if existing.is_active else None
     secret = str(config.TASTYTRADE_CLIENT_SECRET or "").strip()
     token = str(config.TASTYTRADE_REFRESH_TOKEN or "").strip()
     account = str(config.TASTYTRADE_ACCOUNT_NUMBER or "").strip()
