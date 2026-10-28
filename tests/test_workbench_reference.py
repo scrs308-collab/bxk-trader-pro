@@ -35,3 +35,10 @@ def test_unusable_spx_reference_blocks_instead_of_using_close(change):
     with pytest.raises(HTTPException) as error:
         spx_reference(broker)
     assert error.value.status_code == 503
+
+
+def test_full_runtime_does_not_register_legacy_shared_workbench_api():
+    from bxk_app.main import app
+    paths = set(app.openapi()['paths'])
+    assert not any(path.startswith('/api/workbench/') for path in paths)
+    assert '/api/workbench-preview/reference' in paths
