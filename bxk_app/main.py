@@ -326,9 +326,21 @@ def home(
             status_code=303,
         )
 
-    return FileResponse(
-        "static/production-dashboard.html"
-    )
+    import os
+    if os.getenv("BXK_WORKBENCH_PREVIEW_ENABLED", "").strip().lower() == "true":
+        from bxk_app.authorization import require_owner
+        try:
+            require_owner(request)
+        except HTTPException:
+            pass
+        else:
+            from pathlib import Path
+            from fastapi.responses import HTMLResponse
+            html = Path("static/production-dashboard.html").read_text()
+            link = '<a href="/workbench" style="color:#164986;background:#e6f2ff;border:1px solid #8db9ec;border-radius:10px;padding:12px 16px;font-weight:700;text-decoration:none">Trade Workbench · Preview</a>'
+            return HTMLResponse(html.replace("</header>", link + "</header>", 1),
+                                headers={"Cache-Control":"no-store"})
+    return FileResponse("static/production-dashboard.html")
 
 
 @app.get("/workbench", include_in_schema=False)
