@@ -10,6 +10,28 @@
   const moveStatus=document.createElement("p");moveStatus.setAttribute("role","status");
   move.parentElement.after(moveStatus);
   let latestSnapshot=null;
+  spotInput.readOnly=true;spotInput.value="";spotInput.placeholder="Auto: current SPX";
+  const spotStatus=document.createElement("p");spotStatus.setAttribute("role","status");
+  spotInput.parentElement.after(spotStatus);
+  async function refreshReference() {
+    spotInput.value="";move.value="";
+    spotStatus.textContent="Retrieving current SPX reference...";
+    try {
+      const response=await fetch("/api/workbench-preview/reference",{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok)throw new Error("SPX reference unavailable");
+      const data=await response.json();
+      const age=Date.now()-Date.parse(data.timestamp);
+      if(data.user_scoped!==true || data.order_submission_available!==false || data.symbol!=="SPX" || data.fresh!==true || !Number.isFinite(data.price) || !(data.price>1000 && data.price<100000) || !Number.isFinite(age) || age>120000 || age< -60000)throw new Error("Fresh SPX reference required");
+      spotInput.value=data.price.toFixed(2);
+      spotStatus.textContent="Auto SPX: tastytrade "+data.price_field+" · "+data.timestamp;
+      populateMove();return true;
+    } catch {
+      spotInput.value="";move.value="";
+      spotStatus.textContent="Current SPX unavailable or stale. Retry loading quotes; analysis requires a fresh reference.";
+      return false;
+    }
+  }
+  refreshReference();
   function automaticMove(snapshot,spot,expiration,now=Date.now()) {
     if(!snapshot || snapshot.expiration!==expiration || !(spot>0) || !Number.isFinite(spot))return null;
     const quotes=snapshot.quotes||[];
@@ -51,6 +73,7 @@
         const item=document.createElement("li"); item.textContent=row.date+" ("+row.dte+" DTE)"; list.appendChild(item);
       }
       load.disabled=data.expirations.length===0;
+      await refreshReference();
       status.textContent=data.expirations.length+" SPXW expirations received using your broker connection. Order submission is unavailable.";
     } catch { status.textContent="Connection check unavailable. No order was submitted."; }
     finally { button.disabled=false; }
@@ -64,6 +87,7 @@
     if(!expiry.value || !(low>0 && high>low && high-low<=400)){status.textContent="Select expiration and a positive strike range of at most 400 points.";return;}
     load.disabled=true;status.textContent="Loading bid/ask quotes...";
     try{
+      if(!await refreshReference())throw new Error("Fresh SPX reference unavailable. Try again shortly.");
       const params=new URLSearchParams({expiration:expiry.value,min_strike:String(low),max_strike:String(high)});
       const response=await fetch("/api/workbench-preview/quotes?"+params,{credentials:"same-origin",cache:"no-store"});
       if(!response.ok)throw new Error("Quote request rejected ("+response.status+"). Narrow the range or check your connection.");
@@ -86,6 +110,7 @@
     // Refresh the ATM inputs before each analysis; never reuse a stale/manual move.
     move.value="";
     try {
+      if(!await refreshReference())throw new Error("Fresh SPX reference unavailable");
       const quoteParams=new URLSearchParams({expiration:expiry.value,min_strike:document.getElementById("quoteMin").value,max_strike:document.getElementById("quoteMax").value});
       const response=await fetch("/api/workbench-preview/quotes?"+quoteParams,{credentials:"same-origin",cache:"no-store"});
       if(!response.ok)throw new Error("Fresh ATM quotes unavailable");
