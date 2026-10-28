@@ -54,6 +54,33 @@ def listed_expirations(broker):
 def expirations(user=Depends(preview_access), session: Session=Depends(get_db)):
     return listed_expirations(scoped_broker(session, user))
 
+def spx_reference(broker):
+    quote = broker.get_index_quote("SPX")
+    if not isinstance(quote, dict) or str(quote.get("symbol") or quote.get("instrument-symbol") or "").lstrip("$").upper() != "SPX":
+        raise HTTPException(503, "SPX index quote unavailable")
+    stamp = quote.get("updated-at") or quote.get("updatedAt") or quote.get("timestamp")
+    try:
+        age = (datetime.now(timezone.utc)-datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))).total_seconds()
+        if not -60 <= age <= 120:
+            raise ValueError("Stale quote")
+    except (ValueError, TypeError, OverflowError):
+        raise HTTPException(503, "Fresh SPX index quote required") from None
+    # Closing prices must never be presented as a current SPX reference.
+    for field in ("last", "last-price", "mark", "mark-price"):
+        try:
+            price = float(quote.get(field))
+        except (ValueError, TypeError):
+            continue
+        if math.isfinite(price) and 1000 < price < 100000:
+            return {"symbol":"SPX", "price":price, "timestamp":stamp,
+                    "price_field":field, "source":"tastytrade", "fresh":True,
+                    "user_scoped":True, "order_submission_available":False}
+    raise HTTPException(503, "SPX quote has no usable current price")
+
+@router.get("/reference")
+def reference(user=Depends(preview_access), session: Session=Depends(get_db)):
+    return spx_reference(scoped_broker(session,user))
+
 def quote_snapshot(broker, expiration, min_strike, max_strike):
     try:
         date.fromisoformat(expiration)
