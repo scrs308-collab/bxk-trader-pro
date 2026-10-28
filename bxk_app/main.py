@@ -36,6 +36,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log configuration state without exposing any credential values.
+    from bxk_app.services.auth_service import auth_configuration_status
+    auth_state = auth_configuration_status()
+    logger.warning(
+        "BXK staging startup configuration: auth_enabled=%s, auth_configured=%s, "
+        "username_configured=%s, password_configured=%s, session_secret_configured=%s, "
+        "preview_mode=%s, live_trading_enabled=%s",
+        auth_state["enabled"], auth_state["configured"],
+        auth_state["username_configured"], auth_state["password_configured"],
+        auth_state["session_secret_configured"], config.BXK_PREVIEW_MODE,
+        config.BXK_LIVE_TRADING_ENABLED,
+    )
     if config.BXK_PREVIEW_MODE:
         logger.info(
             "BXK preview mode enabled. Background "
@@ -314,6 +326,28 @@ def home(
             status_code=303,
         )
 
-    return FileResponse(
-        "static/index.html"
-    )
+    import os
+    if os.getenv("BXK_WORKBENCH_PREVIEW_ENABLED", "").strip().lower() == "true":
+        from bxk_app.authorization import require_owner
+        try:
+            require_owner(request)
+        except HTTPException:
+            pass
+        else:
+            from pathlib import Path
+            from fastapi.responses import HTMLResponse
+            html = Path("static/production-dashboard.html").read_text()
+            link = '<a href="/workbench" style="color:#164986;background:#e6f2ff;border:1px solid #8db9ec;border-radius:10px;padding:12px 16px;font-weight:700;text-decoration:none">Trade Workbench · Preview</a>'
+            return HTMLResponse(html.replace("</header>", link + "</header>", 1),
+                                headers={"Cache-Control":"no-store"})
+    return FileResponse("static/production-dashboard.html")
+
+
+@app.get("/workbench", include_in_schema=False)
+def workbench_preview_page(request: Request):
+    from bxk_app.workbench_preview import workbench_page
+    return workbench_page(request)
+
+
+from bxk_app.routes.workbench_preview import router as workbench_preview_router
+app.include_router(workbench_preview_router)

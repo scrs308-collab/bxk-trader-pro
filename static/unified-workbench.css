@@ -1,0 +1,29 @@
+#unifiedWorkbench { margin-bottom:20px; }
+.bxk-workbench-modes {display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.bxk-mode {padding:12px 20px;border:1px solid #64748b;border-radius:10px;background:transparent;color:inherit;cursor:pointer}
+.bxk-mode.active {background:#157a54;border-color:#22c55e;color:#fff}
+.bxk-workbench-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:16px 0}
+.bxk-workbench-fields label {display:flex;flex-direction:column;gap:7px;font-size:13px}
+.bxk-workbench-fields input {width:100%;padding:10px;border:1px solid #64748b;border-radius:8px;background:var(--input-bg,transparent);color:inherit}
+.bxk-workbench-warning {border-left:3px solid #eab308;padding:10px;margin-top:12px}
+.bxk-workbench-metrics {display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
+.bxk-workbench-metrics span {display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #64748b;border-radius:8px;min-width:130px}
+#workbenchResults svg {margin-top:14px}
+#workbenchManual[hidden], #workbenchSearchNote[hidden] {display:none!important}
+
+.bxk-workbench-table {width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+.bxk-workbench-table th,.bxk-workbench-table td {text-align:left;padding:10px;border-bottom:1px solid #64748b}
+#wbSearchResults {overflow-x:auto}
+.bxk-mode:disabled {opacity:.4;cursor:not-allowed}
+#workbenchSearch[hidden] {display:none!important}
+
+/* Keep legacy BXK Auto cards intact, but show only the user-directed workbench in manual modes. */
+#tradeSetup.bxk-manual-mode > :not(#unifiedWorkbench) { display:none!important; }
+
+#wbOrderPreview {border:1px solid #64748b;border-radius:12px;padding:18px;margin:18px 0;max-width:900px}
+#wbOrderPreview[hidden] {display:none!important}
+#wbOrderPreview h3 {margin-top:0}
+
+/* Isolated staging does not expose the legacy dashboard APIs. */
+#apiStatus {display:none!important}
+#unifiedWorkbench [data-workbench-mode="auto"] {opacity:.45;cursor:not-allowed}

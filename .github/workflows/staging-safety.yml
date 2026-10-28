@@ -1,0 +1,28 @@
+name: Staging confirmation and reconciliation safeguards
+on:
+  push:
+    branches: [feature/unified-trade-workbench]
+    paths:
+      - 'staging_*.py'
+      - 'tests/test_staging*.py'
+      - static/unified-workbench.js
+      - static/index.html
+      - .github/workflows/staging-safety.yml
+  workflow_dispatch:
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install 'fastapi>=0.110,<1' requests httpx
+      - name: Run staging safeguard regression tests
+        run: python -m unittest discover -s tests -p 'test_staging*.py' -v
+      - name: Check staging JavaScript syntax
+        run: node --check static/unified-workbench.js

@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     APIRouter,
@@ -1097,7 +1098,7 @@ def _validate_order(
             ).date()
 
             expiration_valid = (
-                expiration_date >= date.today()
+                expiration_date >= datetime.now(ZoneInfo("America/New_York")).date()
             )
         except ValueError:
             expiration_valid = False
@@ -3275,6 +3276,15 @@ def order_submit_api(
         get_db
     ),
 ):
+    # Defense in depth: preview deployments cannot send real orders,
+    # even if live-trading credentials are accidentally configured.
+    from bxk_app import config
+    if config.BXK_PREVIEW_MODE:
+        raise HTTPException(
+            status_code=403,
+            detail="Live order submission is disabled in preview mode.",
+        )
+
     role_value = user_context.get(
         "role"
     )

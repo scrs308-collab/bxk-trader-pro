@@ -2,8 +2,8 @@
 builder = "RAILPACK"
 
 [deploy]
-preDeployCommand = ["sh -c 'python scripts/check_tls_trust.py --probe && python -m alembic upgrade head'"]
-startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT"
+preDeployCommand = ["python scripts/prepare_runtime.py"]
+startCommand = "python scripts/start_runtime.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ALWAYS"

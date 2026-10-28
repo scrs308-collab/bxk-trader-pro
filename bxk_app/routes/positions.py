@@ -1,3 +1,5 @@
+import os
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -65,6 +67,16 @@ def position_monitor(
                         user_context,
                 )
             )
+
+            # Workbench staging requires a personal broker connection.
+            # Return the setup signal instead of an empty legacy-owner result.
+            if (
+                os.getenv("BXK_WORKBENCH_PREVIEW_ENABLED", "").strip().lower() == "true"
+                and not status.get("connected")
+            ):
+                raise BrokerConnectionRequired(
+                    "Connect and verify your personal Tastytrade account."
+                )
 
             if (
                 status.get("source")

@@ -12,7 +12,7 @@ BXK_ENV_PATH = (
 
 load_dotenv(
     dotenv_path=BXK_ENV_PATH,
-    override=True,
+    override=False,
 )
 
 DATABASE_URL = os.getenv(

@@ -11,6 +11,7 @@
 
   <link rel="stylesheet" href="/static/style.css?v=30" />
   <link rel="stylesheet" href="/static/position-v10.css?v=1" />
+  <link rel="stylesheet" href="/static/unified-workbench.css?v=3" />
   <link rel="icon" href="/static/favicon.ico" />
 </head>
 
@@ -20,10 +21,10 @@
     <header class="topbar">
       <div>
         <h1>BXK Trader Pro</h1>
-        <p>Live Market Intelligence</p>
+        <p>Staging Workbench · tastytrade market data and dry-run previews</p>
       </div>
 
-      <div class="status-pill" id="apiStatus">
+      <div class="status-pill" id="apiStatus" hidden>
         ● Connecting
       </div>
     </header>
@@ -37,7 +38,7 @@
     class="dashboard-tab active"
     data-tab="tradeSetup"
   >
-    Trade Setup
+    Trade Workbench
   </button>
 
   <button
@@ -105,6 +106,112 @@
   id="tradeSetup"
   class="dashboard-tab-panel active"
 >
+<section class="card" id="unifiedWorkbench" aria-label="Trade Workbench">
+  <div class="card-label">TRADE WORKBENCH</div>
+  <div class="bxk-workbench-modes" role="group" aria-label="Trading method">
+    <button type="button" class="bxk-mode" data-workbench-mode="auto" aria-pressed="false" disabled title="Legacy BXK Auto APIs are unavailable in isolated staging">BXK Auto</button>
+    <button type="button" class="bxk-mode active" data-workbench-mode="search" aria-pressed="true">Condor Search</button>
+    <button type="button" class="bxk-mode" data-workbench-mode="custom" aria-pressed="false">Custom Builder</button>
+  </div>
+  <p id="workbenchModeDescription">Existing BXK trading engine and market analysis.</p>
+  <div id="workbenchManual" hidden>
+    <p class="bxk-workbench-warning">Analysis only. No broker orders can be submitted from this panel. Premium and POP require authorized tastytrade quotes.</p>
+    <div id="workbenchSearch" hidden>
+      <p class="bxk-workbench-warning">Quotes are indicative and may be delayed or stale. Results are for analysis only; trading is disabled in staging.</p>
+      <div class="bxk-workbench-fields">
+        <label>Expiration <select id="wbLiveExpiry" aria-label="SPXW expiration"><option value="">Connect to load expirations</option></select></label>
+        <label>SPX reference price <input id="wbLiveSpot" type="number" min="1" step=".01" placeholder="Auto from tastytrade" readonly><small id="wbSpotStatus">Waiting for verified SPX quote</small><select id="wbSpotSource"><option value="auto">Auto: tastytrade SPX</option><option value="manual">Manual override</option></select></label>
+        <label>Strike range (+/- points) <select id="wbLiveRange"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select></label>
+      </div>
+      <div class="bxk-workbench-fields">
+        <label>Minimum modeled POP (%) <input id="wbMinPop" type="number" min="1" max="99" step="1" value="70"></label>
+        <label>Expected move (1σ, SPX points) <input id="wbExpectedMove" type="number" min="0.01" step="0.1" placeholder="Calculated from ATM straddle" readonly></label>
+        <label><span>Expected move source</span><select id="wbExpectedMoveSource"><option value="auto" selected>Auto: tastytrade ATM straddle</option><option value="manual">Manual override</option></select></label>
+      </div>
+      <p class="bxk-workbench-warning">Auto expected move is estimated from the nearest at-the-money SPXW call and put midpoint premiums (straddle × 1.2533). Modeled POP assumes a normal distribution at expiration; it is not tastytrade POP or a validated forecast. Stale or missing quotes disable auto POP.</p>
+      <div class="bxk-workbench-fields">
+        <label>Sort condors by
+          <select id="wbCondorSort">
+            <option value="premium">Highest premium</option>
+            <option value="pop">Highest modeled POP</option>
+            <option value="riskreward">Best premium / maximum loss</option>
+            <option value="risk">Lowest maximum loss</option>
+          </select>
+        </label>
+      </div>
+      <button type="button" class="bxk-mode" id="wbConnectMarket">Check tastytrade market data</button>
+      <button type="button" class="bxk-mode" id="wbLoadQuotes" disabled>Load SPXW quotes</button>
+      <section id="wbOrderPreview" hidden aria-label="Review-only position preview">
+        <h3>Position review — no order submission</h3>
+        <p id="wbPreviewStatus" role="status">Select a quoted condor to review its four legs.</p>
+        <div id="wbPreviewDetails"></div>
+        <button type="button" class="bxk-mode" id="wbBrokerPreview">Check broker buying power (dry-run only)</button>
+        <p id="wbBrokerPreviewStatus" role="status"></p>
+        <div id="wbConfirmationRehearsal" hidden>
+          <h4>Final confirmation rehearsal — no live order</h4>
+          <p>Review the four strikes, expiration, limit premium, risk, fees, buying power and broker warnings. This is a UI safeguard test only.</p>
+          <label><input type="checkbox" id="wbConfirmReview"> I reviewed this specific four-leg position and the broker dry-run results.</label>
+          <button type="button" class="bxk-mode" id="wbConfirmSimulation" disabled>Confirm review (simulation only)</button>
+          <p id="wbConfirmationStatus" role="status"></p>
+        </div>
+        <button type="button" class="bxk-mode" id="wbClosePreview">Close review</button>
+      </section>
+      <details id="wbStagingDiagnostics">
+        <summary>Staging safety tests</summary>
+        <p>Run recovery scenarios once, restart staging, then verify recovery. Running new scenarios creates a new receipt.</p>
+      <section id="wbReplayPanel" hidden>
+        <h3>Staging restart rehearsal</h3>
+        <p>The last simulation is retained in this browser tab for replay testing across a staging restart. No broker order is sent.</p>
+        <button type="button" id="wbReplaySimulation" class="bxk-mode">Verify saved simulation and reject replay</button>
+        <button type="button" id="wbForgetSimulation" class="bxk-mode">Forget saved simulation</button>
+        <p id="wbReplayStatus" role="status"></p>
+      </section>
+      <section>
+        <h3>Reconciliation safety rehearsal</h3>
+        <p>Uses synthetic broker outcomes only. Tests timeout recovery, partial fills and duplicate protection. No broker orders are sent.</p>
+        <button type="button" id="wbRunReconciliation" class="bxk-mode">Run recovery scenarios</button>
+        <button type="button" id="wbVerifyReconciliation" class="bxk-mode" disabled>Verify recovery after restart</button>
+        <p id="wbReconciliationStatus" role="status"></p>
+        <p id="wbReconciliationRecovery" role="status"></p>
+      </section>
+      </details>
+      <section aria-labelledby="wbCertRecoveryTitle">
+        <h3 id="wbCertRecoveryTitle">Certification order recovery</h3>
+        <p>Tracks sandbox orders using simulated money. Unresolved attempts stay blocked while broker records are checked.</p>
+        <button type="button" id="wbRefreshCertRecovery" class="bxk-mode">Refresh recovery status</button>
+        <p id="wbCertRecoveryStatus" role="status">Loading recovery status…</p>
+        <div id="wbCertRecoveryItems"></div>
+        <section id="wbOwnerReview" hidden aria-labelledby="wbOwnerReviewTitle">
+          <h4 id="wbOwnerReviewTitle">Owner review</h4>
+          <p id="wbOwnerReviewSummary"></p>
+          <div id="wbOwnerReviewOrder"></div>
+          <div id="wbOwnerReviewHistory"></div>
+          <p id="wbOwnerReviewProof"></p>
+          <button type="button" id="wbOwnerRefreshEvidence" class="bxk-mode">Refresh broker evidence</button>
+          <p id="wbOwnerEvidenceStatus" role="status"></p>
+          <label>Resolution <select id="wbOwnerDecision" disabled></select></label>
+          <label>Review note (no credentials) <textarea id="wbOwnerNote" minlength="20" maxlength="500" rows="3"></textarea></label>
+          <label><input type="checkbox" id="wbOwnerAcknowledged"> I reviewed the evidence. This cannot retry the original attempt; a new order needs fresh validation and confirmation.</label>
+          <button type="button" id="wbOwnerSaveResolution" class="bxk-mode" disabled>Save owner resolution</button>
+          <button type="button" id="wbOwnerClose" class="bxk-mode">Close owner review</button>
+          <p id="wbOwnerReviewResult" role="status"></p>
+        </section>
+      </section>
+      <div id="wbQuoteResults" aria-live="polite"></div>
+      <div id="wbSearchStatus" role="status" aria-live="polite">Waiting for tastytrade market-data connection.</div>
+    </div>
+    <div class="bxk-workbench-fields">
+      <label>Short put <input id="wbShortPut" type="number" step="5" value="7500"></label>
+      <label>Short call <input id="wbShortCall" type="number" step="5" value="7700"></label>
+      <label>Put wing <input id="wbPutWing" type="number" min="1" step="5" value="10"></label>
+      <label>Call wing <input id="wbCallWing" type="number" min="1" step="5" value="10"></label>
+      <label>Net premium (points) <input id="wbCredit" type="number" min="0" step=".05" value="2.50"></label>
+      <label>Contracts <input id="wbContracts" type="number" min="1" max="100" step="1" value="1"></label>
+    </div>
+    <div id="workbenchResults" aria-live="polite"></div>
+    <p id="workbenchSearchNote" hidden>Condor Search will use tastytrade quotes once the read-only market-data adapter is connected.</p>
+  </div>
+</section>
  <div class="trade-parameters">
   <div class="trade-parameter">
     <label for="underlyingSelector">
@@ -755,8 +862,8 @@
   </section>
 </div>
 </div>
-<script type="module" src="/static/dashboard.js?v=39"></script>
-<script type="module" src="/static/buying-power-reserve.js?v=2"></script>
+<script src="/static/unified-workbench.js?v=30" defer></script>
+<!-- Isolated staging runs unified-workbench.js only. Legacy dashboard modules poll disabled trading APIs. -->
      
    
 </body>
