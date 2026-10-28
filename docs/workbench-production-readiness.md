@@ -10,7 +10,7 @@
 - The preview creates no execution lock, confirmation token or live order. Raw credentials and broker responses are not exposed by its APIs.
 
 ## Verification evidence
-Before the October 28 UI/data updates, the clean integrated branch passed 1,280 Python tests with 3 skipped, 8 subtests, and 4 JavaScript test files. This is historical evidence, not a full-suite rerun of the latest changes.
+Final October 28 validation from a clean checkout of the updated integrated branch passed the full Python suite: 1,280 tests, 3 skipped, 8 subtests. Nine additional SPX-reference regression cases passed separately. All five JavaScript test files passed, including the new automatic expected-move and dry-run summary cases. Six dependency deprecation warnings remain; no test failed.
 October 28 targeted checks verified automatic ATM calculation, missing/stale/foreign-expiration rejection, fresh SPX parsing, rejection of wrong symbols/closing-only/stale data, and disconnected staging-owner setup signaling. JavaScript syntax and HTML control IDs were checked. Browser rendering could not be automated locally because the Playwright browser executable was unavailable; user screenshots confirmed the deployed layout and automatic fields.
 
 The separate bxk-runtime-staging service now runs the full application with a staging PostgreSQL database, database-backed OWNER login and an encrypted personal broker connection. The user confirmed:
@@ -27,7 +27,6 @@ Earlier isolated-staging synthetic restart recovery also passed: original identi
 
 ## Remaining release checks
 - Observe a fully passing real-broker dry-run when the account naturally meets the configured reserve. Do not lower the reserve merely to make this test pass. Mocked success-path coverage already exists in the integration tests.
-- Run the full regression suite on the final branch before production promotion; latest incremental changes have targeted checks only.
 - Review production integration and approval separately. PR #24 remains the review vehicle; this record does not authorize merging, production deployment or live trading.
 
 Live trading remains disabled in staging. Production promotion and live execution have not been performed by this workflow.
