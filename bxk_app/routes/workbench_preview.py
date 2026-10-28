@@ -18,6 +18,7 @@ def preview_access(response: Response, user=Depends(require_owner)):
 def scoped_broker(session, user):
     from bxk_app.services.broker_connection_service import (
         get_user_tastytrade_connection, resolve_tastytrade_broker,
+        import_legacy_owner_connection, BrokerVerificationError,
         BrokerConnectionInvalid, BrokerConnectionRequired,
     )
     from uuid import UUID
@@ -26,6 +27,12 @@ def scoped_broker(session, user):
     except (ValueError, TypeError):
         raise HTTPException(409, "A user-specific broker connection is required") from None
     connection = get_user_tastytrade_connection(session, user_id=user_id)
+    if connection is None:
+        try:
+            connection = import_legacy_owner_connection(session, user_context=user)
+        except (BrokerVerificationError, BrokerConnectionInvalid):
+            session.rollback()
+            raise HTTPException(409, "Existing owner connection could not be verified") from None
     if connection is None or not connection.is_verified:
         raise HTTPException(409, "Connect and verify this user's tastytrade account first")
     try:
