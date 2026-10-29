@@ -95,3 +95,5 @@ router.include_router(stop_audit_router)
 from bxk_app.routes.setup_invitations import router as setup_invitations_router
 router.include_router(setup_invitations_router)
 
+from bxk_app.routes.messages import router as messages_router
+router.include_router(messages_router)
