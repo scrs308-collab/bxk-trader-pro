@@ -206,23 +206,44 @@ def reviewed_position(result, payload):
             "review_lock_issued":False,"order_submission_available":False,
             "message":"Fresh snapshot verified. Broker risk and buying power review still required."}
 
+def refresh_selected_position(broker, payload):
+    """Reprice these exact legs, independently of the top-ten discovery ranking."""
+    from bxk_app.services.workbench_analysis import analyze_condors
+    snapshot = quote_snapshot(broker, payload.expiration, payload.min_strike, payload.max_strike)
+    selected_legs = {("put", payload.put_short), ("put", payload.put_long),
+                     ("call", payload.call_short), ("call", payload.call_long)}
+    selected_snapshot = dict(snapshot, quotes=[q for q in snapshot.get("quotes", [])
+        if (q.get("type"), q.get("strike")) in selected_legs])
+    try:
+        result = analyze_condors(selected_snapshot, payload.spot, payload.expected_move,
+                                 payload.width, payload.minimum_pop)
+    except ValueError:
+        raise HTTPException(400, "Invalid analysis inputs") from None
+    result["checked_at"] = snapshot["checked_at"]
+    keys = ("put_short", "put_long", "call_short", "call_long")
+    selected = next((c for c in result["condors"]
+                     if all(c[k] == getattr(payload, k) for k in keys)), None)
+    if selected is None:
+        raise HTTPException(409, "Selected legs no longer meet the fresh quote, wing-width, OTM or minimum POP requirements. Reload analysis and select another position.")
+    # This is analysis/dry-run only: price the refreshed snapshot, never the old row.
+    refreshed_payload = payload.model_copy(update={"credit_points": selected["credit_points"]})
+    review = reviewed_position(result, refreshed_payload)
+    review["previous_credit_points"] = payload.credit_points
+    review["credit_change_dollars"] = round((selected["credit_points"] - payload.credit_points) * 100, 2)
+    return review, refreshed_payload
+
 @router.post("/position-review")
 def position_review(payload:PositionReviewRequest,user=Depends(preview_access),session:Session=Depends(get_db)):
-    result=condors(expiration=payload.expiration,min_strike=payload.min_strike,
-        max_strike=payload.max_strike,spot=payload.spot,expected_move=payload.expected_move,
-        width=payload.width,minimum_pop=payload.minimum_pop,user=user,session=session)
-    return reviewed_position(result,payload)
+    review, _ = refresh_selected_position(scoped_broker(session, user), payload)
+    return review
 
 @router.post("/dry-run")
 def preview_dry_run(payload:PositionReviewRequest,user=Depends(preview_access),session:Session=Depends(get_db)):
-    from bxk_app.services.workbench_analysis import analyze_condors
     from bxk_app.services.workbench_dry_run import run_dry_run
-    broker=scoped_broker(session,user)
-    snapshot=quote_snapshot(broker,payload.expiration,payload.min_strike,payload.max_strike)
-    try:
-        result=analyze_condors(snapshot,payload.spot,payload.expected_move,payload.width,payload.minimum_pop)
-    except ValueError:
-        raise HTTPException(400,"Invalid analysis inputs") from None
-    result["checked_at"]=snapshot["checked_at"]
-    review=reviewed_position(result,payload)
-    return run_dry_run(review,payload,broker,session,user)
+    broker = scoped_broker(session, user)
+    review, refreshed_payload = refresh_selected_position(broker, payload)
+    result = run_dry_run(review, refreshed_payload, broker, session, user)
+    return dict(result, position=review["position"],
+                previous_credit_points=review["previous_credit_points"],
+                credit_change_dollars=review["credit_change_dollars"],
+                quote_checked_at=review["quote_checked_at"])
