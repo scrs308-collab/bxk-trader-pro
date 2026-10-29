@@ -288,9 +288,15 @@ def get_broker_connection_status(
         )
 
     if connection is not None:
-        return _connection_status(
-            connection
-        )
+        status = _connection_status(connection)
+        if role == UserRole.OWNER.value:
+            # OWNER submission is controlled by the installation live switch;
+            # per-connection permissions are the explicit BETA-user control.
+            status["user_live_trading_enabled"] = True
+            status["live_trading_enabled"] = bool(
+                status["connected"] and config.BXK_LIVE_TRADING_ENABLED
+            )
+        return status
 
     if role == UserRole.OWNER.value:
         legacy_configured = bool(
@@ -1388,7 +1394,9 @@ def resolve_tastytrade_broker(
                 connection.base_url
             ),
             live_trading_enabled=(
-                connection.live_trading_enabled
+                config.BXK_LIVE_TRADING_ENABLED
+                if role == UserRole.OWNER.value
+                else connection.live_trading_enabled
             ),
         )
 
