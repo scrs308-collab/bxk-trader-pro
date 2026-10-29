@@ -29,3 +29,7 @@ assert.equal(root.children[3].open,undefined);
 context.renderDryRun(root,{passed:true,checks:[{passed:true,message:'Verified'}]});
 assert.equal(root.children[0].textContent,'Dry-run passed · No order submitted');
 console.log('Workbench UI: automatic ATM move, stale/missing inputs, blocker priority, money formatting and collapsed checks passed.');
+const refreshed=new Element('div');
+context.renderDryRun(refreshed,{passed:true,checks:[],position:{put_short:7660,put_long:7650,call_short:7725,call_long:7735,premium_dollars:300,max_loss_before_fees:700,lower_breakeven:7657,upper_breakeven:7728,modeled_pop:80},credit_change_dollars:50});
+assert.match(refreshed.children[0].textContent,/Refreshed selected position.*Credit \$300/);
+assert.match(refreshed.children[1].textContent,/Credit changed by \$50.00/);
