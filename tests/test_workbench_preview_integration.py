@@ -161,3 +161,45 @@ def test_preview_page_flag_owner_and_csp(monkeypatch):
     response=workbench_page(request)
     assert response.headers['cache-control']=='no-store'
     assert "form-action 'none'" in response.headers['content-security-policy']
+
+
+def test_review_refreshes_exact_legs_even_outside_top_ten(monkeypatch):
+    review,payload=fixture()
+    stamp=datetime.now(timezone.utc).isoformat()
+    def quote(kind,strike,mid):
+        compact=payload.expiration[2:4]+payload.expiration[5:7]+payload.expiration[8:10]
+        return dict(symbol=f'SPXW  {compact}{kind[0].upper()}{strike*1000:08d}',strike=strike,type=kind,bid=mid,ask=mid,timestamp=stamp)
+    quotes=[quote('put',7660,2),quote('put',7650,.75),quote('call',7725,2),quote('call',7735,.75)]
+    # Several better-credit spreads push the still-valid original selection out
+    # of the discovery list. Ranking is irrelevant to reviewing these legs.
+    for strike in range(7600,7660,15):quotes += [quote('put',strike,4),quote('put',strike-10,1)]
+    for strike in range(7745,7810,15):quotes += [quote('call',strike,4),quote('call',strike+10,1)]
+    # Restore exact selected legs after overlapping synthetic ladder quotes.
+    quotes += [quote('put',7660,2.5),quote('put',7650,.75),quote('call',7725,2),quote('call',7735,.75)]
+    snapshot=dict(quotes=quotes,checked_at=stamp)
+    discovery=analyze_condors(snapshot,payload.spot,payload.expected_move,payload.width,payload.minimum_pop)
+    assert discovery['matching_count']>10
+    assert not any(c['put_short']==7660 and c['call_short']==7725 for c in discovery['condors'])
+    monkeypatch.setattr(routes,'quote_snapshot',lambda *a:snapshot)
+    fresh,new_payload=routes.refresh_selected_position(None,payload)
+    assert fresh['position']['put_short']==7660 and fresh['position']['call_short']==7725
+    assert fresh['credit_change_dollars']==50
+    assert new_payload.credit_points==3
+    broker=setup_broker()
+    result=run_dry_run(fresh,new_payload,broker,None,{},policy())
+    assert result['passed'] and result['reviewed_credit']==3
+    assert broker.preview_order.call_args.args[0]['limit_price']==3
+    broker.submit_order.assert_not_called()
+
+
+def test_selected_review_still_rejects_stale_or_invalid_legs(monkeypatch):
+    from datetime import timedelta
+    review,payload=fixture()
+    for bad in ['stale','pop','missing']:
+        stamp=(datetime.now(timezone.utc)-timedelta(seconds=121 if bad=='stale' else 0)).isoformat()
+        quotes=[dict(symbol=symbol,strike=strike,type=kind,bid=bid,ask=bid,timestamp=stamp) for symbol,strike,kind,bid in zip(review['position']['symbols'],[7660,7650,7725,7735],['put','put','call','call'],[2,.75,2,.75])]
+        if bad=='missing':quotes.pop()
+        monkeypatch.setattr(routes,'quote_snapshot',lambda *a:dict(quotes=quotes,checked_at=stamp))
+        request=payload.model_copy(update={'minimum_pop':99}) if bad=='pop' else payload
+        with pytest.raises(HTTPException) as error:routes.refresh_selected_position(None,request)
+        assert error.value.status_code==409
