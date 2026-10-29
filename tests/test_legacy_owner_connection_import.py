@@ -55,3 +55,17 @@ def test_failed_verification_does_not_save(setup, monkeypatch):
     with pytest.raises(service.BrokerVerificationError):
         service.import_legacy_owner_connection(session, user_context=context)
     assert service.get_any_user_tastytrade_connection(session, user_id=uuid.UUID(context['user_id'])) is None
+
+@pytest.mark.parametrize('global_enabled', [False, True])
+def test_owner_broker_matches_global_switch_without_enabling_beta(setup, monkeypatch, global_enabled):
+    session, context = setup
+    monkeypatch.setattr(service, 'verify_tastytrade_credentials', lambda **k: [{'account_number': 'account-7178'}])
+    connection = service.import_legacy_owner_connection(session, user_context=context)
+    assert connection.live_trading_enabled is False
+    monkeypatch.setattr(config, 'BXK_LIVE_TRADING_ENABLED', global_enabled)
+    broker = service.resolve_tastytrade_broker(session, user_context=context)
+    assert broker.live_trading_enabled is global_enabled
+    assert service.get_broker_connection_status(session, user_context=context)['live_trading_enabled'] is global_enabled
+    beta_context = {**context, 'role': 'BETA'}
+    assert service.resolve_tastytrade_broker(session, user_context=beta_context).live_trading_enabled is False
+    assert service.get_broker_connection_status(session, user_context=beta_context)['live_trading_enabled'] is False
