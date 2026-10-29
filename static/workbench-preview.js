@@ -105,6 +105,13 @@
   });
   function renderDryRun(container,result) {
     container.replaceChildren();container.className="dry-run-result";
+    if(result.position){
+      const p=result.position, pricing=document.createElement("p");pricing.className="help";
+      pricing.textContent="Refreshed selected position: sell put "+p.put_short+", buy put "+p.put_long+", sell call "+p.call_short+", buy call "+p.call_long+
+        ". Credit $"+p.premium_dollars+"; maximum loss before fees $"+p.max_loss_before_fees+"; breakevens "+p.lower_breakeven+" / "+p.upper_breakeven+"; modeled POP "+p.modeled_pop+"%.";
+      container.appendChild(pricing);
+      if(Number(result.credit_change_dollars)!==0){const change=document.createElement("p");change.textContent="Credit changed by $"+Number(result.credit_change_dollars).toFixed(2)+" from your previous snapshot. Broker checks use the refreshed price.";container.appendChild(change);}
+    }
     const checks=Array.isArray(result.checks)?result.checks:[];
     const blocked=checks.filter(check=>check.passed!==true);
     const passed=checks.filter(check=>check.passed===true);
@@ -181,10 +188,11 @@
           for(const key of ["put_short","put_long","call_short","call_long","credit_points"])payload[key]=candidate[key];
           try{
             const response=await fetch("/api/workbench-preview/position-review",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-            if(!response.ok)throw new Error(response.status===409?"Position or premium changed. Reload condors and select again.":"Position review unavailable ("+response.status+").");
+            if(!response.ok){let detail="Position review unavailable ("+response.status+").";try{const error=await response.json();if(typeof error.detail==="string")detail=error.detail;}catch{}throw new Error(detail);}
             const reviewed=await response.json();
             if(reviewed.review_lock_issued!==false||reviewed.order_submission_available!==false||reviewed.user_scoped!==true)throw new Error("Unexpected review response");
             const p=reviewed.position;
+            payload.credit_points=p.credit_points;
             reviewOutput.textContent="Verified snapshot: sell put "+p.put_short+", buy put "+p.put_long+", sell call "+p.call_short+", buy call "+p.call_long+
               ". Credit $"+p.premium_dollars+"; maximum loss before fees $"+p.max_loss_before_fees+
               "; breakevens "+p.lower_breakeven+" / "+p.upper_breakeven+". Buying power unverified. No execution lock or order created.";
@@ -195,10 +203,11 @@
               dryButton.disabled=true;dryStatus.textContent="Refreshing quotes and checking broker risk...";
               try{
                 const response=await fetch("/api/workbench-preview/dry-run",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-                if(!response.ok)throw new Error(response.status===409?"Quotes or position changed. Reload and review again.":"Dry-run unavailable ("+response.status+"). No order submitted.");
+                if(!response.ok){let detail="Dry-run unavailable ("+response.status+"). No order submitted.";try{const error=await response.json();if(typeof error.detail==="string")detail=error.detail;}catch{}throw new Error(detail);}
                 const result=await response.json();
                 if(result.order_submission_available!==false||result.review_lock_issued!==false)throw new Error("Unexpected dry-run response");
                 renderDryRun(dryStatus,result);
+                dryStatus.scrollIntoView?.({behavior:"smooth",block:"nearest"});
               }catch(error){dryStatus.textContent=error.message;}
               finally{dryButton.disabled=false;}
             });
