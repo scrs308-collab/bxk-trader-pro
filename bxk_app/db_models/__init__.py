@@ -52,3 +52,5 @@ __all__ = [
     "User",
     "UserRole",
 ]
+
+from bxk_app.db_models.message import ChatMessage, ChatReadState

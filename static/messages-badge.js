@@ -1,0 +1,1 @@
+(()=>{async function update(){if(document.hidden)return;try{const r=await fetch('/api/messages/inbox',{credentials:'same-origin',cache:'no-store'});if(!r.ok)return;const data=await r.json();const badge=document.getElementById('messagesUnread');if(badge)badge.textContent=data.total_unread?'('+data.total_unread+')':'';}catch{}}update();setInterval(update,30000);})();
