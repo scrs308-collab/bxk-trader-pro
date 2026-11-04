@@ -142,7 +142,31 @@ def construct_legs(strategy, chain, spot, width, expected_move):
     raise ValueError("A valid structure cannot be built from available strikes and symbols.")
 
 
-def build_manual_debit(strategy, dte, wing_width):
+def selected_debit_legs(strategy, chain, strikes, expiration, width):
+    """Resolve exact selected contracts from a fresh chain; never trust client symbols."""
+    pattern = PATTERNS[strategy]
+    if not expiration or len(strikes) != len(pattern):
+        raise ValueError("Selected contracts or expiration are missing. Rebuild the trade.")
+    rows = {float(row["strike"]): row for row in chain
+            if str(row.get("expiration_date")) == str(expiration)}
+    legs = []
+    for strike, (action, kind, ratio) in zip(strikes, pattern):
+        row = rows.get(float(strike))
+        if not row:
+            raise ValueError("Selected contract is unavailable. Rebuild the trade.")
+        leg = {"action": action, "option_type": kind, "quantity": ratio,
+               "strike": float(strike), "symbol": row.get(kind.lower()),
+               "streamer_symbol": row.get(kind.lower() + "_streamer")}
+        if not leg["symbol"] or not leg["streamer_symbol"]:
+            raise ValueError("Selected contract symbols are unavailable.")
+        legs.append(leg)
+    risk = debit_risk(strategy, legs, float(width) / 2)
+    if not math.isclose(risk["width"], float(width)):
+        raise ValueError("Selected contract width does not match the request.")
+    return legs
+
+
+def build_manual_debit(strategy, dte, wing_width, selected_strikes=None, selected_expiration=None):
     from bxk_app.trade_builder import refresh_live_trade_context
     from bxk_app.option_scanner import get_spx_strikes_by_dte
     from bxk_app.live_option_engine import get_live_market_data
@@ -152,7 +176,9 @@ def build_manual_debit(strategy, dte, wing_width):
     try:
         chain = get_spx_strikes_by_dte(dte)
         spot = float(snapshot.get("spx") or snapshot.get("price"))
-        legs = construct_legs(strategy, chain, spot, wing_width, float(snapshot["expected_move"]))
+        legs = (selected_debit_legs(strategy, chain, selected_strikes, selected_expiration, wing_width)
+                if selected_strikes is not None else
+                construct_legs(strategy, chain, spot, wing_width, float(snapshot["expected_move"])))
         pricing = price_debit_legs(strategy, legs, get_live_market_data([leg["streamer_symbol"] for leg in legs]))
         trade = {"strategy": DEBIT_NAMES[strategy], "symbol": "SPX", "spx_price": spot,
                  "manual_selection": True, "structure_validated": True,
