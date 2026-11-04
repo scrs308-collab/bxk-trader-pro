@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
         auth_state["session_secret_configured"], config.BXK_PREVIEW_MODE,
         config.BXK_LIVE_TRADING_ENABLED,
     )
+    if request.url.path.startswith("/static/") and request.url.path.endswith(".js"):
+        response.headers["Cache-Control"] = "no-store"
+
     if config.BXK_PREVIEW_MODE:
         logger.info(
             "BXK preview mode enabled. Background "
