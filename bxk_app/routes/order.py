@@ -1194,8 +1194,14 @@ def _build_current_order(
     wing_width: int,
     contracts: int,
     target_pop: int | None = None,
+    selected_strikes=None,
+    selected_expiration=None,
 ):
+    selection = ({"selected_strikes": selected_strikes,
+                  "selected_expiration": selected_expiration}
+                 if selected_strikes is not None else {})
     result = get_best_trade(
+        **selection,
         strategy=strategy,
         dte=dte,
         wing_width=wing_width,
@@ -1235,6 +1241,8 @@ def order_preview(
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     target_pop: int | None = None,
+    selected_strikes: str | None = Query(None, max_length=200),
+    selected_expiration: str | None = Query(None, max_length=10),
     user_context: dict = Depends(
         require_owner_or_beta
     ),
@@ -1250,12 +1258,23 @@ def order_preview(
     if target_pop is not None and target_pop not in (70, 75, 80):
         raise HTTPException(status_code=422, detail="target_pop must be 70, 75, or 80")
 
+    selection = {}
+    if selected_strikes is not None:
+        try:
+            strikes = json.loads(selected_strikes)
+            if strategy not in DEBIT_NAMES or not isinstance(strikes, list):
+                raise ValueError("Exact selection requires a manual debit strategy.")
+            selection = {"selected_strikes": strikes,
+                         "selected_expiration": selected_expiration}
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail="Invalid selected contracts.") from exc
     trade, order = _build_current_order(
         strategy,
         dte,
         wing_width,
         contracts,
         target_pop,
+        **selection,
     )
 
     if not trade:

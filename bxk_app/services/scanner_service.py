@@ -165,6 +165,8 @@ def get_best_trade(
     wing_width: int = 25,
     contracts: int = 1,
     target_pop: int | None = None,
+    selected_strikes=None,
+    selected_expiration=None,
 ):
     if target_pop is not None and target_pop not in (70, 75, 80):
         raise ValueError("target_pop must be 70, 75, or 80")
@@ -177,7 +179,10 @@ def get_best_trade(
     market = run_trade_quality()
 
     if strategy in DEBIT_NAMES:
-        result = build_manual_debit(strategy, dte, wing_width)
+        result = (build_manual_debit(strategy, dte, wing_width,
+                                     selected_strikes, selected_expiration)
+                  if selected_strikes is not None else
+                  build_manual_debit(strategy, dte, wing_width))
         result.update(requested_contracts=contracts, requested_strategy=strategy,
                       requested_dte=dte, requested_wing_width=wing_width)
         if result.get("best_trade"):

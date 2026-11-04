@@ -692,6 +692,10 @@ const buyingPower =
               previewParams.set("target_pop", selectedTargetPop);
             }
 
+            if (trade.manual_selection) {
+              previewParams.set("selected_strikes", JSON.stringify(trade.legs.map(leg => leg.strike)));
+              previewParams.set("selected_expiration", trade.expiration);
+            }
             const previewResponse =
               await fetch(
                 `/api/order-preview?${previewParams.toString()}`,
@@ -707,10 +711,21 @@ const buyingPower =
               );
             }
 
+            if (trade.manual_selection) {
+              const reviewed = preview.order?.legs || [];
+              const sameLegs = reviewed.length === trade.legs.length && reviewed.every((leg, i) =>
+                leg.symbol === trade.legs[i].symbol &&
+                Number(leg.strike) === Number(trade.legs[i].strike) &&
+                leg.action === trade.legs[i].action &&
+                leg.option_type === trade.legs[i].option_type);
+              if (!sameLegs || preview.order.expiration !== trade.expiration) {
+                throw new Error("Review contracts differ from your selection. Rebuild the trade; no order was submitted.");
+              }
+            }
             renderOrderPreview({
               preview,
-              missionScore,
-              missionConfidence,
+              missionScore: preview.trade?.structure_analysis?.score ?? preview.trade?.trade_quality_score ?? missionScore,
+              missionConfidence: preview.trade?.structure_analysis?.confidence ?? preview.trade?.confidence ?? missionConfidence,
               executionStatus,
               pop,
               buyingPower,
