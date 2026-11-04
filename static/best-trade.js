@@ -78,10 +78,10 @@ const selectedContracts =
   contractsSelector?.value ??
   "1";
 
-const selectedTargetPop =
-  overrides.targetPop ??
-  el("popTargetSelector")?.value ??
-  "";
+const supportsPopTarget = ["auto", "iron_condor"].includes(selectedStrategy);
+const selectedTargetPop = supportsPopTarget
+  ? (overrides.targetPop ?? el("popTargetSelector")?.value ?? "")
+  : "";
 
 const params = new URLSearchParams({
   strategy: selectedStrategy,
@@ -181,6 +181,7 @@ const response = await fetch(
       Math.min(
         100,
         safeNumber(
+          trade.structure_analysis?.score ??
           trade.trade_quality_score ??
           trade.trade_score ??
           trade.score ??
@@ -191,6 +192,7 @@ const response = await fetch(
     );
 
     const missionConfidence = String(
+      trade.structure_analysis?.confidence ??
       trade.confidence ??
       trade.rating ??
       trade.quality_label ??
@@ -245,7 +247,7 @@ const response = await fetch(
       !executionReady
         ? "WAIT FOR FRESH QUOTE"
         : manualPreviewReady
-          ? `MANUAL · ${trade.playbook_status || "CAUTION"}`
+          ? `MANUAL FIT · ${trade.playbook_status || "CAUTION"}`
           : tradeApproved
             ? recommendation
             : "NO TRADE";
@@ -533,6 +535,7 @@ const buyingPower =
       </div>
       <div class="setup-market-item"><strong>Strategy Playbook: ${trade.playbook_status || "See Strategies"}</strong></div>
       ${trade.structure_analysis ? `<div class="setup-market-item">Live structure fit: ${trade.structure_analysis.status} · ${trade.structure_analysis.score}/100<br>${trade.structure_analysis.factors.map(factor => factor.label + ": " + factor.points).join(" · ")}</div>` : ""}
+      ${trade.pop_reason ? `<div class="setup-market-item">POP: ${trade.pop_reason}</div>` : ""}
       ${trade.breakevens ? `<div class="setup-market-item">${trade.risk_classification} · Width ${trade.width} · Max profit ${formatMoney(trade.max_profit)} · Breakevens ${trade.breakevens.join(" / ")}<br>Midpoint ${formatMoney(trade.midpoint, 2)} · Quote ${quoteTimeLabel(trade.quote_timestamp)} · Age ${quoteAgeLabel(trade.quote_age_seconds)}${!executionReady ? `<br>${trade.execution?.reason || "Fresh option quotes are required before execution."}` : ""}</div>` : ""}
 
       <div class="setup-divider"></div>
@@ -546,7 +549,7 @@ const buyingPower =
         </div>
 
         <div class="setup-metric">
-          <span>Condor POP${selectedTargetPop ? ` (target ${selectedTargetPop}%)` : ""}</span>
+          <span>${trade.manual_selection ? "Probability of profit" : `Condor POP${selectedTargetPop ? ` (target ${selectedTargetPop}%)` : ""}`}</span>
           <strong>
             ${
               pop > 0
@@ -576,7 +579,7 @@ const buyingPower =
         <div class="setup-metric">
           <span>Max profit / max risk</span>
           <strong>${credit > 0 && maxRisk > 0
-            ? `${formatNumber((credit * 100) / maxRisk * 100, 1)}%`
+            ? `${formatNumber(safeNumber(trade.max_profit, trade.debit != null ? 0 : credit * 100) / maxRisk * 100, 1)}%`
             : "--"}</strong>
         </div>
 
@@ -901,8 +904,8 @@ function renderOrderPreview({
       : "--";
 
   const riskReward =
-    maxProfit > 0
-      ? maxRisk / maxProfit
+    maxRisk > 0
+      ? maxProfit / maxRisk
       : 0;
 
   const legs = Array.isArray(order.legs)
@@ -1058,7 +1061,7 @@ function renderOrderPreview({
       </div>
 
       <div class="order-review-content">
-        <div class="order-review-section"><strong>Strategy Playbook: ${order.playbook_status || displayedTrade.playbook_status || "See Strategies"}</strong>
+        <div class="order-review-section">${displayedTrade.pop_reason ? `<p>POP: ${displayedTrade.pop_reason}</p>` : ""}<strong>Strategy Playbook: ${order.playbook_status || displayedTrade.playbook_status || "See Strategies"}</strong>
           ${order.breakevens ? `<p>${order.risk_classification} · Width ${order.width} · Breakevens ${order.breakevens.join(" / ")} · Midpoint ${formatMoney(order.midpoint, 2)} · Quote ${quoteTimeLabel(order.quote_timestamp)} · Age ${quoteAgeLabel(order.quote_age_seconds)}</p>` : ""}
         </div>
         <div class="order-review-main">

@@ -185,9 +185,16 @@ def get_best_trade(
             from bxk_app.market_data import market_data
             rankings = rank_strategies_v2(safe_market_value(market, "score", 0), safe_market_value(market, "vix_state", "UNKNOWN"), current_price=market_data.spx, condor_stability=market_data.condor_stability)
             item = next((r for r in rankings if r["name"] == DEBIT_NAMES[strategy]), {})
-            result["best_trade"]["playbook_status"] = item.get("status", "CAUTION")
+            trade = result["best_trade"]
+            trade["market_playbook_status"] = item.get("status", "CAUTION")
             if strategy == "reverse_iron_condor":
-                result["best_trade"]["structure_analysis"] = reverse_condor_playbook(market_data.condor_stability, result["best_trade"])
+                item = reverse_condor_playbook(market_data.condor_stability, trade)
+                trade["structure_analysis"] = item
+            trade["playbook_status"] = item.get("status", "CAUTION")
+            trade["trade_quality_score"] = item.get("score")
+            trade["confidence"] = item.get("confidence")
+            trade["pop"] = None
+            trade["pop_reason"] = "Not calculated: a debit-strategy probability model is not available. Credit-condor OTM estimates do not apply."
         return result
 
     if strategy == "auto":
