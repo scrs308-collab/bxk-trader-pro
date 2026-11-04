@@ -32,7 +32,7 @@ import {
 import {
   loadBestTrade,
   initializeTradeBuilder,
-} from "./best-trade.js?v=21";
+} from "./best-trade.js?v=32";
 
 import {
   loadPositions,

@@ -36,9 +36,29 @@ function quoteAgeLabel(value) {
   return `${formatNumber(age, 1)}s`;
 }
 
+let tradeLoadSequence = 0;
+function normalizedStrategy(value) {
+  return String(value || "").trim().toLowerCase().replace(/^spx /, "").replace(/[ -]/g, "_");
+}
+function assertReviewIdentity(trade, preview) {
+  const order = preview?.order;
+  if (!order || normalizedStrategy(order.strategy) !== normalizedStrategy(trade.strategy)) {
+    throw new Error("Review strategy differs from the selected trade. No order was submitted.");
+  }
+  const selected = trade.legs || [];
+  const reviewed = order.legs || [];
+  if (selected.length && (reviewed.length !== selected.length ||
+      reviewed.some((leg, i) => leg.symbol !== selected[i].symbol ||
+        Number(leg.strike) !== Number(selected[i].strike) ||
+        leg.action !== selected[i].action || leg.option_type !== selected[i].option_type))) {
+    throw new Error("Review contracts differ from the selected trade. No order was submitted.");
+  }
+}
+
 export async function loadBestTrade(
   overrides = {},
 ) {
+  const requestSequence = ++tradeLoadSequence;
   const card = el("bestTradeCard");
 
   if (!card) {
@@ -107,6 +127,7 @@ const response = await fetch(
     }
 
     const data = await response.json();
+    if (requestSequence !== tradeLoadSequence) return;
     const trade = data.best_trade;
       
     if (!trade) {
@@ -681,7 +702,7 @@ const buyingPower =
           try {
             const previewParams =
               new URLSearchParams({
-                strategy: selectedStrategy,
+                strategy: normalizedStrategy(trade.strategy),
                 dte: selectedDte,
                 wing_width:
                   selectedWingWidth,
@@ -711,6 +732,7 @@ const buyingPower =
               );
             }
 
+            assertReviewIdentity(trade, preview);
             if (trade.manual_selection) {
               const reviewed = preview.order?.legs || [];
               const sameLegs = reviewed.length === trade.legs.length && reviewed.every((leg, i) =>
@@ -729,7 +751,7 @@ const buyingPower =
               executionStatus,
               pop,
               buyingPower,
-              strategy: selectedStrategy,
+              strategy: normalizedStrategy(trade.strategy),
               dte: selectedDte,
               wingWidth: selectedWingWidth,
               contracts: selectedContracts,
@@ -746,8 +768,8 @@ const buyingPower =
               error,
             );
 
-            enterTradeButton.textContent =
-              "PREVIEW FAILED";
+            enterTradeButton.textContent = "PREVIEW BLOCKED";
+            window.alert(error.message || "Review could not be verified. No order was submitted.");
 
           } finally {
             window.setTimeout(() => {
