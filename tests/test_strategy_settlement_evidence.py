@@ -63,7 +63,8 @@ def test_expiration_all_legs_confirms_gross_not_net():
     assert item["status"] == "EXPIRED_WORTHLESS_GROSS_VERIFIED"
     assert item["gross_estimate"] == "960.00"
     assert item["fees"] is None and item["net_pnl"] is None
-    assert item["closed_quantity"] == 0
+    assert item["closed_quantity"] == 4
+    assert item["open_quantity"] == 0
     assert result["settlement_gross_count"] == 1
 
 
