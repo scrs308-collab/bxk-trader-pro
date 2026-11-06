@@ -201,6 +201,8 @@ def _settlement_candidate(opening, transactions, other_openings):
         return None
     if expiration >= datetime.now(timezone.utc).date():
         return None
+    if opening["time"].date() > expiration:
+        return None
     snapshot = {
         "order": {
             "legs": [
