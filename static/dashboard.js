@@ -2395,6 +2395,70 @@ async function syncTastytradePerformance() {
   }
 }
 
+function renderBrokerStrategyReview(payload) {
+  const target = document.getElementById("brokerStrategyReconciliation");
+  if (!target) return;
+  const data = payload || {};
+  const heading = document.createElement("h4");
+  heading.textContent = "Strategy reconciliation — independently verified net only";
+  const summary = document.createElement("p");
+  summary.textContent = (data.total_candidates || 0) + " candidate structures; " +
+    (data.verified_count || 0) + " broker-transaction-verified; " +
+    (data.partial_count || 0) + " partial closes; " +
+    (data.ambiguous_count || 0) + " ambiguous repeated structures; " +
+    (data.unmatched_closing_contracts || 0) + " closing contracts without an identified opening order.";
+  const warning = document.createElement("p");
+  warning.textContent = data.warning ||
+    "Unverified trades must not be used in realized performance statistics.";
+  target.replaceChildren(heading, summary, warning);
+  if (data.transaction_notice) {
+    const note = document.createElement("p");
+    note.textContent = data.transaction_notice + " Gross estimates are not net P/L.";
+    target.appendChild(note);
+  }
+  const rows = data.records || [];
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No complete eligible strategy pairs in the selected broker-history window.";
+    target.appendChild(empty);
+    return;
+  }
+  const table = document.createElement("table");
+  table.style.cssText = "width:100%;min-width:900px;text-align:left;border-collapse:collapse";
+  const header = document.createElement("tr");
+  ["Status", "Structure", "Opened", "Closed", "Closed/total qty",
+   "Gross (provisional)", "Broker fees", "Verified net", "Review reason"].forEach(label => {
+    const th = document.createElement("th");
+    th.textContent = label;
+    th.style.cssText = "padding:8px;border-bottom:1px solid #334155";
+    header.appendChild(th);
+  });
+  table.appendChild(header);
+  rows.forEach(item => {
+    const tr = document.createElement("tr");
+    const isVerified = item.status === "TRANSACTION_VERIFIED";
+    const values = [
+      isVerified ? "Transaction verified" : item.status || "Review required",
+      item.strategy || "—",
+      item.opened_at ? new Date(item.opened_at).toLocaleString() : "—",
+      item.closed_at ? new Date(item.closed_at).toLocaleString() : "—",
+      (item.closed_quantity ?? "—") + " / " + (item.quantity ?? "—"),
+      item.gross_estimate ?? "—",
+      isVerified ? (item.fees ?? "—") : "Unverified",
+      isVerified ? (item.net_pnl ?? "—") : "Not calculated",
+      item.reason || "—",
+    ];
+    values.forEach(value => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      td.style.cssText = "padding:8px;border-bottom:1px solid #334155;vertical-align:top";
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  target.appendChild(table);
+}
+
 async function loadAllBrokerExecutions() {
   const status = document.getElementById("brokerHistoryStatus");
   const target = document.getElementById("brokerHistoryList");
@@ -2411,6 +2475,7 @@ async function loadAllBrokerExecutions() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "History unavailable");
     const orders = data.orders || [];
+    renderBrokerStrategyReview(data.strategy_review);
     if (status) status.textContent = orders.length +
       " filled orders. Order prices are broker-reported averages when present; leg prices use actual fill details. No strategy-level P/L is inferred.";
     if (!orders.length) {
@@ -2487,6 +2552,8 @@ async function loadAllBrokerExecutions() {
   } catch (error) {
     if (status) status.textContent = "Unable to load broker trades: " + error.message;
     if (matchedTarget) matchedTarget.textContent = "";
+    const strategyTarget = document.getElementById("brokerStrategyReconciliation");
+    if (strategyTarget) strategyTarget.textContent = "";
   } finally {
     button.disabled = false;
   }
