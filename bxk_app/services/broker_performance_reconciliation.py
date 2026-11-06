@@ -36,7 +36,7 @@ def valid_timestamp(value):
         return None
 
 
-def parse_leg_fills(leg, order_id):
+def parse_leg_fills(leg, order_id, leg_index=0):
     """Return actual execution lots; no estimate if fill data is incomplete."""
     if not isinstance(leg, dict):
         return []
@@ -62,19 +62,28 @@ def parse_leg_fills(leg, order_id):
         records.append({
             "symbol": symbol, "action": action, "quantity": int(quantity),
             "price": price, "timestamp": timestamp,
-            "order_id": order_id, "fill_index": index,
+            "order_id": order_id, "leg_index": leg_index, "fill_index": index,
         })
+    # Incomplete broker fills must not enter a FIFO calculation.
+    expected = decimal_value(leg.get("quantity"))
+    total = sum((lot["quantity"] for lot in records), 0)
+    if expected is not None and expected != total:
+        return []
     return records
 
 
 def extract_option_fills(orders):
     executions = []
+    seen_orders = set()
     for order in orders:
         if not isinstance(order, dict) or str(order.get("status") or "").strip().lower() != "filled":
             continue
         order_id = str(order.get("id") or "").strip()
-        for leg in order.get("legs") or []:
-            executions.extend(parse_leg_fills(leg, order_id))
+        if not order_id or order_id in seen_orders:
+            continue
+        seen_orders.add(order_id)
+        for leg_index, leg in enumerate(order.get("legs") or []):
+            executions.extend(parse_leg_fills(leg, order_id, leg_index))
     return executions
 
 
@@ -98,7 +107,7 @@ def reconcile_contract_fills(orders):
     are not reconstructed and may leave unmatched lots.
     """
     fills = extract_option_fills(orders)
-    fills.sort(key=lambda x: (x["timestamp"], x["order_id"], x["fill_index"]))
+    fills.sort(key=lambda x: (x["timestamp"], x["order_id"], x["leg_index"], x["fill_index"]))
     books = defaultdict(deque)
     matches = []
     unpaired_closing_quantity = 0
@@ -109,7 +118,7 @@ def reconcile_contract_fills(orders):
         if not STANDARD_OCC.fullmatch(symbol) or action not in OPEN_ACTIONS and action not in CLOSE_ACTIONS:
             ignored += 1
             continue
-        key = (fill["order_id"], symbol, action, fill["fill_index"])
+        key = (fill["order_id"], fill["leg_index"], fill["fill_index"])
         if key in seen:
             continue
         seen.add(key)
@@ -141,6 +150,25 @@ def reconcile_contract_fills(orders):
                 queue.popleft()
         unpaired_closing_quantity += remaining
 
+    # Collapse identical FIFO fragments of a single opening/closing order
+    # pair. This reduces noisy repeated lines without merging different trades.
+    consolidated = {}
+    for match in matches:
+        key = (
+            match["symbol"], match["side"],
+            match["open_order_id"], match["close_order_id"],
+            match["opened_at"], match["closed_at"],
+            match["entry_fill"], match["exit_fill"],
+        )
+        if key not in consolidated:
+            consolidated[key] = match.copy()
+        else:
+            row = consolidated[key]
+            row["quantity"] += match["quantity"]
+            row["gross_estimate"] = str((
+                Decimal(row["gross_estimate"]) + Decimal(match["gross_estimate"])
+            ).quantize(Decimal("0.01")))
+    matches = list(consolidated.values())
     matches.sort(key=lambda x: x["closed_at"], reverse=True)
     return {
         "matches": matches,
