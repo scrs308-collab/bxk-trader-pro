@@ -7,6 +7,8 @@ historical opening trades are never assigned fabricated realized P/L.
 """
 from collections import defaultdict
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from bxk_app.services import trade_journal_service as journal_service
 from decimal import Decimal
 from itertools import chain
 import re
@@ -176,6 +178,60 @@ def _strategy_label(order):
     return "Four-leg option strategy"
 
 
+def _settlement_candidate(opening, transactions, other_openings):
+    """Reuse the established complete SPXW settlement evidence validator.
+
+    Never allocate transaction evidence across repeated/overlapping openings.
+    This returns gross cash flow only, not verified net P/L.
+    """
+    if len(opening["legs"]) != 4:
+        return None
+    if any(leg["root"] != "SPXW" for leg in opening["legs"]):
+        return None
+    symbols = {leg["symbol"] for leg in opening["legs"]}
+    if any(
+        other["id"] != opening["id"]
+        and symbols.intersection(leg["symbol"] for leg in other["legs"])
+        for other in other_openings
+    ):
+        return None
+    try:
+        expiration = datetime.strptime(opening["legs"][0]["expiry"], "%y%m%d").date()
+    except ValueError:
+        return None
+    if expiration >= datetime.now(timezone.utc).date():
+        return None
+    snapshot = {
+        "order": {
+            "legs": [
+                {"symbol": leg["symbol"], "quantity": leg["quantity"]}
+                for leg in opening["legs"]
+            ]
+        }
+    }
+    journal = SimpleNamespace(
+        expiration=expiration,
+        quantity=opening["quantity"],
+        entry_snapshot=snapshot,
+    )
+    evidence = journal_service._expiration_settlement_evidence(journal, transactions)
+    if not evidence.get("complete"):
+        return None
+    settlement_debit = decimal_value(evidence.get("settlement_dollars"))
+    if settlement_debit is None:
+        return None
+    gross = opening["gross_total"] - settlement_debit
+    return {
+        "gross": gross,
+        "closed_at": evidence["closed_at"].isoformat(),
+        "resolution": (
+            "CASH_SETTLEMENT_GROSS_VERIFIED"
+            if evidence["cash_settled"]
+            else "EXPIRED_WORTHLESS_GROSS_VERIFIED"
+        ),
+    }
+
+
 def reconcile_strategies(orders, transactions=None, *, transactions_available=True, limit=100):
     """Return conservative candidate strategy pairs and unsupported/unmatched counts."""
     transactions = transactions if isinstance(transactions, list) else []
@@ -204,6 +260,7 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         group.sort(key=lambda row: (row["time"], row["id"]))
 
     rows = []
+    all_openings = list(chain.from_iterable(opening_groups.values()))
     unmatched_closes = 0
     for signature, group in opening_groups.items():
         related = closings.pop(signature, [])
@@ -242,6 +299,17 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         review = "Closing order missing or expired/assigned position is not reconciled."
         if closed:
             review = "Partial closure; unclosed contracts and settlements require review." if available else "Fill-matched; fees or brokerage transactions incomplete."
+        settlement = None
+        if not closed and available == opening["quantity"] and transactions_available:
+            settlement = _settlement_candidate(opening, transactions, all_openings)
+        if settlement is not None:
+            status = settlement["resolution"]
+            gross = settlement["gross"]
+            review = (
+                "All four expiration legs have broker terminal evidence; "
+                "gross settlement cash flow verified. Entry/settlement fees "
+                "and final net P/L remain unverified."
+            )
         settlement_events = [
             tx for tx in transactions
             if isinstance(tx, dict)
@@ -250,7 +318,7 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
             and str(tx.get("symbol") or "").strip().upper()
             in {leg["symbol"] for leg in opening["legs"]}
         ]
-        if settlement_events:
+        if settlement_events and settlement is None:
             review = "Settlement, exercise or assignment activity requires separate verification."
         if closed and not available and transactions_available and not settlement_events:
             order_finances = [_transaction_money(item, transactions) for item in [opening, *applicable]]
@@ -266,10 +334,12 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
             "opening_orders": [opening["id"]],
             "closing_orders": [x["id"] for x in applicable],
             "opened_at": opening["time"].isoformat(),
-            "closed_at": applicable[-1]["time"].isoformat() if applicable else None,
+            "closed_at": applicable[-1]["time"].isoformat() if applicable else (
+                settlement["closed_at"] if settlement else None
+            ),
             "quantity": opening["quantity"], "closed_quantity": closed,
             "open_quantity": available,
-            "gross_estimate": _money(gross) if closed else None,
+            "gross_estimate": _money(gross) if (closed or settlement) else None,
             "fees": _money(fees), "net_pnl": _money(net),
             "reason": review,
         })
@@ -282,10 +352,20 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         "records": rows[:limit],
         "total_candidates": len(rows),
         "verified_count": sum(r["status"] == "TRANSACTION_VERIFIED" for r in rows),
+        "settlement_gross_count": sum(
+            r["status"] in {
+                "CASH_SETTLEMENT_GROSS_VERIFIED",
+                "EXPIRED_WORTHLESS_GROSS_VERIFIED",
+            } for r in rows
+        ),
+        "estimated_fee_transaction_count": sum(
+            row.get("is-estimated-fee") is True
+            for row in transactions if isinstance(row, dict)
+        ),
         "partial_count": sum(r["status"] == "PARTIAL_CLOSE" for r in rows),
         "ambiguous_count": sum(r["status"] == "AMBIGUOUS_REPEAT" for r in rows),
         "unmatched_closing_contracts": max(unmatched_closes, 0),
         "unsupported_orders": unsupported,
         "net_pnl_total": None,
-        "warning": "Read-only candidate strategy reconciliation. No global P/L: rolling, repeat structures, partial/unmatched positions, expiration, cash settlement, assignments, and out-of-window orders require further verification.",
+        "warning": "Read-only strategy review. Complete four-leg SPXW expiration evidence may verify gross settlement cash flow only, not fees or net P/L. Repeated structures, partial positions, assignments, and out-of-window trades remain unverified.",
     }
