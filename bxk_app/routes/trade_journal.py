@@ -157,22 +157,35 @@ def broker_trade_history(
     )
     if getattr(broker, "last_error", None):
         raise HTTPException(status_code=502, detail="Broker history request failed.")
+    if not isinstance(orders, list):
+        raise HTTPException(status_code=502, detail="Invalid broker order-history response.")
     results = []
     seen = set()
-    for order in orders or []:
+    for order in orders:
         if not isinstance(order, dict):
+            raise HTTPException(status_code=502, detail="Invalid broker order-history response.")
+        # Do not display working, rejected, or cancelled orders as filled,
+        # even if the broker unexpectedly ignores the requested status filter.
+        if str(order.get("status") or "").strip().lower() != "filled":
             continue
         order_id = str(order.get("id") or "").strip()
-        if not order_id or order_id in seen:
+        legs = order.get("legs")
+        if not order_id or not isinstance(legs, list) or not all(
+            isinstance(leg, dict) for leg in legs
+        ):
+            raise HTTPException(status_code=502, detail="Invalid broker order-history response.")
+        if order_id in seen:
             continue
         seen.add(order_id)
-        legs = order.get("legs") or []
         timestamp = _order_fill_timestamp(order)
+        fill_price = order.get("average-fill-price")
+        if fill_price is None:
+            fill_price = order.get("price")
         results.append({
             "id": order_id,
             "filled_at": timestamp.isoformat() if timestamp else None,
-            "status": order.get("status"),
-            "price": order.get("average-fill-price") or order.get("price"),
+            "status": "Filled",
+            "price": fill_price,
             "price_effect": order.get("price-effect"),
             "legs": [
                 {
@@ -180,7 +193,7 @@ def broker_trade_history(
                     "action": leg.get("action"),
                     "quantity": leg.get("quantity"),
                 }
-                for leg in legs if isinstance(leg, dict)
+                for leg in legs
             ],
         })
     return {"available": True, "count": len(results), "orders": results}
