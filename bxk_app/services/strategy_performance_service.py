@@ -15,7 +15,7 @@ from bxk_app.services.broker_performance_reconciliation import (
     decimal_value, leg_weighted_price, valid_timestamp,
 )
 
-OCC = re.compile(r"^([A-Z0-9.]{1,6})\\s*(\\d{6})([CP])(\\d{8})$")
+OCC = re.compile(r"^([A-Z0-9.]{1,6})\s*(\d{6})([CP])(\d{8})$")
 OPEN = {"BUY TO OPEN": "LONG", "SELL TO OPEN": "SHORT"}
 CLOSE = {"SELL TO CLOSE": "LONG", "BUY TO CLOSE": "SHORT"}
 CENT = Decimal("0.01")
@@ -219,7 +219,17 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         review = "Closing order missing or expired/assigned position is not reconciled."
         if closed:
             review = "Partial closure; unclosed contracts and settlements require review." if available else "Fill-matched; fees or brokerage transactions incomplete."
-        if closed and not available and transactions_available:
+        settlement_events = [
+            tx for tx in transactions
+            if isinstance(tx, dict)
+            and str(tx.get("transaction-sub-type") or "").strip().upper()
+            in {"EXPIRATION", "ASSIGNMENT", "EXERCISE"}
+            and str(tx.get("symbol") or "").strip().upper()
+            in {leg["symbol"] for leg in opening["legs"]}
+        ]
+        if settlement_events:
+            review = "Settlement, exercise or assignment activity requires separate verification."
+        if closed and not available and transactions_available and not settlement_events:
             order_finances = [_transaction_money(item, transactions) for item in [opening, *applicable]]
             if all(item["status"] == "VERIFIED" for item in order_finances):
                 net = sum((item["net"] for item in order_finances), Decimal(0))
