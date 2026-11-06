@@ -2395,7 +2395,61 @@ async function syncTastytradePerformance() {
   }
 }
 
+async function loadAllBrokerExecutions() {
+  const status = document.getElementById("brokerHistoryStatus");
+  const target = document.getElementById("brokerHistoryList");
+  const button = document.getElementById("brokerHistoryRefresh");
+  if (!target || !button) return;
+  button.disabled = true;
+  if (status) status.textContent = "Loading filled broker orders...";
+  try {
+    const response = await fetch("/api/trade-journal/broker-history?days=30", {
+      credentials: "same-origin", cache: "no-store",
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "History unavailable");
+    const orders = data.orders || [];
+    if (status) status.textContent = orders.length + " filled orders. Executions are not reconciled P/L.";
+    if (!orders.length) {
+      target.textContent = "No filled orders returned for this period.";
+      return;
+    }
+    const table = document.createElement("table");
+    table.style.cssText = "width:100%;min-width:540px;text-align:left;border-collapse:collapse";
+    const header = document.createElement("tr");
+    ["Date", "Instrument / legs", "Action", "Quantity", "Fill", "Effect"].forEach(label => {
+      const cell = document.createElement("th"); cell.textContent = label; header.appendChild(cell);
+    });
+    table.appendChild(header);
+    orders.forEach(order => {
+      const legs = order.legs || [];
+      const row = document.createElement("tr");
+      const values = [
+        order.filled_at ? new Date(order.filled_at).toLocaleString() : "—",
+        legs.map(leg => leg.symbol || "Unknown").join(", "),
+        legs.map(leg => leg.action || "—").join(", "),
+        legs.map(leg => leg.quantity ?? "—").join(", "),
+        order.price ?? "—", order.price_effect || "—",
+      ];
+      values.forEach(value => {
+        const cell = document.createElement("td");
+        cell.textContent = String(value);
+        cell.style.cssText = "padding:8px;border-bottom:1px solid #334155;vertical-align:top";
+        row.appendChild(cell);
+      });
+      table.appendChild(row);
+    });
+    target.replaceChildren(table);
+  } catch (error) {
+    if (status) status.textContent = "Unable to load broker trades: " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function initializeTradeJournalPerformanceControls() {
+  const brokerHistoryButton = document.getElementById("brokerHistoryRefresh");
+  if (brokerHistoryButton) brokerHistoryButton.addEventListener("click", loadAllBrokerExecutions);
   const syncButton = document.getElementById("journalSyncButton");
   if (syncButton) syncButton.addEventListener("click", syncTastytradePerformance);
   const refreshButton =
