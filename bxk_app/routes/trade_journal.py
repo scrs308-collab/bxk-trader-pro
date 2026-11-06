@@ -199,9 +199,35 @@ def broker_trade_history(
             ],
         })
     reconciliation = reconcile_contract_fills(orders)
+    from bxk_app.services.strategy_performance_service import reconcile_strategies
+    transactions = []
+    transactions_available = False
+    transaction_notice = "Broker transaction history is unavailable."
+    if hasattr(broker, "get_transactions"):
+        try:
+            transactions = broker.get_transactions(
+                account_number=account,
+                start_date=(today - timedelta(days=days)).isoformat(),
+                end_date=today.isoformat(),
+            )
+            transactions_available = (
+                isinstance(transactions, list)
+                and not getattr(broker, "last_error", None)
+            )
+            if transactions_available:
+                transaction_notice = None
+        except (ValueError, TypeError, RuntimeError, OSError):
+            transactions = []
+    strategy_review = reconcile_strategies(
+        orders,
+        transactions if transactions_available else None,
+        transactions_available=transactions_available,
+    )
+    strategy_review["transaction_notice"] = transaction_notice
     return {
         "available": True,
         "count": len(results),
         "orders": results,
         "contract_reconciliation": reconciliation,
+        "strategy_review": strategy_review,
     }
