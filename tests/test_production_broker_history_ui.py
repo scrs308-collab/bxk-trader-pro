@@ -12,7 +12,9 @@ def test_production_dashboard_exposes_broker_history():
     assert 'id="brokerHistoryRefresh"' in dashboard
     assert 'id="brokerHistoryStatus"' in dashboard
     assert 'id="brokerHistoryList"' in dashboard
-    assert 'src="/static/dashboard.js?v=41"' in dashboard
+    assert 'id="brokerMatchedContracts"' in dashboard
+    assert 'getElementById("brokerMatchedContracts")' in script
+    assert 'src="/static/dashboard.js?v=42"' in dashboard
     assert 'getElementById("brokerHistoryRefresh")' in script
     assert 'broker-history?days=30' in script
     assert 'addEventListener("click", loadAllBrokerExecutions)' in script

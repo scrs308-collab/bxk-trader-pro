@@ -2399,9 +2399,11 @@ async function loadAllBrokerExecutions() {
   const status = document.getElementById("brokerHistoryStatus");
   const target = document.getElementById("brokerHistoryList");
   const button = document.getElementById("brokerHistoryRefresh");
+  const matchedTarget = document.getElementById("brokerMatchedContracts");
   if (!target || !button) return;
   button.disabled = true;
   if (status) status.textContent = "Loading filled broker orders...";
+  if (matchedTarget) matchedTarget.textContent = "";
   try {
     const response = await fetch("/api/trade-journal/broker-history?days=30", {
       credentials: "same-origin", cache: "no-store",
@@ -2409,39 +2411,82 @@ async function loadAllBrokerExecutions() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "History unavailable");
     const orders = data.orders || [];
-    if (status) status.textContent = orders.length + " filled orders. Executions are not reconciled P/L.";
+    if (status) status.textContent = orders.length +
+      " filled orders. Order prices are broker-reported averages when present; leg prices use actual fill details. No strategy-level P/L is inferred.";
     if (!orders.length) {
       target.textContent = "No filled orders returned for this period.";
-      return;
-    }
-    const table = document.createElement("table");
-    table.style.cssText = "width:100%;min-width:540px;text-align:left;border-collapse:collapse";
-    const header = document.createElement("tr");
-    ["Date", "Instrument / legs", "Action", "Quantity", "Fill", "Effect"].forEach(label => {
-      const cell = document.createElement("th"); cell.textContent = label; header.appendChild(cell);
-    });
-    table.appendChild(header);
-    orders.forEach(order => {
-      const legs = order.legs || [];
-      const row = document.createElement("tr");
-      const values = [
-        order.filled_at ? new Date(order.filled_at).toLocaleString() : "—",
-        legs.map(leg => leg.symbol || "Unknown").join(", "),
-        legs.map(leg => leg.action || "—").join(", "),
-        legs.map(leg => leg.quantity ?? "—").join(", "),
-        order.price ?? "—", order.price_effect || "—",
-      ];
-      values.forEach(value => {
-        const cell = document.createElement("td");
-        cell.textContent = String(value);
-        cell.style.cssText = "padding:8px;border-bottom:1px solid #334155;vertical-align:top";
-        row.appendChild(cell);
+    } else {
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;min-width:660px;text-align:left;border-collapse:collapse";
+      const header = document.createElement("tr");
+      ["Date", "Instrument / legs", "Action", "Quantity", "Leg fill prices", "Order average fill", "Effect"].forEach(label => {
+        const cell = document.createElement("th"); cell.textContent = label; header.appendChild(cell);
       });
-      table.appendChild(row);
-    });
-    target.replaceChildren(table);
+      table.appendChild(header);
+      orders.forEach(order => {
+        const legs = order.legs || [];
+        const row = document.createElement("tr");
+        const values = [
+          order.filled_at ? new Date(order.filled_at).toLocaleString() : "—",
+          legs.map(leg => leg.symbol || "Unknown").join(", "),
+          legs.map(leg => leg.action || "—").join(", "),
+          legs.map(leg => leg.quantity ?? "—").join(", "),
+          legs.map(leg => leg.fill_price ?? "—").join(", "),
+          order.price ?? "—", order.price_effect || "—",
+        ];
+        values.forEach(value => {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          cell.style.cssText = "padding:8px;border-bottom:1px solid #334155;vertical-align:top";
+          row.appendChild(cell);
+        });
+        table.appendChild(row);
+      });
+      target.replaceChildren(table);
+    }
+    const reconciliation = data.contract_reconciliation || {};
+    if (matchedTarget) {
+      const title = document.createElement("h4");
+      title.textContent = "Matched option-contract closes (gross estimates, not strategy P/L)";
+      const explanation = document.createElement("p");
+      explanation.textContent = reconciliation.disclaimer ||
+        "Only same-contract opening and closing fills are paired; fees and cash settlements are not included.";
+      const count = document.createElement("p");
+      count.textContent = (reconciliation.count || 0) + " FIFO matches; " +
+        (reconciliation.unpaired_closing_quantity || 0) + " closing contracts without matching openings; " +
+        (reconciliation.remaining_open_quantity || 0) + " contracts still unmatched on the opening side.";
+      matchedTarget.replaceChildren(title, explanation, count);
+      const matches = reconciliation.matches || [];
+      if (matches.length) {
+        const table = document.createElement("table");
+        table.style.cssText = "width:100%;min-width:750px;text-align:left;border-collapse:collapse";
+        const header = document.createElement("tr");
+        ["Closed", "Contract", "Side", "Qty", "Entry fill", "Exit fill", "Gross estimate", "Fees / net"].forEach(label => {
+          const cell = document.createElement("th"); cell.textContent = label; header.appendChild(cell);
+        });
+        table.appendChild(header);
+        matches.forEach(match => {
+          const row = document.createElement("tr");
+          const values = [
+            match.closed_at ? new Date(match.closed_at).toLocaleString() : "—",
+            match.symbol || "—", match.side || "—", match.quantity ?? "—",
+            match.entry_fill ?? "—", match.exit_fill ?? "—",
+            match.gross_estimate ?? "—", "Not calculated",
+          ];
+          values.forEach(value => {
+            const cell = document.createElement("td");
+            cell.textContent = String(value);
+            cell.style.cssText = "padding:8px;border-bottom:1px solid #334155;vertical-align:top";
+            row.appendChild(cell);
+          });
+          table.appendChild(row);
+        });
+        matchedTarget.appendChild(table);
+      }
+    }
   } catch (error) {
     if (status) status.textContent = "Unable to load broker trades: " + error.message;
+    if (matchedTarget) matchedTarget.textContent = "";
   } finally {
     button.disabled = false;
   }

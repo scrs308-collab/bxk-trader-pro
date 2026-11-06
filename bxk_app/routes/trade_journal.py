@@ -134,6 +134,9 @@ def broker_trade_history(
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
     from bxk_app.services.trade_journal_service import _order_fill_timestamp
+    from bxk_app.services.broker_performance_reconciliation import (
+        leg_weighted_price, reconcile_contract_fills,
+    )
 
     days = max(1, min(int(days), 90))
     today = datetime.now(ZoneInfo("America/New_York")).date()
@@ -178,22 +181,27 @@ def broker_trade_history(
             continue
         seen.add(order_id)
         timestamp = _order_fill_timestamp(order)
-        fill_price = order.get("average-fill-price")
-        if fill_price is None:
-            fill_price = order.get("price")
         results.append({
             "id": order_id,
             "filled_at": timestamp.isoformat() if timestamp else None,
             "status": "Filled",
-            "price": fill_price,
+            # Never present an order's limit price as an execution price.
+            "price": order.get("average-fill-price"),
             "price_effect": order.get("price-effect"),
             "legs": [
                 {
                     "symbol": leg.get("symbol"),
                     "action": leg.get("action"),
                     "quantity": leg.get("quantity"),
+                    "fill_price": leg_weighted_price(leg, order_id),
                 }
                 for leg in legs
             ],
         })
-    return {"available": True, "count": len(results), "orders": results}
+    reconciliation = reconcile_contract_fills(orders)
+    return {
+        "available": True,
+        "count": len(results),
+        "orders": results,
+        "contract_reconciliation": reconciliation,
+    }
