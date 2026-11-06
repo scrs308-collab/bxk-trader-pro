@@ -339,8 +339,9 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
             "closed_at": applicable[-1]["time"].isoformat() if applicable else (
                 settlement["closed_at"] if settlement else None
             ),
-            "quantity": opening["quantity"], "closed_quantity": closed,
-            "open_quantity": available,
+            "quantity": opening["quantity"],
+            "closed_quantity": opening["quantity"] if settlement else closed,
+            "open_quantity": 0 if settlement else available,
             "gross_estimate": _money(gross) if (closed or settlement) else None,
             "fees": _money(fees), "net_pnl": _money(net),
             "reason": review,
