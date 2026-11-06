@@ -121,7 +121,7 @@ def test_fee_mismatch_prevents_verified_net():
     row = out["records"][0]
     assert row["status"] == "GROSS_ONLY"
     assert row["net_pnl"] is None
-    assert "TRANSACTION_MISMATCH" in row["reason"]
+    assert "UNVERIFIED_FEES" in row["reason"]
 
 
 def test_fee_components_must_reconcile_to_broker_net_cash():
