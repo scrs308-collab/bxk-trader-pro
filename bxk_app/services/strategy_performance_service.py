@@ -130,6 +130,29 @@ def _transaction_money(order, transactions):
                 or quantity <= 0 or quantity != quantity.to_integral_value()
                 or gross_value is None or net_value is None):
             return {"status": "INVALID_TRANSACTION", "net": None}
+        # Net value must be independently supported by the fee fields. A
+        # missing fee entry is not evidence that the charge was zero.
+        fees = Decimal(0)
+        named_fees = 0
+        for name in (
+            "commission", "clearing-fees", "regulatory-fees",
+            "proprietary-index-option-fees", "other-charge",
+        ):
+            amount = decimal_value(row.get(name))
+            if amount is None:
+                continue
+            direction = str(row.get(name + "-effect") or "").strip().upper()
+            if amount == 0 and direction in {"", "NONE"}:
+                named_fees += 1
+                continue
+            if amount < 0 or direction not in {"DEBIT", "CREDIT"}:
+                return {"status": "INVALID_FEE_DETAIL", "net": None}
+            fees += amount * (1 if direction == "DEBIT" else -1)
+            named_fees += 1
+        if abs((gross_value - net_value) - fees) > Decimal("0.02"):
+            return {"status": "UNVERIFIED_FEES", "net": None}
+        if not named_fees and gross_value != net_value:
+            return {"status": "MISSING_FEE_DETAIL", "net": None}
         received[(symbol, action)] += int(quantity)
         gross += gross_value
         net += net_value
