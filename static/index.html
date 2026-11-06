@@ -643,6 +643,16 @@
     </div>
   </section>
 
+  <section class="card" id="brokerHistorySection">
+    <div class="journal-header-row">
+      <div><div class="card-label">All Tastytrade Executions</div>
+        <p class="journal-subtitle">Filled orders from the last 30 days. Entries and exits are shown separately; P/L is not estimated.</p></div>
+      <button id="brokerHistoryRefresh" class="journal-refresh-button" type="button">LOAD TRADES</button>
+    </div>
+    <div id="brokerHistoryStatus" role="status" aria-live="polite"></div>
+    <div id="brokerHistoryList" style="overflow-x:auto"></div>
+  </section>
+
   <section class="card stop-audit" id="stopAuditSection" aria-labelledby="stopAuditHeading">
     <div class="journal-header-row">
       <div>
