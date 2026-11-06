@@ -201,7 +201,6 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         applicable = []
         for closing in related:
             if closing["time"] <= opening["time"] or closing["quantity"] > available:
-                unmatched_closes += closing["quantity"]
                 continue
             available -= closing["quantity"]
             applicable.append(closing)
@@ -243,7 +242,7 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         })
         unmatched_closes += sum(
             c["quantity"] for c in related if c not in applicable
-        ) - sum(c["quantity"] for c in related if c["time"] <= opening["time"] or c["quantity"] > opening["quantity"])
+        )
     unmatched_closes += sum(c["quantity"] for items in closings.values() for c in items)
     rows.sort(key=lambda r: r.get("closed_at") or r.get("opened_at") or "", reverse=True)
     return {
