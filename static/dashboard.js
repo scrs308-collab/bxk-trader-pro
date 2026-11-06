@@ -2404,9 +2404,11 @@ function renderBrokerStrategyReview(payload) {
   const summary = document.createElement("p");
   summary.textContent = (data.total_candidates || 0) + " candidate structures; " +
     (data.verified_count || 0) + " broker-transaction-verified; " +
+    (data.settlement_gross_count || 0) + " gross settlement-verified (fees excluded); " +
     (data.partial_count || 0) + " partial closes; " +
     (data.ambiguous_count || 0) + " ambiguous repeated structures; " +
-    (data.unmatched_closing_contracts || 0) + " closing contracts without an identified opening order.";
+    (data.unmatched_closing_contracts || 0) + " closing contracts without an identified opening order; " +
+    (data.estimated_fee_transaction_count || 0) + " broker transactions still have estimated fees.";
   const warning = document.createElement("p");
   warning.textContent = data.warning ||
     "Unverified trades must not be used in realized performance statistics.";
