@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from datetime import date, datetime
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import (
@@ -1241,8 +1242,8 @@ def order_preview(
     wing_width: int = Query(25),
     contracts: int = Query(1, ge=1, le=10),
     target_pop: int | None = None,
-    selected_strikes: str | None = Query(None, max_length=200),
-    selected_expiration: str | None = Query(None, max_length=10),
+    selected_strikes: Annotated[str | None, Query(max_length=200)] = None,
+    selected_expiration: Annotated[str | None, Query(max_length=10)] = None,
     user_context: dict = Depends(
         require_owner_or_beta
     ),
