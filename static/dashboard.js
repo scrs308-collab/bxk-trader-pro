@@ -2356,7 +2356,48 @@ async function loadTradeJournalPerformance(
 }
 
 
+async function syncTastytradePerformance() {
+  const button = document.getElementById("journalSyncButton");
+  const status = document.getElementById("journalSyncStatus");
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  if (status) status.textContent = "Checking Tastytrade history...";
+  try {
+    const previewResponse = await fetch("/api/trade-journal/backfill?days=30&dry_run=true", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+    });
+    const preview = await previewResponse.json();
+    if (!previewResponse.ok || !preview.ok) {
+      throw new Error(preview.detail || preview.reason || "Tastytrade history unavailable");
+    }
+    const counts = preview.counts || {};
+    const eligible = ["BROKER_CLOSE_ORDER", "EXPIRED_WORTHLESS", "SPX_CASH_SETTLEMENT", "OPEN"]
+      .reduce((total, key) => total + Number(counts[key] || 0), 0);
+    if (!eligible) {
+      if (status) status.textContent = "Up to date. No new eligible SPXW iron condors in the last 30 days.";
+      await loadTradeJournalPerformance(true);
+      return;
+    }
+    if (status) status.textContent = "Importing " + eligible + " eligible trade(s)...";
+    const response = await fetch("/api/trade-journal/backfill?days=30&dry_run=false", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || result.reason || "Sync failed");
+    if (status) status.textContent = result.ok
+      ? "Synced " + Number(result.imported || 0) + " trade(s); " + Number(result.skipped || 0) + " skipped."
+      : "Partial sync: " + Number(result.imported || 0) + " imported; some trades need review.";
+    await loadTradeJournalPerformance(true);
+  } catch (error) {
+    if (status) status.textContent = "Sync failed: " + (error.message || "Unknown error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function initializeTradeJournalPerformanceControls() {
+  const syncButton = document.getElementById("journalSyncButton");
+  if (syncButton) syncButton.addEventListener("click", syncTastytradePerformance);
   const refreshButton =
     document.getElementById(
       "journalRefreshButton",
