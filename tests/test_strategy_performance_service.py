@@ -48,6 +48,7 @@ def make_transactions(order):
             "quantity": str(quantity),
             "value": str(value), "value-effect": direction,
             "net-value": str(net_value), "net-value-effect": direction,
+            "commission": "0.25", "commission-effect": "Debit",
             "is-estimated-fee": False,
         })
     return result
@@ -121,6 +122,29 @@ def test_fee_mismatch_prevents_verified_net():
     assert row["status"] == "GROSS_ONLY"
     assert row["net_pnl"] is None
     assert "TRANSACTION_MISMATCH" in row["reason"]
+
+
+def test_fee_components_must_reconcile_to_broker_net_cash():
+    op, cl = make_order("o"), make_order("c", closing=True)
+    tx = make_transactions(op) + make_transactions(cl)
+    tx[0].pop("commission")
+    tx[0].pop("commission-effect")
+    out = reconcile_strategies([op, cl], tx)
+    assert out["records"][0]["net_pnl"] is None
+    assert "UNVERIFIED_FEES" in out["records"][0]["reason"]
+
+
+def test_assignment_or_expiration_blocks_verified_net():
+    op, cl = make_order("o"), make_order("c", closing=True)
+    tx = make_transactions(op) + make_transactions(cl)
+    tx.append({
+        "transaction-type": "Receive Deliver",
+        "transaction-sub-type": "Assignment",
+        "symbol": SYMBOLS[0],
+    })
+    out = reconcile_strategies([op, cl], tx)
+    assert out["records"][0]["net_pnl"] is None
+    assert "Settlement" in out["records"][0]["reason"]
 
 
 def test_estimated_fees_prevent_verified_net():
