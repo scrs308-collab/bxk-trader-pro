@@ -534,6 +534,18 @@
     </div>
   </section>
 
+  <section class="card" id="brokerHistorySection">
+    <div class="journal-header-row">
+      <div>
+        <div class="card-label">All Tastytrade Executions</div>
+        <p class="journal-subtitle">Filled orders from the last 30 days. Entries and exits are displayed separately; these records are not reconciled round-trip P/L.</p>
+      </div>
+      <button id="brokerHistoryRefresh" class="journal-refresh-button" type="button">LOAD TRADES</button>
+    </div>
+    <div id="brokerHistoryStatus" role="status" aria-live="polite"></div>
+    <div id="brokerHistoryList" style="overflow-x:auto"></div>
+  </section>
+
   <section class="card stop-audit" id="stopAuditSection" aria-labelledby="stopAuditHeading">
     <div class="journal-header-row">
       <div>
@@ -755,7 +767,7 @@
   </section>
 </div>
 </div>
-<script type="module" src="/static/dashboard.js?v=40"></script>
+<script type="module" src="/static/dashboard.js?v=41"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
    
