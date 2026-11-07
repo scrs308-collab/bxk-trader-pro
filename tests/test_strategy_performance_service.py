@@ -221,3 +221,62 @@ def test_close_cannot_start_before_opening_order_finishes_filling():
     result = reconcile_strategies([op, cl], make_transactions(op) + make_transactions(cl))
     assert result["records"][0]["closed_quantity"] == 0
     assert result["unmatched_closing_contracts"] == 4
+
+
+def test_tastytrade_csv_estimated_fee_fallback_requires_every_fill():
+    import csv
+    import io
+    from bxk_app.services.tastytrade_transaction_csv import COLUMNS, read_transactions_csv
+
+    opening = make_order("100")
+    closing = make_order("101", closing=True)
+    transactions = make_transactions(opening) + make_transactions(closing)
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=sorted(COLUMNS))
+    writer.writeheader()
+    for tx in transactions:
+        tx["is-estimated-fee"] = True
+        order = opening if tx["order-id"] == "100" else closing
+        gross = Decimal(tx["value"]) * (-1 if tx["value-effect"] == "Debit" else 1)
+        writer.writerow({
+            "Date": order["legs"][0]["fills"][0]["filled-at"],
+            "Type": "Trade", "Action": tx["action"].upper().replace(" ", "_"),
+            "Symbol": tx["symbol"], "Instrument Type": "Equity Option",
+            "Value": f"{gross:,}", "Quantity": tx["quantity"],
+            "Commissions": "-4.00" if order is opening else "0.00", "Fees": "-2.88",
+            "Multiplier": "100", "Order #": order["id"], "Currency": "USD",
+            "Total": gross - Decimal("2.88") - (4 if order is opening else 0),
+        })
+    evidence = read_transactions_csv(output.getvalue().encode())
+    args = ([opening, closing], transactions)
+    result = reconcile_strategies(*args, csv_orders=evidence)
+    assert result["verified_count"] == 0
+    assert result["csv_reconciled_count"] == 1
+    assert result["records"][0]["status"] == "CSV_RECONCILED"
+    assert result["records"][0]["net_pnl"] == "680.96"
+    assert result["records"][0]["fees"] == "39.04"
+
+    evidence["101"].append(evidence["101"][0])
+    duplicate = reconcile_strategies(*args, csv_orders=evidence)
+    assert duplicate["records"][0]["net_pnl"] is None
+
+    evidence["101"] = evidence["101"][1:-1]
+    partial = reconcile_strategies(*args, csv_orders=evidence)
+    assert partial["records"][0]["net_pnl"] is None
+    assert "CSV evidence is incomplete" in partial["records"][0]["reason"]
+
+
+def test_transactions_csv_upload_requires_transactions_export():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(route.router)
+    app.dependency_overrides[route.require_owner_or_beta] = lambda: {"role": "OWNER"}
+    app.dependency_overrides[route.get_db] = lambda: None
+    client = TestClient(app)
+    url = "/api/trade-journal/broker-history/transactions-csv"
+    response = client.post(url, content="Symbol,Status,Price\nSPX,Filled,2.40 cr\n",
+                           headers={"Content-Type": "text/csv"})
+    assert response.status_code == 422
+    assert "Transactions CSV with commissions and fees" in response.json()["detail"]

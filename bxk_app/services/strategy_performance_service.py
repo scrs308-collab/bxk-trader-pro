@@ -5,7 +5,7 @@ closing legs and complete broker transaction cash flows for every order.
 Ambiguous/repeated strategies, rolls, unsupported settlement activity, and
 historical opening trades are never assigned fabricated realized P/L.
 """
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from types import SimpleNamespace
@@ -108,6 +108,7 @@ def _order_record(order):
         parsed.append({
             "symbol": symbol, "side": side, "action": action,
             "quantity": int(quantity), "gross": cash if action.startswith("SELL") else -cash,
+            "fills": fills,
             "expiry": match.group(2),
             "root": match.group(1), "type": match.group(3),
             "strike": int(match.group(4)), "sell": action.startswith("SELL"),
@@ -180,6 +181,47 @@ def _transaction_money(order, transactions):
         "status": "VERIFIED", "gross": gross, "net": net,
         "fees": gross - net,
     }
+
+
+def _csv_order_money(order, rows):
+    if not rows or any(row is None for row in rows):
+        return None
+    expected = Counter(
+        (leg["symbol"], leg["action"], fill["timestamp"].replace(microsecond=0),
+         fill["quantity"], fill["price"] * fill["quantity"] * MULTIPLIER * (1 if leg["sell"] else -1))
+        for leg in order["legs"] for fill in leg["fills"]
+    )
+    actual = Counter(
+        (_option_symbol(row["symbol"]), row["action"], row["time"].replace(microsecond=0),
+         row["quantity"], row["gross"])
+        for row in rows
+    )
+    if actual != expected:
+        return None
+    return sum((row["net"] for row in rows), Decimal(0))
+
+
+def _csv_strategy_net(orders, finances, csv_orders, transactions):
+    if any(item["status"] not in {"VERIFIED", "ESTIMATED_FEES"} for item in finances):
+        return None
+    order_ids = {order["id"] for order in orders}
+    trade_ids = {
+        str(row["id"]) for row in transactions if isinstance(row, dict)
+        and str(row.get("order-id")) in order_ids and row.get("id") is not None
+    }
+    if any(
+        isinstance(row, dict) and row.get("reverses-id") is not None
+        and (str(row["reverses-id"]) in trade_ids or str(row.get("order-id")) in order_ids)
+        for row in transactions
+    ):
+        return None
+    values = [_csv_order_money(order, csv_orders.get(order["id"])) for order in orders]
+    if any(
+        value is None or (item["net"] is not None and value != item["net"])
+        for item, value in zip(finances, values)
+    ):
+        return None
+    return sum(values, Decimal(0))
 
 
 def _strategy_label(order):
@@ -284,9 +326,10 @@ def _settlement_candidate(opening, transactions, other_openings):
     }
 
 
-def reconcile_strategies(orders, transactions=None, *, transactions_available=True, limit=100):
+def reconcile_strategies(orders, transactions=None, *, transactions_available=True, limit=100, csv_orders=None):
     """Return conservative candidate strategy pairs and unsupported/unmatched counts."""
     transactions = transactions if isinstance(transactions, list) else []
+    csv_orders = csv_orders or {}
     seen_orders = set()
     parsed = []
     unsupported = 0
@@ -387,7 +430,8 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         if overlaps:
             review = "Another opening shares the same contracts and sides; trade linkage requires review."
         if closed and not available and not overlaps and transactions_available and not settlement_events:
-            order_finances = [_transaction_money(item, transactions) for item in [opening, *applicable]]
+            matched_orders = [opening, *applicable]
+            order_finances = [_transaction_money(item, transactions) for item in matched_orders]
             if all(item["status"] == "VERIFIED" for item in order_finances):
                 net = sum((item["net"] for item in order_finances), Decimal(0))
                 gross = sum((item["gross"] for item in order_finances), Decimal(0))
@@ -396,6 +440,16 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
                 review = "Net order cash flows verified against broker trade transactions; independent assignments or settlement outside these orders not included."
             else:
                 review = "Missing or unmatched broker transaction evidence: " + ", ".join(item["status"] for item in order_finances)
+                if any(order["id"] in csv_orders for order in matched_orders):
+                    csv_net = _csv_strategy_net(matched_orders, order_finances, csv_orders, transactions)
+                    if csv_net is None:
+                        review += ". CSV evidence is incomplete or differs from broker records."
+                    else:
+                        gross = sum((order["gross_total"] for order in matched_orders), Decimal(0))
+                        net = csv_net
+                        fees = gross - net
+                        status = "CSV_RECONCILED"
+                        review = "All fills and charges reconcile against the uploaded Tastytrade Transactions CSV."
         rows.append({
             "status": status, "strategy": _strategy_label(opening),
             "opening_orders": [opening["id"]],
@@ -417,10 +471,12 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
     unmatched_closes += sum(c["quantity"] for items in closings.values() for c in items)
     rows.sort(key=lambda r: r.get("closed_at") or r.get("opened_at") or "", reverse=True)
     verified = [Decimal(row["net_pnl"]) for row in rows if row["net_pnl"] is not None]
+    csv_reconciled = sum(row["status"] == "CSV_RECONCILED" for row in rows)
     return {
         "records": rows[:limit],
         "total_candidates": len(rows),
-        "verified_count": len(verified),
+        "verified_count": len(verified) - csv_reconciled,
+        "csv_reconciled_count": csv_reconciled,
         "settlement_gross_count": sum(
             r["status"] in {
                 "CASH_SETTLEMENT_GROSS_VERIFIED",

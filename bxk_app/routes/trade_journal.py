@@ -2,8 +2,10 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
 )
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from bxk_app.authorization import (
     require_owner_or_beta,
@@ -127,6 +129,33 @@ def broker_trade_history(
     user_context: dict = Depends(require_owner_or_beta),
     session: Session = Depends(get_db),
 ):
+    return _broker_trade_history(days, user_context, session)
+
+
+@router.post("/broker-history/transactions-csv")
+async def broker_trade_history_csv(
+    request: Request,
+    days: int = 30,
+    user_context: dict = Depends(require_owner_or_beta),
+    session: Session = Depends(get_db),
+):
+    from bxk_app.services.tastytrade_transaction_csv import MAX_CSV_BYTES, read_transactions_csv
+
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "text/csv":
+        raise HTTPException(status_code=415, detail="Upload a Tastytrade Transactions CSV.")
+    data = bytearray()
+    async for chunk in request.stream():
+        if len(data) + len(chunk) > MAX_CSV_BYTES:
+            raise HTTPException(status_code=413, detail="The Transactions CSV exceeds 2 MB.")
+        data.extend(chunk)
+    try:
+        csv_orders = read_transactions_csv(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return await run_in_threadpool(_broker_trade_history, days, user_context, session, csv_orders)
+
+
+def _broker_trade_history(days, user_context, session, csv_orders=None):
     """Read-only filled broker orders across supported instruments.
 
     These are execution records, not reconciled round-trip P/L.
@@ -222,6 +251,7 @@ def broker_trade_history(
         orders,
         transactions if transactions_available else None,
         transactions_available=transactions_available,
+        csv_orders=csv_orders,
     )
     strategy_review["transaction_notice"] = transaction_notice
     return {

@@ -2404,6 +2404,7 @@ function renderBrokerStrategyReview(payload) {
   const summary = document.createElement("p");
   summary.textContent = (data.total_candidates || 0) + " candidate structures; " +
     (data.verified_count || 0) + " broker-transaction-verified; " +
+    (data.csv_reconciled_count || 0) + " reconciled from Tastytrade CSV; " +
     (data.settlement_gross_count || 0) + " settlements with verified gross cash flow; " +
     (data.partial_count || 0) + " partial closes; " +
     (data.ambiguous_count || 0) + " ambiguous repeated structures; " +
@@ -2446,7 +2447,8 @@ function renderBrokerStrategyReview(payload) {
     const tr = document.createElement("tr");
     const isVerified = item.net_pnl != null;
     const values = [
-      isVerified ? "Transaction verified" : item.status || "Review required",
+      item.status === "CSV_RECONCILED" ? "Reconciled from Tastytrade CSV" :
+        isVerified ? "Transaction verified" : item.status || "Review required",
       item.strategy || "—",
       item.opened_at ? new Date(item.opened_at).toLocaleString() : "—",
       item.closed_at ? new Date(item.closed_at).toLocaleString() : "—",
@@ -2467,19 +2469,27 @@ function renderBrokerStrategyReview(payload) {
   target.appendChild(table);
 }
 
-async function loadAllBrokerExecutions() {
+async function loadAllBrokerExecutions(csvFile = null) {
   const status = document.getElementById("brokerHistoryStatus");
   const target = document.getElementById("brokerHistoryList");
   const button = document.getElementById("brokerHistoryRefresh");
   const matchedTarget = document.getElementById("brokerMatchedContracts");
-  if (!target || !button) return;
+  const importButton = document.getElementById("brokerTransactionsReconcile");
+  if (!target || !button || button.disabled) return;
   button.disabled = true;
+  if (importButton) importButton.disabled = true;
   if (status) status.textContent = "Loading filled broker orders...";
   if (matchedTarget) matchedTarget.textContent = "";
   try {
-    const response = await fetch("/api/trade-journal/broker-history?days=30", {
-      credentials: "same-origin", cache: "no-store",
-    });
+    const fromCsv = csvFile instanceof File;
+    const url = "/api/trade-journal/broker-history" + (fromCsv ? "/transactions-csv" : "") + "?days=30";
+    const options = { credentials: "same-origin", cache: "no-store" };
+    if (fromCsv) {
+      options.method = "POST";
+      options.headers = { "Content-Type": "text/csv" };
+      options.body = csvFile;
+    }
+    const response = await fetch(url, options);
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "History unavailable");
     const orders = data.orders || [];
@@ -2564,12 +2574,19 @@ async function loadAllBrokerExecutions() {
     if (strategyTarget) strategyTarget.textContent = "";
   } finally {
     button.disabled = false;
+    if (importButton) importButton.disabled = false;
   }
 }
 
 function initializeTradeJournalPerformanceControls() {
   const brokerHistoryButton = document.getElementById("brokerHistoryRefresh");
   if (brokerHistoryButton) brokerHistoryButton.addEventListener("click", loadAllBrokerExecutions);
+  const csvButton = document.getElementById("brokerTransactionsReconcile");
+  if (csvButton) csvButton.addEventListener("click", () => {
+    const file = document.getElementById("brokerTransactionsCsv")?.files?.[0];
+    if (file) loadAllBrokerExecutions(file);
+    else document.getElementById("brokerHistoryStatus").textContent = "Choose a Tastytrade Transactions CSV first.";
+  });
   const syncButton = document.getElementById("journalSyncButton");
   if (syncButton) syncButton.addEventListener("click", syncTastytradePerformance);
   const refreshButton =
