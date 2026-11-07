@@ -269,6 +269,9 @@ def reconcile_strategies(orders, transactions=None, *, transactions_available=Tr
         # Never choose an arbitrary opening when the exact same strategy
         # was traded more than once in the period.
         if len(group) != 1:
+            # Repeated openings cannot be allocated safely, but their
+            # closing quantities must still appear in unmatched diagnostics.
+            unmatched_closes += sum(c["quantity"] for c in related)
             rows.append({
                 "status": "AMBIGUOUS_REPEAT", "strategy": _strategy_label(group[0]),
                 "opening_orders": [r["id"] for r in group],

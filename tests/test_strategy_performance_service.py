@@ -180,3 +180,15 @@ def test_duplicate_order_ids_and_no_invented_expiration_settlement():
     assert out["total_candidates"] == 1
     assert out["records"][0]["status"] == "OPEN_OR_MISSING_CLOSE"
     assert out["records"][0]["net_pnl"] is None
+
+
+def test_repeated_structure_closes_count_as_unmatched():
+    orders = [
+        make_order("a"),
+        make_order("b", at="2026-11-06T14:05:00Z"),
+        make_order("c", closing=True, qty=2),
+    ]
+    out = reconcile_strategies(orders)
+    assert out["ambiguous_count"] == 1
+    assert out["unmatched_closing_contracts"] == 2
+    assert out["records"][0]["net_pnl"] is None
