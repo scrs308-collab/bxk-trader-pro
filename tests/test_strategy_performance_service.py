@@ -180,3 +180,44 @@ def test_duplicate_order_ids_and_no_invented_expiration_settlement():
     assert out["total_candidates"] == 1
     assert out["records"][0]["status"] == "OPEN_OR_MISSING_CLOSE"
     assert out["records"][0]["net_pnl"] is None
+
+
+def test_repeated_structure_closes_count_as_unmatched():
+    orders = [
+        make_order("a"),
+        make_order("b", at="2026-11-06T14:05:00Z"),
+        make_order("c", closing=True, qty=2),
+    ]
+    out = reconcile_strategies(orders)
+    assert out["ambiguous_count"] == 1
+    assert out["unmatched_closing_contracts"] == 2
+    assert out["records"][0]["net_pnl"] is None
+
+
+def test_normalizes_occ_padding_and_ignores_identical_ledger_duplicates():
+    op, cl = make_order("o"), make_order("c", closing=True)
+    tx = make_transactions(op) + make_transactions(cl)
+    for row in tx:
+        row["symbol"] = row["symbol"].replace(" ", "")
+    result = reconcile_strategies([op, cl], tx + tx)
+    assert result["records"][0]["net_pnl"] == "718.00"
+    assert result["verified_net_subtotal"] == "718.00"
+
+
+def test_offsetting_leg_mismatches_cannot_verify_an_order():
+    op, cl = make_order("o"), make_order("c", closing=True)
+    tx = make_transactions(op) + make_transactions(cl)
+    for row in tx[:2]:
+        for key in ("value", "net-value"):
+            row[key] = str(Decimal(row[key]) + 1)
+    row = reconcile_strategies([op, cl], tx)["records"][0]
+    assert row["net_pnl"] is None
+    assert "TRANSACTION_MISMATCH" in row["reason"]
+
+
+def test_close_cannot_start_before_opening_order_finishes_filling():
+    op, cl = make_order("o"), make_order("c", closing=True)
+    op["legs"][-1]["fills"][0]["filled-at"] = "2026-11-06T18:00:00Z"
+    result = reconcile_strategies([op, cl], make_transactions(op) + make_transactions(cl))
+    assert result["records"][0]["closed_quantity"] == 0
+    assert result["unmatched_closing_contracts"] == 4

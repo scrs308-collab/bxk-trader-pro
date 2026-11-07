@@ -2404,7 +2404,7 @@ function renderBrokerStrategyReview(payload) {
   const summary = document.createElement("p");
   summary.textContent = (data.total_candidates || 0) + " candidate structures; " +
     (data.verified_count || 0) + " broker-transaction-verified; " +
-    (data.settlement_gross_count || 0) + " gross settlement-verified (fees excluded); " +
+    (data.settlement_gross_count || 0) + " settlements with verified gross cash flow; " +
     (data.partial_count || 0) + " partial closes; " +
     (data.ambiguous_count || 0) + " ambiguous repeated structures; " +
     (data.unmatched_closing_contracts || 0) + " closing contracts without an identified opening order; " +
@@ -2413,6 +2413,12 @@ function renderBrokerStrategyReview(payload) {
   warning.textContent = data.warning ||
     "Unverified trades must not be used in realized performance statistics.";
   target.replaceChildren(heading, summary, warning);
+  if (data.verified_net_subtotal != null) {
+    const subtotal = document.createElement("p");
+    subtotal.textContent = "Verified net P/L subtotal (verified trades only): " +
+      journalCurrency(data.verified_net_subtotal);
+    target.appendChild(subtotal);
+  }
   if (data.transaction_notice) {
     const note = document.createElement("p");
     note.textContent = data.transaction_notice + " Gross estimates are not net P/L.";
@@ -2438,7 +2444,7 @@ function renderBrokerStrategyReview(payload) {
   table.appendChild(header);
   rows.forEach(item => {
     const tr = document.createElement("tr");
-    const isVerified = item.status === "TRANSACTION_VERIFIED";
+    const isVerified = item.net_pnl != null;
     const values = [
       isVerified ? "Transaction verified" : item.status || "Review required",
       item.strategy || "—",

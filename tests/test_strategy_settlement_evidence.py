@@ -132,3 +132,31 @@ def test_settlement_unavailable_never_fabricates_gross():
     result = reconcile_strategies([entry()], transactions_available=False)
     assert result["settlement_gross_count"] == 0
     assert result["records"][0]["gross_estimate"] is None
+
+
+def test_terminal_net_requires_finalized_entry_and_all_four_terminal_transactions():
+    from test_strategy_performance_service import make_transactions
+
+    opening = entry()
+    rows = make_transactions(opening)
+    terminal = [
+        expiration(SYMBOLS[0]), expiration(SYMBOLS[1]),
+        cash(SYMBOLS[2], "Debit", 2000), cash(SYMBOLS[3], "Credit", 1000),
+    ]
+    for row in terminal:
+        row.update({
+            "is-estimated-fee": False, "net-value": row["value"],
+            "net-value-effect": row["value-effect"],
+        })
+    terminal[2].update({
+        "net-value": "2000.50", "other-charge": "0.50", "other-charge-effect": "Debit",
+    })
+    result = reconcile_strategies([opening], rows + terminal)
+    assert result["records"][0]["net_pnl"] == "-41.50"
+    assert result["records"][0]["fees"] == "1.50"
+    assert result["verified_net_subtotal"] == "-41.50"
+
+    terminal[2]["is-estimated-fee"] = True
+    result = reconcile_strategies([opening], rows + terminal)
+    assert result["records"][0]["net_pnl"] is None
+    assert result["records"][0]["gross_estimate"] == "-40.00"
