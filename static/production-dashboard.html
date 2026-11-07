@@ -541,6 +541,10 @@
         <p class="journal-subtitle">Filled orders from the last 30 days. Entries and exits are displayed separately; these records are not reconciled round-trip P/L.</p>
       </div>
       <button id="brokerHistoryRefresh" class="journal-refresh-button" type="button">LOAD TRADES</button>
+      <label for="brokerTransactionsCsv">Tastytrade Transactions CSV</label>
+      <input id="brokerTransactionsCsv" type="file" accept=".csv,text/csv">
+      <button id="brokerTransactionsReconcile" class="journal-refresh-button" type="button">RECONCILE CSV</button>
+      <p>CSV results apply to this review. Reloading trades clears the CSV results.</p>
     </div>
     <div id="brokerHistoryStatus" role="status" aria-live="polite"></div>
     <div id="brokerHistoryList" style="overflow-x:auto"></div>
@@ -769,7 +773,7 @@
   </section>
 </div>
 </div>
-<script type="module" src="/static/dashboard.js?v=45"></script>
+<script type="module" src="/static/dashboard.js?v=46"></script>
 <script type="module" src="/static/buying-power-reserve.js?v=2"></script>
      
    
