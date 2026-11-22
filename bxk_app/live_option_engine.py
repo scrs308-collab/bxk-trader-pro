@@ -1,9 +1,12 @@
 import asyncio
 import time
+import logging
 from decimal import Decimal
 
 from tastytrade import Session, DXLinkStreamer
 from tastytrade.dxfeed import Greeks, Quote
+
+logger = logging.getLogger(__name__)
 
 from bxk_app.config import (
     TASTYTRADE_CLIENT_SECRET,
@@ -300,9 +303,7 @@ def get_live_market_data(symbols: list[str]) -> dict:
             loop.close()
 
     except Exception as error:
-        print(
-            f"LIVE MARKET DATA ERROR: {error}"
-        )
+        logger.exception("LIVE MARKET DATA ERROR: DXLink option quote/Greeks fetch failed")
         return {}
 
 
