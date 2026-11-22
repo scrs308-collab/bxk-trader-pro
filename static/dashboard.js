@@ -1489,7 +1489,7 @@ async function fetchLiveMarketSummary() {
       const summary = document.getElementById("marketSummary");
       if (summary) {
         summary.textContent =
-          "Market data unavailable. Last quotes may be stale; trading signals are disabled.";
+          "Market data unavailable. Quotes may be stale. Do not use this screen for trade entry.";
       }
     } else {
       renderUniversalObservationCard({
