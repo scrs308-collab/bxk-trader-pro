@@ -205,9 +205,20 @@ async function fetchOvernightRisk() {
 }
 
 
+// Bound broker-backed requests so a stalled stream cannot freeze the dashboard.
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchRecommendation() {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${API_URL}?_=${Date.now()}`,
       {
         cache: "no-store",
@@ -1333,7 +1344,7 @@ async function fetchLiveMarketSummary() {
       underlying === "SPX" ||
       underlying === "QQQ"
     ) {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `/api/live-market?underlying=${
           encodeURIComponent(
             underlying,
@@ -1444,7 +1455,7 @@ async function fetchLiveMarketSummary() {
         _: Date.now().toString(),
       });
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `/api/underlying-analysis?${
         params.toString()
       }`,
@@ -1474,9 +1485,13 @@ async function fetchLiveMarketSummary() {
       error,
     );
 
-    if (
-      underlying !== "SPX"
-    ) {
+    if (underlying === "SPX") {
+      const summary = document.getElementById("marketSummary");
+      if (summary) {
+        summary.textContent =
+          "Market data unavailable. Quotes may be stale. Do not use this screen for trade entry.";
+      }
+    } else {
       renderUniversalObservationCard({
         symbol: underlying,
         reason_code:
